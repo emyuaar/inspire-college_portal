@@ -50,6 +50,7 @@
                                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
                                    value="{{ $user->first_name }}"
                                    disabled>
+                            <input type="hidden" name="first_name" value="{{ $user->first_name }}">
                         </div>
 
                         <div>
@@ -58,6 +59,7 @@
                                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
                                    value="{{ $user->middle_name }}"
                                    disabled>
+                            <input type="hidden" name="middle_name" value="{{ $user->middle_name }}">
                         </div>
 
                         <div>
@@ -66,6 +68,7 @@
                                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
                                    value="{{ $user->sur_name }}"
                                    disabled>
+                            <input type="hidden" name="sur_name" value="{{ $user->sur_name }}">
                         </div>
 
                         <div>
