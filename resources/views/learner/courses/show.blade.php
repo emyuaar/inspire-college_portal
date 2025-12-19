@@ -105,28 +105,60 @@
                                                         {{ $lesson->title }}
                                                     </p>
                                                 </div>
-                                                @if($lesson->content)
+                                                @if(!blank($lesson->content))
+                                                    @php
+                                                        // 1) strip tags
+                                                        $plain = strip_tags($lesson->content);
+
+                                                        // 2) decode entities: &nbsp; &amp; etc
+                                                        $plain = html_entity_decode($plain, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                                                        // 3) replace non-breaking spaces (NBSP) with normal spaces
+                                                        $plain = str_replace("\xC2\xA0", ' ', $plain);
+
+                                                        // 4) clean extra spaces
+                                                        $plain = preg_replace('/\s+/', ' ', trim($plain));
+                                                    @endphp
+
                                                     <p class="text-xs text-slate-600 mt-0.5 line-clamp-2">
-                                                        {{ \Illuminate\Support\Str::limit(strip_tags($lesson->content), 120) }}
+                                                        {{ \Illuminate\Support\Str::limit($plain, 120) }}
                                                     </p>
                                                 @endif
 
+                                                @php
+                                                    $hasContent = !blank($lesson->content); // content exists => actual lesson page
+                                                    $file = $lesson->file_path;
+                                                    $isUrl = $file && \Illuminate\Support\Str::startsWith($file, ['http://','https://']);
+                                                @endphp
+
                                                 <div class="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                                                    @if($lesson->file_path)
-                                                        <a href="{{ asset('storage/'.$lesson->file_path) }}"
-                                                           target="_blank"
-                                                           class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                                                            📂 Download file
+
+                                                    {{-- ✅ View lesson ONLY when content exists --}}
+                                                    @if($hasContent)
+                                                        <a href="{{ route('portal.learner.lessons.show', $lesson->id) }}"
+                                                        class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                            👁️ View lesson
                                                         </a>
                                                     @endif
 
-                                                    @if($lesson->video_url)
+                                                    {{-- File link (SharePoint / local) --}}
+                                                    @if(!blank($file))
+                                                        <a href="{{ $isUrl ? $file : asset('storage/'.$file) }}"
+                                                        target="_blank"
+                                                        class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                            📂 View file
+                                                        </a>
+                                                    @endif
+
+                                                    {{-- External link/video --}}
+                                                    @if(!blank($lesson->video_url))
                                                         <a href="{{ $lesson->video_url }}"
-                                                           target="_blank"
-                                                           class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                        target="_blank"
+                                                        class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
                                                             🔗 Open link / video
                                                         </a>
                                                     @endif
+
                                                 </div>
                                             </div>
                                             <span class="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
@@ -188,10 +220,10 @@
                                                                 You submitted a file on
                                                                 {{ $submission->created_at->format('d M Y, H:i') }}
                                                             </span>
-                                                            <a href="{{ $submission->sharepoint_url }}"
-                                                            target="_blank"
-                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                                                                📂 View your submission ({{ $submission->file_name }})
+                                                            <a href="{{ route('portal.learner.submission.view', $submission->id) }}"
+                                                                target="_blank"
+                                                                class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                    📂 Download your submission ({{ $submission->file_name }})
                                                             </a>
                                                         </div>
                                                         <span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">

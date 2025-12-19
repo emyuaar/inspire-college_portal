@@ -107,7 +107,8 @@ class SharePointService
             ? "root:/{$fileName}:/content"
             : "root:/{$folderPath}/{$fileName}:/content";
 
-        $res = Http::withToken($this->token())
+        $res = Http::timeout(300)
+            ->withToken($this->token())
             ->withBody(file_get_contents($absoluteFilePath), 'application/octet-stream')
             ->put("https://graph.microsoft.com/v1.0/drives/{$driveId}/{$graphPath}");
 
@@ -118,11 +119,102 @@ class SharePointService
         return $res->json(); // contains webUrl, id, parentReference, etc.
     }
 
+    public function uploadLargeFile(string $folderPath, string $fileName, string $absoluteFilePath): array
+    {
+        $driveId = $this->driveId();
+        $folderPath = trim($folderPath, '/');
+
+        // 1) Create upload session
+        $graphPath = $folderPath === ''
+            ? "root:/{$fileName}:/createUploadSession"
+            : "root:/{$folderPath}/{$fileName}:/createUploadSession";
+
+        $sessionRes = Http::timeout(300)
+            ->withToken($this->token())
+            ->post("https://graph.microsoft.com/v1.0/drives/{$driveId}/{$graphPath}", [
+                'item' => [
+                    '@microsoft.graph.conflictBehavior' => 'replace',
+                    'name' => $fileName,
+                ],
+            ]);
+
+        if (!$sessionRes->successful()) {
+            throw new \Exception('Create upload session failed: ' . $sessionRes->body());
+        }
+
+        $uploadUrl = $sessionRes->json()['uploadUrl'] ?? null;
+        if (!$uploadUrl) {
+            throw new \Exception('UploadUrl missing from session response.');
+        }
+
+        // 2) Upload in chunks
+        $fileSize  = filesize($absoluteFilePath);
+        $handle    = fopen($absoluteFilePath, 'rb');
+
+        // 5MB chunk (Graph friendly)
+        $chunkSize = 5 * 1024 * 1024;
+        $start     = 0;
+
+        while (!feof($handle)) {
+            $data = fread($handle, $chunkSize);
+            $end  = $start + strlen($data) - 1;
+
+            $chunkRes = Http::timeout(120)
+                ->withHeaders([
+                    'Content-Length' => (string) strlen($data),
+                    'Content-Range'  => "bytes {$start}-{$end}/{$fileSize}",
+                ])
+                ->withBody($data, 'application/octet-stream')
+                ->put($uploadUrl);
+
+            // 202 = chunk accepted (more to come)
+            // 201/200 = upload complete with file metadata
+            if (in_array($chunkRes->status(), [200, 201], true)) {
+                fclose($handle);
+                return $chunkRes->json();
+            }
+
+            if ($chunkRes->status() !== 202) {
+                fclose($handle);
+                throw new \Exception('Chunk upload failed: ' . $chunkRes->status() . ' ' . $chunkRes->body());
+            }
+
+            $start = $end + 1;
+        }
+
+        fclose($handle);
+        throw new \Exception('Upload did not complete (unexpected EOF).');
+    }
+
     public function safeName(string $name): string
     {
         $name = Str::of($name)->replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], ' ');
         $name = Str::of($name)->squish()->trim();
         $name = Str::of($name)->replace(' ', '_');
         return (string) $name;
+    }
+
+    public function streamByItemId(string $itemId, string $downloadName = 'file')
+    {
+        $driveId = $this->driveId();
+
+        $url = "https://graph.microsoft.com/v1.0/drives/{$driveId}/items/{$itemId}/content";
+
+        $res = Http::timeout(300)
+            ->withToken($this->token())
+            ->withOptions(['stream' => true])
+            ->get($url);
+
+        if (!$res->successful()) {
+            throw new \Exception('Unable to fetch file from SharePoint: ' . $res->body());
+        }
+
+        $contentType = $res->header('Content-Type') ?? 'application/octet-stream';
+
+        return response()->streamDownload(function () use ($res) {
+            echo $res->body();
+        }, $downloadName, [
+            'Content-Type' => $contentType,
+        ]);
     }
 }

@@ -69,4 +69,10 @@ Route::middleware('auth')->group(function () {
     // assignment submission
     Route::post('/learner/assignment/{assignment}/submit', [LearnerCourseController::class, 'submitAssignment'])
         ->name('portal.learner.assignment.submit');
+
+    Route::get('/learner/submissions/{submission}/view', [LearnerCourseController::class, 'viewSubmission'])
+        ->name('portal.learner.submission.view');
+    
+    Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
+        ->name('portal.learner.lessons.show');
 });

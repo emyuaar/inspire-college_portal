@@ -43,42 +43,61 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | DEFAULT: PORTAL (LMS) DATABASE
+        |--------------------------------------------------------------------------
+        */
         'mysql_portal' => [
             'driver' => 'mysql',
-            'host' => env('DB_HOST','127.0.0.1'),
-            'port' => env('DB_PORT',3306),
-            'database' => env('DB_DATABASE','directskills_portal'),
-            'username' => env('DB_USERNAME','root'),
-            'password' => env('DB_PASSWORD',''),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', 3306),
+            'database' => env('DB_DATABASE', 'directskillsco_portal'),
+            'username' => env('DB_USERNAME', 'directskillsco_portal'),
+            'password' => env('DB_PASSWORD', '=1Z3cfh4^Y]Xsnb3'),
+            'unix_socket' => env('DB_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
+            'engine' => null,
         ],
 
-        // CRM
+        /*
+        |--------------------------------------------------------------------------
+        | CRM DATABASE
+        |--------------------------------------------------------------------------
+        */
         'mysql_crm' => [
             'driver' => 'mysql',
-            'host' => env('DB_CRM_HOST','127.0.0.1'),
-            'port' => env('DB_CRM_PORT',3306),
-            'database' => env('DB_CRM_DATABASE','directskills_crm'),
-            'username' => env('DB_CRM_USERNAME','root'),
-            'password' => env('DB_CRM_PASSWORD',''),
+            'host' => env('DB_CRM_HOST', '127.0.0.1'),
+            'port' => env('DB_CRM_PORT', 3306),
+            'database' => env('DB_CRM_DATABASE', 'directskillsco_crm'),
+            'username' => env('DB_CRM_USERNAME', 'directskillsco_crm'),
+            'password' => env('DB_CRM_PASSWORD', '=C1A)kpTJXvhZ;ylm'),
+            'unix_socket' => env('DB_CRM_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
+            'engine' => null,
         ],
 
-        // WEBSITE (optional)
+        /*
+        |--------------------------------------------------------------------------
+        | WEBSITE DATABASE
+        |--------------------------------------------------------------------------
+        */
         'mysql_website' => [
             'driver' => 'mysql',
-            'host' => env('DB_WEBSITE_HOST','127.0.0.1'),
-            'port' => env('DB_WEBSITE_PORT',3306),
-            'database' => env('DB_WEBSITE_DATABASE','direct_skills'),
-            'username' => env('DB_WEBSITE_USERNAME','root'),
-            'password' => env('DB_WEBSITE_PASSWORD',''),
+            'host' => env('DB_WEBSITE_HOST', '127.0.0.1'),
+            'port' => env('DB_WEBSITE_PORT', 3306),
+            'database' => env('DB_WEBSITE_DATABASE', 'directskillsco_website'),
+            'username' => env('DB_WEBSITE_USERNAME', 'directskillsco_website'),
+            'password' => env('DB_WEBSITE_PASSWORD', 'jBkx)=)K}u9T,4q-'),
+            'unix_socket' => env('DB_WEBSITE_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
+            'engine' => null,
         ],
 
         'mariadb' => [

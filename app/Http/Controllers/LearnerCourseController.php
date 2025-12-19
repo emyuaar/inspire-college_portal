@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Crm\Enrolment;
 use App\Models\CourseModule;
+use App\Models\Lesson;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Services\SharePointService;
@@ -106,7 +107,13 @@ class LearnerCourseController extends Controller
         $path4 = $sp->ensureFolder($path3, $assFolder);
 
         // upload to SharePoint
-        $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
+        $size = $file->getSize(); // bytes
+
+        if ($size <= 3.5 * 1024 * 1024) {
+            $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
+        } else {
+            $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+        }
 
         // DB save (NO file_path)
         AssignmentSubmission::create([
@@ -121,5 +128,71 @@ class LearnerCourseController extends Controller
         ]);
 
         return back()->with('success', 'Your assignment file has been submitted (uploaded to SharePoint).');
+    }
+
+    public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        // Security: learner sirf apni file dekh sakta hai
+        if ((int)$submission->learner_id !== (int)$user->id) {
+            abort(403);
+        }
+
+        // If you ever store local files too (optional)
+        // if ($submission->file_path) return response()->file(storage_path('app/public/'.$submission->file_path));
+
+        // SharePoint streaming (no Microsoft login for learner)
+        if (!$submission->sharepoint_item_id) {
+            return back()->with('error', 'File not found on SharePoint.');
+        }
+
+        // Stream / download from SharePoint using APP token
+        return $sp->streamByItemId($submission->sharepoint_item_id, $submission->file_name ?? 'submission');
+    }
+
+    public function viewLesson(Lesson $lesson)
+    {
+        $user = Auth::user();
+
+        // module + course id
+        $module = CourseModule::findOrFail($lesson->module_id);
+
+        // CRM enrolment check (approved only)
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if ((int) $enrolment->status_id !== 2) {
+            return redirect()
+                ->route('portal.learner.dashboard')
+                ->with('error', 'Your enrolment is not approved yet.');
+        }
+
+        // published only
+        if (!(int)$lesson->is_published) {
+            abort(404);
+        }
+
+        // optional: previous/next lesson (same module)
+        $prev = Lesson::where('module_id', $lesson->module_id)
+            ->where('is_published', 1)
+            ->where('sort_order', '<', $lesson->sort_order)
+            ->orderBy('sort_order', 'desc')
+            ->first();
+
+        $next = Lesson::where('module_id', $lesson->module_id)
+            ->where('is_published', 1)
+            ->where('sort_order', '>', $lesson->sort_order)
+            ->orderBy('sort_order', 'asc')
+            ->first();
+
+        return view('learner.lessons.show', [
+            'lesson'   => $lesson,
+            'module'   => $module,
+            'enrolment'=> $enrolment,
+            'prev'     => $prev,
+            'next'     => $next,
+        ]);
     }
 }
