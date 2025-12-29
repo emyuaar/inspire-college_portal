@@ -63,16 +63,40 @@ Route::middleware('auth')->group(function () {
     Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
         ->name('portal.learner.course.show');
 
-    Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
-        ->name('portal.learner.course.show');
-
     // assignment submission
     Route::post('/learner/assignment/{assignment}/submit', [LearnerCourseController::class, 'submitAssignment'])
         ->name('portal.learner.assignment.submit');
 
-    Route::get('/learner/submissions/{submission}/view', [LearnerCourseController::class, 'viewSubmission'])
+    // Route::get('/learner/submissions/{submission}/view', [LearnerCourseController::class, 'viewSubmission'])
+    //     ->name('portal.learner.submission.view');
+    
+    Route::get('/learner/submissions/{submission}/download', [LearnerCourseController::class, 'viewSubmission'])
         ->name('portal.learner.submission.view');
+
+    Route::get('/learner/submissions/{submission}/inline', [LearnerCourseController::class, 'viewSubmission'])
+        ->name('portal.learner.submission.inline');
+
+    Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
+        ->name('portal.learner.submission.direct');
     
     Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
         ->name('portal.learner.lessons.show');
+
+    // Lesson file (SharePoint proxy)
+    Route::get('/learner/lessons/{lesson}/file/download', [LearnerCourseController::class, 'downloadLessonFile'])
+        ->name('portal.learner.lesson.file.download');
+
+    Route::get('/learner/lessons/{lesson}/file/inline', [LearnerCourseController::class, 'downloadLessonFile'])
+        ->name('portal.learner.lesson.file.inline');
+
+    // Assignment brief file (SharePoint proxy)
+    // NOTE: $brief here is an AssignmentFile (or whatever model your $assignment->files uses)
+    Route::get('/learner/assignment-brief/{brief}/download', [LearnerCourseController::class, 'downloadAssignmentBrief'])
+        ->name('portal.learner.assignment.brief.download');
+
+    Route::get('/learner/assignment-brief/{brief}/inline', [LearnerCourseController::class, 'downloadAssignmentBrief'])
+        ->name('portal.learner.assignment.brief.inline');
+    
+    Route::get('/learner/assignment-brief/{brief}/local', [LearnerCourseController::class, 'downloadAssignmentBriefLocal'])
+        ->name('portal.learner.assignment.brief.local');
 });

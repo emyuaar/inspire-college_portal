@@ -194,7 +194,7 @@ class SharePointService
         return (string) $name;
     }
 
-    public function streamByItemId(string $itemId, string $downloadName = 'file')
+    public function streamByItemId(string $itemId, string $downloadName = 'file', bool $inline = false)
     {
         $driveId = $this->driveId();
 
@@ -206,15 +206,46 @@ class SharePointService
             ->get($url);
 
         if (!$res->successful()) {
-            throw new \Exception('Unable to fetch file from SharePoint: ' . $res->body());
+            throw new \Exception('Unable to fetch file from SharePoint: ' . $res->status() . ' ' . $res->body());
         }
 
-        $contentType = $res->header('Content-Type') ?? 'application/octet-stream';
+        $psr  = $res->toPsrResponse();
+        $body = $psr->getBody();
 
-        return response()->streamDownload(function () use ($res) {
-            echo $res->body();
+        $contentType = $res->header('Content-Type') ?? 'application/octet-stream';
+        $disposition = $inline ? 'inline' : 'attachment';
+
+        return response()->streamDownload(function () use ($body) {
+            while (!$body->eof()) {
+                echo $body->read(1024 * 64); // 64KB chunks
+                if (function_exists('flush')) flush();
+            }
         }, $downloadName, [
-            'Content-Type' => $contentType,
+            'Content-Type'        => $contentType,
+            'Content-Disposition' => $disposition . '; filename="' . addslashes($downloadName) . '"',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+    public function temporaryDownloadUrlByItemId(string $itemId): string
+    {
+        $driveId = $this->driveId();
+
+        // Graph returns @microsoft.graph.downloadUrl on item
+        $res = Http::withToken($this->token())
+            ->get("https://graph.microsoft.com/v1.0/drives/{$driveId}/items/{$itemId}", [
+                '$select' => 'id,name,@microsoft.graph.downloadUrl',
+            ]);
+
+        if (!$res->successful()) {
+            throw new \Exception('Unable to get downloadUrl: ' . $res->status() . ' ' . $res->body());
+        }
+
+        $url = $res->json()['@microsoft.graph.downloadUrl'] ?? null;
+
+        if (!$url) {
+            throw new \Exception('downloadUrl missing from Graph response.');
+        }
+
+        return $url;
     }
 }

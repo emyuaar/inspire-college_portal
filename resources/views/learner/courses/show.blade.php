@@ -143,11 +143,39 @@
 
                                                     {{-- File link (SharePoint / local) --}}
                                                     @if(!blank($file))
-                                                        <a href="{{ $isUrl ? $file : asset('storage/'.$file) }}"
-                                                        target="_blank"
-                                                        class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                                                            📂 View file
-                                                        </a>
+                                                        @php
+                                                            // If already an external URL (YouTube etc) keep it as is
+                                                            $isUrl = \Illuminate\Support\Str::startsWith($file, ['http://','https://']);
+
+                                                            // If your DB stores sharepoint item id or url separately, adjust here.
+                                                            // Assumption: lesson has sharepoint_item_id OR sharepoint_url.
+                                                            $hasSpItem = !blank($lesson->sharepoint_item_id ?? null);
+                                                            $hasSpUrl  = !blank($lesson->sharepoint_url ?? null);
+                                                        @endphp
+
+                                                        @if($isUrl)
+                                                            <a href="{{ $file }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                📂 View file
+                                                            </a>
+                                                        @elseif($hasSpItem)
+                                                            <a href="{{ route('portal.learner.lesson.file.download', $lesson->id) }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                📂 Download file
+                                                            </a>
+
+                                                            <a href="{{ route('portal.learner.lesson.file.inline', $lesson->id) }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                👁️ View online
+                                                            </a>
+                                                        @elseif($hasSpUrl)
+                                                            <a href="{{ $lesson->sharepoint_url }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                📂 View file
+                                                            </a>
+                                                        @else
+                                                            <span class="text-[11px] text-slate-400">File link not available.</span>
+                                                        @endif
                                                     @endif
 
                                                     {{-- External link/video --}}
@@ -197,9 +225,9 @@
 
                                                     <div class="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-600">
                                                         @if($brief)
-                                                            <a href="{{ asset('storage/'.$brief->file_path) }}"
-                                                               target="_blank"
-                                                               class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                            <a href="{{ route('portal.learner.assignment.brief.local', $brief->id) }}"
+                                                            target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
                                                                 📥 Download assignment brief ({{ $brief->file_name }})
                                                             </a>
                                                         @endif
@@ -215,16 +243,21 @@
                                             <div class="mt-2 border-t border-amber-100 pt-2">
                                                 @if($submission)
                                                     <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                                        <div class="flex flex-col gap-1">
-                                                            <span>
-                                                                You submitted a file on
-                                                                {{ $submission->created_at->format('d M Y, H:i') }}
-                                                            </span>
-                                                            <a href="{{ route('portal.learner.submission.view', $submission->id) }}"
-                                                                target="_blank"
-                                                                class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                                                                    📂 Download your submission ({{ $submission->file_name }})
+                                                        <div class="mt-1 flex flex-wrap gap-2">
+                                                            <a href="{{ route('portal.learner.submission.view', $submission->id) }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                📂 Download your submission
                                                             </a>
+
+                                                            {{-- <a href="{{ route('portal.learner.submission.inline', $submission->id) }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                👁️ View online
+                                                            </a>
+
+                                                            <a href="{{ route('portal.learner.submission.direct', $submission->id) }}" target="_blank"
+                                                            class="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                                                                🔗 Direct link
+                                                            </a> --}}
                                                         </div>
                                                         <span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                                             {{ ucfirst($submission->status ?? 'submitted') }}

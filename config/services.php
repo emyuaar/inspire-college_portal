@@ -46,4 +46,8 @@ return [
         'site_path'     => env('SP_SITE_PATH'),
         'library_name'  => env('SP_LIBRARY_NAME', 'Submissions'),
     ],
+
+    'crm' => [
+        'storage_root' => env('CRM_STORAGE_ROOT'),
+    ],
 ];

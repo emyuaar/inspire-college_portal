@@ -8,6 +8,7 @@ use App\Models\Crm\Enrolment;
 use App\Models\CourseModule;
 use App\Models\Lesson;
 use App\Models\Assignment;
+use App\Models\AssignmentFile;
 use App\Models\AssignmentSubmission;
 use App\Services\SharePointService;
 
@@ -134,21 +135,39 @@ class LearnerCourseController extends Controller
     {
         $user = Auth::user();
 
-        // Security: learner sirf apni file dekh sakta hai
         if ((int)$submission->learner_id !== (int)$user->id) {
             abort(403);
         }
 
-        // If you ever store local files too (optional)
-        // if ($submission->file_path) return response()->file(storage_path('app/public/'.$submission->file_path));
-
-        // SharePoint streaming (no Microsoft login for learner)
         if (!$submission->sharepoint_item_id) {
             return back()->with('error', 'File not found on SharePoint.');
         }
 
-        // Stream / download from SharePoint using APP token
-        return $sp->streamByItemId($submission->sharepoint_item_id, $submission->file_name ?? 'submission');
+        // inline if route is "inline" OR query inline=1
+        $inline = request()->routeIs('portal.learner.submission.inline') || request()->boolean('inline', false);
+
+        return $sp->streamByItemId(
+            $submission->sharepoint_item_id,
+            $submission->file_name ?? 'submission',
+            $inline
+        );
+    }
+
+    public function submissionDirectLink(AssignmentSubmission $submission, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        if ((int)$submission->learner_id !== (int)$user->id) {
+            abort(403);
+        }
+
+        if (!$submission->sharepoint_item_id) {
+            return back()->with('error', 'File not found on SharePoint.');
+        }
+
+        $url = $sp->temporaryDownloadUrlByItemId($submission->sharepoint_item_id);
+
+        return redirect()->away($url);
     }
 
     public function viewLesson(Lesson $lesson)
@@ -194,5 +213,101 @@ class LearnerCourseController extends Controller
             'prev'     => $prev,
             'next'     => $next,
         ]);
+    }
+
+    public function downloadLessonFile(Lesson $lesson, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        // learner enrolment check for this lesson's course (approved only)
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if ((int)$enrolment->status_id !== 2) {
+            abort(403);
+        }
+
+        if (blank($lesson->sharepoint_item_id)) {
+            return back()->with('error', 'Lesson file not available on SharePoint.');
+        }
+
+        $inline = request()->routeIs('portal.learner.lesson.file.inline');
+
+        $name = $lesson->file_name ?? $lesson->title . '.pdf'; // adjust if you store
+        return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline);
+    }
+
+    public function downloadAssignmentBrief(AssignmentFile $brief, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        // Security: brief belongs to assignment -> course_id, so ensure learner enrolled & approved
+        $assignment = $brief->assignment; // ensure relation exists in model
+        if (!$assignment) abort(404);
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $assignment->course_id)
+            ->firstOrFail();
+
+        if ((int)$enrolment->status_id !== 2) {
+            abort(403);
+        }
+
+        if (blank($brief->sharepoint_item_id)) {
+            return back()->with('error', 'Brief not available on SharePoint.');
+        }
+
+        $inline = request()->routeIs('portal.learner.assignment.brief.inline');
+        return $sp->streamByItemId($brief->sharepoint_item_id, $brief->file_name ?? 'brief', $inline);
+    }
+
+    public function downloadAssignmentBriefLocal(AssignmentFile $brief)
+    {
+        $user = Auth::user();
+
+        $assignment = $brief->assignment; // ensure relation exists
+        if (!$assignment) {
+            abort(404);
+        }
+
+        // Approved enrolment check
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $assignment->course_id)
+            ->firstOrFail();
+
+        if ((int)$enrolment->status_id !== 2) {
+            abort(403);
+        }
+
+        $crmRoot = config('services.crm.storage_root');
+        if (!$crmRoot) {
+            abort(500, 'CRM storage path not configured.');
+        }
+
+        // DB me usually "assignments/briefs/xxx.docx" hota hai
+        $relative = ltrim((string) $brief->file_path, '/\\');
+
+        // Safe join + normalize (path traversal protection)
+        $crmRootReal = realpath($crmRoot);
+        if (!$crmRootReal) {
+            abort(500, 'CRM storage path invalid.');
+        }
+
+        $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relative);
+
+        $fullReal = realpath($fullPath);
+        if (!$fullReal || !is_file($fullReal)) {
+            abort(404, 'Brief file not found.');
+        }
+
+        // extra safety: ensure file is inside crm storage root
+        if (strpos($fullReal, $crmRootReal) !== 0) {
+            abort(403);
+        }
+
+        $downloadName = $brief->file_name ?: basename($fullReal);
+
+        return response()->download($fullReal, $downloadName);
     }
 }
