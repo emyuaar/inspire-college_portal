@@ -242,8 +242,7 @@ class LearnerCourseController extends Controller
     {
         $user = Auth::user();
 
-        // Security: brief belongs to assignment -> course_id, so ensure learner enrolled & approved
-        $assignment = $brief->assignment; // ensure relation exists in model
+        $assignment = $brief->assignment;
         if (!$assignment) abort(404);
 
         $enrolment = Enrolment::where('learner_id', $user->id)
