@@ -436,7 +436,7 @@
                                             @endif
                                         </p>
                                         <p class="text-[11px] ds-muted mt-0.5">
-                                            Enrolment ID: DS{{ $enrolment->id }}
+                                            Enrolment ID: <b>DS{{ $user->id }}</b>
                                         </p>
                                     </div>
 
