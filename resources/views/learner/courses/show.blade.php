@@ -414,7 +414,7 @@
                     {{-- Contact Support RIGHT --}}
                     <div class="course-header-actions">
                         <a href="{{ route('portal.learner.courses.all') }}" class="ds-btn-primary">
-                            Contact Support
+                            All Courses
                         </a>
                     </div>
                 </div>
