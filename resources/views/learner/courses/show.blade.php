@@ -516,7 +516,7 @@
                     <div class="ds-card h-full overflow-hidden">
                         <div class="ds-h">
                             <p class="text-sm font-semibold ds-title-navy">Course Navigation</p>
-                            <p class="text-[11px] text-slate-600 mt-0.5">Units on left, content on right</p>
+                            <p class="text-[11px] text-slate-600 mt-0.5">Click on the Units to access the content on the right.</p>
                         </div>
 
                         <div class="ds-sidebar-scroll ds-nav space-y-3">
