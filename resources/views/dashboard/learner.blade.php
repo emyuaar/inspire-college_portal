@@ -213,7 +213,7 @@
 
                         <div class="mt-3 flex flex-wrap gap-2">
                             <span class="ds-pill">
-                                Student ID: <b>DS{{ $user->id }}</b>
+                                DirectSkills Student Number (SID): <b>DS{{ $user->id }}</b>
                             </span>
                             <span class="ds-pill" style="max-width: 100%; overflow:hidden;">
                                 <span class="truncate">Email: <b>{{ $user->email_address }}</b></span>
@@ -303,7 +303,7 @@
                             </div>
 
                             <div class="flex justify-between gap-4">
-                                <dt class="text-slate-500">Student ID:</dt>
+                                <dt class="text-slate-500">DirectSkills Student Number (SID):</dt>
                                 <dd class="font-semibold text-right ds-title">DS{{ $user->id }}</dd>
                             </div>
                         </dl>
@@ -436,7 +436,7 @@
                                             @endif
                                         </p>
                                         <p class="text-[11px] ds-muted mt-0.5">
-                                            Enrolment ID: <b>DS{{ $user->id }}</b>
+                                            DirectSkills Student Number (SID): <b>DS{{ $user->id }}</b>
                                         </p>
                                     </div>
 
