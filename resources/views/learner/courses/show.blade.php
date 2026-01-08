@@ -720,16 +720,22 @@
                                                         <div class="px-4 py-3 border-b flex items-center justify-between gap-3 ds-assignment-head">
                                                             <div class="flex items-start gap-3 min-w-0">
                                                                 <div class="h-9 w-9 rounded-xl flex items-center justify-center font-bold ds-soft ds-assignment-ico">📝</div>
-                                                                <a href="{{ route('portal.learner.assignment.brief.local', $brief->id) }}"
+                                                                @if($brief)
+                                                                    <a href="{{ $brief->file_path }}" target="_blank"
                                                                     class="text-sm font-semibold ds-title-navy hover:underline hover:text-[var(--ds-pink)]">
                                                                         {{ $assignment->title }}
-                                                                </a>
+                                                                    </a>
+                                                                @else
+                                                                    <span class="text-sm font-semibold ds-title-navy">
+                                                                        {{ $assignment->title }}
+                                                                    </span>
+                                                                @endif
                                                             </div>
 
                                                             @if($brief)
-                                                                <a href="{{ route('portal.learner.assignment.brief.local', $brief->id) }}" target="_blank"
-                                                                   class="ds-action-outline">
-                                                                    Download brief
+                                                                <a href="{{ $brief->file_path }}" target="_blank"
+                                                                class="ds-action-outline">
+                                                                    Open brief
                                                                 </a>
                                                             @endif
                                                         </div>
