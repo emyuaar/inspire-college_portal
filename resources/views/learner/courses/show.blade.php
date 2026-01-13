@@ -450,7 +450,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
         font-size: 12px;
         font-weight: 800;
     }
-    
+
     /* Make mobile app-like typography */
     .ds-card{
         border-radius: 18px;
@@ -555,7 +555,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
     display:block;
     color: var(--ds-navy);
     text-decoration: none;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.25rem;
   }
   .ds-row .ds-row-title:active,
