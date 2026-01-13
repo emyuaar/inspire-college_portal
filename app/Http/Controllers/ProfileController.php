@@ -11,6 +11,8 @@ use App\Models\Crm\UserDetail;
 use App\Models\Crm\LearnerDocument;
 use App\Models\Crm\LearnerOnboardingStatus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
@@ -177,23 +179,43 @@ class ProfileController extends Controller
             ->with('success', 'Disability information saved.');
     }
 
-    protected function storeDocuments(Request $request, int $learnerId, string $category, string $fieldName): void
+    private function storeDocuments(Request $request, int $learnerId, string $category, string $inputName): void
     {
-        if (!$request->hasFile($fieldName)) {
+        // multiple upload: identity_documents[] etc
+        if (!$request->hasFile($inputName)) {
             return;
         }
 
-        foreach ($request->file($fieldName) as $file) {
-            if (!$file) continue;
+        $files = $request->file($inputName);
 
-            // files will be stored in portal's "public" disk; DB row goes to CRM
-            $path = $file->store('documents', 'public');
+        // sometimes Laravel returns single file instead of array
+        if (!is_array($files)) {
+            $files = [$files];
+        }
 
-            LearnerDocument::create([
+        foreach ($files as $file) {
+            if (!$file || !$file->isValid()) {
+                continue;
+            }
+
+            // storage path
+            $dir = "learner_documents/{$learnerId}/{$category}";
+
+            // clean unique filename
+            $ext = strtolower($file->getClientOriginalExtension());
+            $safeName = Str::uuid()->toString() . '.' . $ext;
+
+            // store in public disk (storage/app/public/...)
+            $path = $file->storeAs($dir, $safeName, 'public');
+
+            // DB save (update model/table fields as per your schema)
+            \App\Models\Crm\LearnerDocument::create([
                 'learner_id' => $learnerId,
-                'category'   => $category,
+                'category'   => $category,       // identity / education / experience
                 'title'      => $file->getClientOriginalName(),
-                'file_path'  => $path,
+                'file_path'  => $path,           // e.g. learner_documents/12/identity/uuid.pdf
+                'mime'       => $file->getClientMimeType(),
+                'size'       => $file->getSize(),
             ]);
         }
     }
