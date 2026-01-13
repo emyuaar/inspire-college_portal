@@ -22,60 +22,112 @@
             background: #f8fafc;
         }
 
-        /* Shell same as LMS */
+        /* Shell */
         .ds-shell{
             width: 100%;
             max-width: 1100px;
             margin: 0 auto;
-            padding: 18px 14px;
+            padding: 20px 14px;
+        }
+        @media (min-width:1024px){
+            .ds-shell{ padding: 26px 0; }
         }
 
         /* Card system */
         .ds-card{
             background:#fff;
             border:1px solid var(--ds-border2);
-            border-radius:16px;
+            border-radius:18px;
             box-shadow: var(--ds-shadow);
+            overflow: hidden; /* ✅ header radius works */
         }
+
+        /* Header / Tab strip (ONLY) */
         .ds-h{
             padding: 14px 16px;
-            border-bottom:1px solid var(--ds-border2);
-            background: rgba(1,52,91,.04); /* subtle brand tint */
+            background: #00345b;
+            color: #fff;
+            border-bottom: 1px solid rgba(255,255,255,.12);
         }
-        .ds-b{ padding:14px 16px; }
+
+        /* Only inside header */
+        .ds-h .ds-title,
+        .ds-h h1, .ds-h h2, .ds-h h3,
+        .ds-h p, .ds-h span{
+            color: #fff !important;
+        }
+        .ds-h .ds-muted{
+            color: rgba(255,255,255,.78) !important;
+        }
+
+        /* Header icon */
+        .ds-h .ds-icon{
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            font-weight: 800;
+            font-size: 12px;
+            background: rgba(255,255,255,.16) !important;
+            border: 1px solid rgba(255,255,255,.22) !important;
+            color: #fff !important;
+        }
+
+        /* Header button */
+        .ds-h .ds-btn-outline{
+            background: rgba(255,255,255,.12) !important;
+            border-color: rgba(255,255,255,.22) !important;
+            color: #fff !important;
+        }
+        .ds-h .ds-btn-outline:hover{
+            background: rgba(255,255,255,.18) !important;
+        }
+        .ds-h .ds-btn-outline svg{ color:#fff !important; }
+
+        /* Body */
+        .ds-b{ padding: 16px; }
+        @media (min-width:768px){
+            .ds-b{ padding: 18px; }
+        }
 
         .ds-title{ color: var(--ds-navy); }
         .ds-muted{ color: rgba(71,85,105,1); }
 
-        /* Pills / badges */
+        /* Pills */
         .ds-pill{
             display:inline-flex;
             align-items:center;
             gap:8px;
-            padding: 6px 12px;
+            padding: 7px 12px;
             border-radius:999px;
             font-size: 12px;
-            border:1px solid var(--ds-border2);
-            background:#fff;
+            border:1px solid rgba(15,23,42,.10);
+            background: linear-gradient(180deg,#fff, rgba(1,52,91,.02));
             color: var(--ds-navy);
-            box-shadow: inset 0 0 0 1px rgba(15,23,42,.04);
+            box-shadow: inset 0 0 0 1px rgba(15,23,42,.03);
         }
+        .ds-pill b{ font-weight: 700; }
 
+        /* Badges */
         .ds-badge{
             display:inline-flex;
             align-items:center;
-            padding: 5px 10px;
+            padding: 6px 12px;
             border-radius:999px;
             font-size: 11px;
-            font-weight: 600;
-            border:1px solid var(--ds-border2);
+            font-weight: 700;
+            letter-spacing: .2px;
+            border:1px solid rgba(15,23,42,.12);
             background:#fff;
-            color: var(--ds-navy);
         }
+
+        /* Approved badge: NAVY style (like screenshot) */
         .ds-badge-approved{
-            background: rgba(1,52,91,.08);
-            border-color: rgba(1,52,91,.18);
-            color: var(--ds-navy);
+            background: rgba(1,52,91,.12);
+            border-color: rgba(1,52,91,.22);
+            color: #00345b;
         }
         .ds-badge-pending{
             background: rgba(169,26,106,.10);
@@ -98,9 +150,9 @@
             display:inline-flex;
             align-items:center;
             justify-content:center;
-            padding: 10px 18px;
+            padding: 10px 16px;
             border-radius: 999px;
-            font-weight: 700;
+            font-weight: 800;
             font-size: 13px;
             color:#fff;
             background: var(--ds-pink);
@@ -108,6 +160,7 @@
             box-shadow: 0 10px 20px rgba(169,26,106,.22);
             transition: .15s ease;
             white-space: nowrap;
+            text-decoration:none;
         }
         .ds-btn-primary:hover{
             filter: brightness(.98);
@@ -118,15 +171,17 @@
             display:inline-flex;
             align-items:center;
             justify-content:center;
-            padding: 8px 14px;
+            gap:8px;
+            padding: 8px 12px;
             border-radius: 999px;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 12px;
             color: var(--ds-navy);
             background: rgba(1,52,91,.04);
             border: 1px solid rgba(1,52,91,.18);
             transition: .15s ease;
             white-space: nowrap;
+            text-decoration:none;
         }
         .ds-btn-outline:hover{
             background: rgba(1,52,91,.08);
@@ -135,7 +190,7 @@
         /* Links */
         .ds-link{
             color: var(--ds-navy);
-            font-weight: 600;
+            font-weight: 700;
             text-decoration: none;
         }
         .ds-link:hover{
@@ -143,28 +198,66 @@
             text-decoration: underline;
         }
 
-        /* Section icons */
-        .ds-icon{
-            height: 34px;
-            width: 34px;
-            border-radius: 999px;
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            font-weight: 800;
-            border:1px solid var(--ds-border2);
-            background: rgba(1,52,91,.06);
-            color: var(--ds-navy);
-        }
-        .ds-icon-pink{
-            background: rgba(169,26,106,.08);
-            color: var(--ds-pink);
-            border-color: rgba(169,26,106,.16);
-        }
-
-        /* Row separators */
+        /* Divider */
         .ds-divider > * + *{
             border-top: 1px solid rgba(15,23,42,.06);
+        }
+
+        /* Welcome heading */
+        .ds-welcome-name{
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--ds-navy);
+            line-height: 1.2;
+        }
+
+        /* Requirements rows */
+        .ds-req-row{
+            padding: 12px 0;
+            display:flex;
+            gap: 14px;
+            align-items:flex-start;
+            justify-content: space-between;
+        }
+        .ds-req-left{ min-width:0; }
+        .ds-req-left .t{
+            font-weight: 700;
+            color: var(--ds-navy);
+        }
+        .ds-req-left .d{
+            font-size: 11px;
+            color: rgba(71,85,105,1);
+            margin-top: 2px;
+        }
+        .ds-req-right{
+            text-align:right;
+            flex-shrink:0;
+        }
+
+        /* Courses rows */
+        .ds-course-row{
+            padding: 14px 0;
+            display:flex;
+            align-items:flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .ds-course-title{
+            font-weight: 900;
+            color: var(--ds-navy);
+        }
+        .ds-course-sub{
+            font-size: 11px;
+            color: rgba(71,85,105,1);
+            margin-top: 2px;
+        }
+        .ds-course-actions{
+            text-align:right;
+            display:flex;
+            flex-direction:column;
+            align-items:flex-end;
+            gap: 6px;
+            flex-shrink: 0;
         }
 
         /* Microsoft 365 strip */
@@ -179,17 +272,11 @@
             border:1px solid var(--ds-border2);
             box-shadow: inset 0 0 0 1px rgba(15,23,42,.03);
         }
-
         .ds-m365-pill img{
             height: 24px;
             width: auto;
             max-width: 100%;
             object-fit: contain;
-        }
-
-        /* Responsive */
-        @media (min-width: 1024px){
-            .ds-shell{ padding: 20px 0; }
         }
     </style>
 
@@ -200,13 +287,14 @@
             <div class="ds-b">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div class="min-w-0">
-                        <p class="text-[11px] font-bold tracking-wide uppercase mb-1"
-                           style="color: var(--ds-pink);">
+                        <p class="text-[11px] font-bold tracking-wide uppercase mb-1" style="color: var(--ds-pink);">
                             Welcome
                         </p>
-                        <h1 class="text-xl font-bold ds-title leading-tight">
-                            {{ $user->first_name }} {{ $user->sur_name }}
+
+                        <h1 class="ds-welcome-name">
+                            {{ $user->first_name }} {{$user->middle_name}} {{ $user->sur_name }}
                         </h1>
+
                         <p class="text-[13px] ds-muted mt-1">
                             Check your profile, complete required forms, and access your enrolled courses.
                         </p>
@@ -220,13 +308,6 @@
                             </span>
                         </div>
                     </div>
-
-                    {{-- Right side CTA (optional) --}}
-                    {{-- <div class="flex items-center gap-2 sm:justify-end">
-                        <a href="{{ route('portal.learner.courses.all') }}" class="ds-btn-primary">
-                            View Courses
-                        </a>
-                    </div> --}}
                 </div>
             </div>
         </section>
@@ -246,13 +327,19 @@
                         </div>
 
                         <div class="flex flex-wrap gap-2 sm:justify-end">
-                            <a href="{{ route('portal.profile.personal') }}" class="ds-btn-outline" style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
+                            <a href="{{ route('portal.profile.personal') }}"
+                               class="ds-btn-outline"
+                               style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
                                 Refill Personal
                             </a>
-                            <a href="{{ route('portal.profile.rpl') }}" class="ds-btn-outline" style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
+                            <a href="{{ route('portal.profile.rpl') }}"
+                               class="ds-btn-outline"
+                               style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
                                 Refill RPL
                             </a>
-                            <a href="{{ route('portal.profile.disability') }}" class="ds-btn-outline" style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
+                            <a href="{{ route('portal.profile.disability') }}"
+                               class="ds-btn-outline"
+                               style="border-color: rgba(225,29,72,.22); color: rgb(190,18,60); background: rgba(225,29,72,.06);">
                                 Refill Disability
                             </a>
                         </div>
@@ -315,26 +402,26 @@
                     <div class="ds-h">
                         <div class="flex items-start justify-between gap-3">
                             <h2 class="text-base font-bold ds-title flex items-center gap-2">
-                                <span class="ds-icon ds-icon-pink">✔</span>
+                                <span class="ds-icon">✔</span>
                                 Requirements
                             </h2>
-                            <p class="text-[11px] ds-muted mt-0.5">
+                            <p class="text-[11px]" style="color: rgba(255,255,255,.75);">
                                 Complete these steps to start your learning.
                             </p>
                         </div>
                     </div>
 
                     <div class="ds-b">
-                        <div class="space-y-3 text-[13px]">
+                        <div class="ds-divider text-[13px]">
 
                             {{-- Personal --}}
-                            <div class="flex items-start justify-between gap-3 py-2">
-                                <div class="min-w-0">
-                                    <p class="font-semibold ds-title">Personal Information</p>
-                                    <p class="text-[11px] ds-muted">Basic details and contact information.</p>
+                            <div class="ds-req-row">
+                                <div class="ds-req-left">
+                                    <p class="t">Personal Information</p>
+                                    <p class="d">Basic details and contact information.</p>
                                 </div>
 
-                                <div class="text-right shrink-0">
+                                <div class="ds-req-right">
                                     @if ($personalCompleted)
                                         <span class="ds-badge ds-badge-approved">Completed</span>
                                     @else
@@ -346,16 +433,14 @@
                                 </div>
                             </div>
 
-                            <div style="border-top:1px solid rgba(15,23,42,.06)"></div>
-
                             {{-- RPL --}}
-                            <div class="flex items-start justify-between gap-3 py-2">
-                                <div class="min-w-0">
-                                    <p class="font-semibold ds-title">RPL Information</p>
-                                    <p class="text-[11px] ds-muted">Recognition of prior learning and experience.</p>
+                            <div class="ds-req-row">
+                                <div class="ds-req-left">
+                                    <p class="t">RPL Information</p>
+                                    <p class="d">Recognition of prior learning and experience.</p>
                                 </div>
 
-                                <div class="text-right shrink-0">
+                                <div class="ds-req-right">
                                     @if ($rplCompleted)
                                         <span class="ds-badge ds-badge-approved">Completed</span>
                                     @else
@@ -367,16 +452,14 @@
                                 </div>
                             </div>
 
-                            <div style="border-top:1px solid rgba(15,23,42,.06)"></div>
-
                             {{-- Disability --}}
-                            <div class="flex items-start justify-between gap-3 py-2">
-                                <div class="min-w-0">
-                                    <p class="font-semibold ds-title">Disability Information</p>
-                                    <p class="text-[11px] ds-muted">Support needs and reasonable adjustments.</p>
+                            <div class="ds-req-row">
+                                <div class="ds-req-left">
+                                    <p class="t">Disability Information</p>
+                                    <p class="d">Support needs and reasonable adjustments.</p>
                                 </div>
 
-                                <div class="text-right shrink-0">
+                                <div class="ds-req-right">
                                     @if ($disabilityCompleted)
                                         <span class="ds-badge ds-badge-approved">Completed</span>
                                     @else
@@ -403,7 +486,7 @@
                         </h2>
 
                         @if ($enrolments->count())
-                            <span class="text-[11px] ds-muted">
+                            <span class="text-[11px]" style="color: rgba(255,255,255,.75);">
                                 Showing {{ min(5, $enrolments->count()) }} of {{ $enrolments->count() }}
                             </span>
                         @endif
@@ -424,9 +507,9 @@
                                     $denied   = (int)$enrolment->status_id === 3;
                                 @endphp
 
-                                <div class="py-3 flex items-start justify-between gap-3">
+                                <div class="ds-course-row">
                                     <div class="min-w-0">
-                                        <p class="font-semibold ds-title">
+                                        <p class="ds-course-title">
                                             @if ($approved && $course)
                                                 <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="ds-link">
                                                     {{ $course->title }}
@@ -435,12 +518,13 @@
                                                 {{ $course?->title ?? 'Course #' . $enrolment->id }}
                                             @endif
                                         </p>
-                                        <p class="text-[11px] ds-muted mt-0.5">
+
+                                        <p class="ds-course-sub">
                                             DirectSkills Student Number (SID): <b>DS{{ $user->id }}</b>
                                         </p>
                                     </div>
 
-                                    <div class="shrink-0 text-right flex flex-col items-end gap-1">
+                                    <div class="ds-course-actions">
                                         @if ($approved)
                                             <span class="ds-badge ds-badge-approved">Approved</span>
                                             <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="text-[11px] ds-link">
@@ -448,7 +532,7 @@
                                             </a>
                                         @elseif ($denied)
                                             <span class="ds-badge ds-badge-denied">Denied - Refill Required</span>
-                                            <a href="{{ route('portal.settings.profile') }}" class="text-[11px]" style="color: rgb(190,18,60); font-weight:600; text-decoration: underline;">
+                                            <a href="{{ route('portal.settings.profile') }}" class="text-[11px]" style="color: rgb(190,18,60); font-weight:700; text-decoration: underline;">
                                                 Update your details
                                             </a>
                                         @else
@@ -474,17 +558,14 @@
                     @endif
                 </div>
             </section>
-
         </div>
+
         {{-- MICROSOFT 365 ACCESS --}}
         <section class="ds-card">
             <div class="ds-b">
-                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-
-                    {{-- Left info --}}
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="min-w-0">
-                        <p class="text-[11px] font-bold tracking-wide uppercase mb-1"
-                        style="color: var(--ds-navy);">
+                        <p class="text-[11px] font-bold tracking-wide uppercase mb-1" style="color: var(--ds-navy);">
                             Microsoft 365 Access
                         </p>
 
@@ -502,9 +583,7 @@
                         </div>
                     </div>
 
-                    {{-- Right icons --}}
                     <div class="flex flex-wrap items-center gap-3 shrink-0" style="margin-left: auto;">
-
                         <div class="ds-m365-pill">
                             <a href="https://www.office.com" target="_blank" title="Microsoft 365">
                                 <img src="https://www.microsoft.com/favicon.ico" alt="Microsoft 365">
@@ -540,11 +619,11 @@
                                 <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQychPQjxHP_T53JXZDtA3L5BHAu_REHa92NQ&s" alt="Microsoft Teams">
                             </a>
                         </div>
-
                     </div>
                 </div>
             </div>
         </section>
+
     </div>
 </div>
 @endsection

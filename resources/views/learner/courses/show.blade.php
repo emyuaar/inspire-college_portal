@@ -247,9 +247,23 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
     transition: .15s ease;
     margin-bottom: 10px;
 }
-.ds-unitwrap.is-active{ border-color: rgba(169,26,106,.22); }
+.ds-unitwrap.is-active{ border-color: #a91a6a !important; }
 .ds-unitwrap.is-active.is-open {
     margin-bottom: 10px;
+}
+.ds-unitwrap.is-active .ds-unitbtn{
+    background: #01345b !important;     /* pink bg */
+}
+.ds-unitwrap.is-active .ds-unitbtn p,
+.ds-unitwrap.is-active .ds-unitbtn .ds-meta{
+    color: #ffffff !important;          /* white text */
+}
+
+.ds-unitwrap.is-active .ds-unitbtn svg{
+    color: #ffffff !important;
+}
+.ds-unitwrap.is-active .ds-unitbtn:hover{
+    background: #012a4a !important;
 }
 /* Unit header lives inside wrap */
 .ds-unitwrap .ds-unitbtn{
@@ -399,8 +413,44 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
     .ds-mobile-units{ display:block !important; }
 
     /* hide desktop top row if you use appbar */
-    .ds-toprow{ display:none !important; }
+    .ds-m-topbar{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        padding: 10px 12px;
+        border: 1px solid var(--ds-border2);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 10px 22px rgba(2,6,23,0.06);
+    }
 
+    .ds-m-back{
+        display:inline-flex;
+        align-items:center;
+        gap:10px;
+        text-decoration:none;
+        color: var(--ds-navy);
+        font-weight: 800;
+        font-size: 13px;
+    }
+    .ds-m-back .ds-ico{
+        width:34px;
+        height:34px;
+        border-radius:999px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border: 1px solid rgba(1,52,91,.18);
+        background: rgba(1,52,91,.06);
+    }
+    .ds-m-topbar .ds-mini{
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+    }
+    
     /* Make mobile app-like typography */
     .ds-card{
         border-radius: 18px;
@@ -470,6 +520,58 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
 @media (min-width:1024px){
     .ds-mobile-units{ display:none !important; }
 }
+/* ===============================
+   FIXES: Desktop submit alignment + Mobile UX
+   =============================== */
+
+/* Desktop submit button alignment fix (when grid cols used) */
+@media (min-width: 640px){
+      .ds-assignment-form{
+    align-items: center !important; /* ✅ vertical center */
+  }
+
+  .ds-assignment-form .ds-submit-col{
+    display: flex;
+    align-items: center;          /* ✅ button center */
+    justify-content: center;      /* optional */
+  }
+
+  .ds-assignment-form .ds-btn-primary{
+    height: 44px;                /* same as input feel */
+  }
+  /* .ds-assignment-form{
+    align-items: end !important;
+  } */
+}
+
+/* Make buttons consistent height */
+.ds-action, .ds-action-outline, .ds-btn-primary{
+  min-height: 38px;
+}
+
+/* Mobile: make lesson/assignment row title clickable and nicer */
+@media (max-width: 1023px){
+  .ds-row .ds-row-title{
+    display:block;
+    color: var(--ds-navy);
+    text-decoration: none;
+    font-weight: 700;
+    line-height: 1.25rem;
+  }
+  .ds-row .ds-row-title:active,
+  .ds-row .ds-row-title:hover{
+    color: var(--ds-pink);
+    text-decoration: underline;
+  }
+
+  /* Mobile: Open brief button smaller + fixed position look */
+  .ds-brief-btn{
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+  }
+}
 </style>
 
         <main class="ds-shell space-y-4">
@@ -477,16 +579,14 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
             {{-- Top row (DESKTOP only now) --}}
             <div class="ds-toprow flex items-center justify-between gap-3">
                 <a href="{{ route('portal.learner.courses.all') }}"
-                    class="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+                class="inline-flex items-center gap-2 text-sm font-semibold ds-title-navy hover:text-[var(--ds-pink)]">
                     <span class="h-8 w-8 rounded-full ds-backpill ds-soft inline-flex items-center justify-center">←</span>
                     Back to my courses
                 </a>
 
-                <div class="course-header-actions">
-                    <a href="{{ route('portal.learner.courses.all') }}" class="ds-btn-primary">
-                        All Courses
-                    </a>
-                </div>
+                <a href="{{ route('portal.learner.courses.all') }}" class="ds-btn-primary">
+                    All Courses
+                </a>
             </div>
 
             {{-- Flash --}}
@@ -526,11 +626,11 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                         </div>
 
                         {{-- Desktop action (keep) --}}
-                        <div class="course-header-actions hidden lg:flex">
+                        {{-- <div class="course-header-actions hidden lg:flex">
                             <a href="{{ route('portal.learner.courses.all') }}" class="ds-btn-primary">
                                 All Courses
                             </a>
-                        </div>
+                        </div> --}}
                     </div>
                 </div>
             </section>
@@ -610,9 +710,10 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                 class="h-9 w-9 rounded-xl flex items-center justify-center font-bold ds-soft ds-lesson-ico">
                                                                 📄</div>
                                                             <div class="min-w-0 flex-1">
-                                                                <div class="text-sm font-semibold ds-title-navy">
+                                                                <a class="ds-row-title"
+                                                                    href="{{ route('portal.learner.lessons.show', $lesson->id) }}">
                                                                     {{ $lesson->title }}
-                                                                </div>
+                                                                </a>
 
                                                                 <div class="mt-2 flex flex-wrap gap-2">
                                                                     <a href="{{ route('portal.learner.lessons.show', $lesson->id) }}"
@@ -638,12 +739,12 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                         @endif
                                                                     @endif
 
-                                                                    @if (!blank($lesson->video_url))
+                                                                    {{-- @if (!blank($lesson->video_url))
                                                                         <a href="{{ $lesson->video_url }}" target="_blank"
                                                                             class="ds-action-outline">
                                                                             Lesson
                                                                         </a>
-                                                                    @endif
+                                                                    @endif --}}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -674,16 +775,21 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                     class="h-9 w-9 rounded-xl flex items-center justify-center font-bold ds-soft ds-assignment-ico">
                                                                     📝</div>
                                                                 <div class="min-w-0">
-                                                                    <div class="text-sm font-semibold ds-title-navy">
-                                                                        {{ $assignment->title }}
-                                                                    </div>
+                                                                    @if ($brief)
+                                                                        <a class="ds-row-title"
+                                                                            href="{{ $brief->file_path }}" target="_blank">
+                                                                            {{ $assignment->title }}
+                                                                        </a>
+                                                                        @else
+                                                                        <span class="ds-row-title">{{ $assignment->title }}</span>
+                                                                    @endif
                                                                 </div>
                                                             </div>
 
                                                             @if ($brief)
                                                                 <a href="{{ $brief->file_path }}" target="_blank"
-                                                                    class="ds-action-outline">
-                                                                    Brief
+                                                                    class="ds-action-outline ds-brief-btn">
+                                                                    Open brief
                                                                 </a>
                                                             @endif
                                                         </div>
@@ -1029,7 +1135,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                         <form
                                                                             action="{{ route('portal.learner.assignment.submit', $assignment->id) }}"
                                                                             method="POST" enctype="multipart/form-data"
-                                                                            class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                                                                            class="ds-assignment-form grid grid-cols-1 sm:grid-cols-12 gap-3">
                                                                             @csrf
 
                                                                             <div class="sm:col-span-8">
