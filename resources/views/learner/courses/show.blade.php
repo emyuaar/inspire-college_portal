@@ -508,7 +508,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
                                 <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white ds-soft"
                                     style="border:1px solid rgba(1,52,91,.18); color: var(--ds-navy); font-weight:700;">
-                                    DirectSkills Student Number (SID): <b>DS{{ $enrolment->id }}</b>
+                                    DirectSkills Student Number (SID): <b>DS{{ $user->id }}</b>
                                 </span>
 
                                 @if ((int) $enrolment->status_id === 2)
