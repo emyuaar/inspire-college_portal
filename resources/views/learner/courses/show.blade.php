@@ -366,7 +366,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
     .ds-sidebar{
         position: static !important;   /* remove sticky */
         top: auto !important;
-        height: 909px !important;       /* remove fixed viewport height */
+        height: auto !important;       /* remove fixed viewport height */
         min-height: 0 !important;
     }
 
