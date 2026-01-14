@@ -245,7 +245,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
     background:#fff;
     overflow: hidden;
     transition: .15s ease;
-    margin-bottom: 10px;
+    margin-bottom: 10px !important;
 }
 .ds-unitwrap.is-active{ border-color: #a91a6a !important; }
 .ds-unitwrap.is-active.is-open {
