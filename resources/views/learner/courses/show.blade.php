@@ -364,10 +364,10 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
 
     /* IMPORTANT: remove 920px minimum (it cuts units) */
     .ds-sidebar{
-        position: sticky;
-        top: 180px;
-        height: calc(100vh - 192px);
-        min-height: 520px;
+        position: static !important;   /* remove sticky */
+        top: auto !important;
+        height: 909px !important;       /* remove fixed viewport height */
+        min-height: 0 !important;
     }
 
     /* card as column */
