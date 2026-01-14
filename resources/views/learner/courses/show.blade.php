@@ -656,7 +656,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                 Unit {{ $index + 1 }}: {{ $module->title ?? 'Unit ' . ($index + 1) }}
                                             </div>
                                             <div class="ds-m-meta">
-                                                <span class="ds-m-count">📄 {{ $module->lessons->count() }} Notes</span>
+                                                <span class="ds-m-count">📚 {{ $module->lessons->count() }} Notes</span>
                                                 <span class="ds-m-count">📝 {{ $module->assignments->count() }}
                                                     Assignments</span>
                                                 @if ($isEmpty)
@@ -704,47 +704,56 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                         $hasSpUrl = !blank($lesson->sharepoint_url ?? null);
                                                     @endphp
 
+                                                    @php
+                                                        $lessonUrl = !blank($lesson->video_url)
+                                                            ? $lesson->video_url
+                                                            : route('portal.learner.lessons.show', $lesson->id);
+                                                    @endphp
+
                                                     <div class="ds-row">
                                                         <div class="flex items-start gap-3">
                                                             <div
                                                                 class="h-9 w-9 rounded-xl flex items-center justify-center font-bold ds-soft ds-lesson-ico">
-                                                                📄</div>
+                                                                📚
+                                                            </div>
+
                                                             <div class="min-w-0 flex-1">
+                                                                {{-- TITLE --}}
                                                                 <a class="ds-row-title"
-                                                                    href="{{ route('portal.learner.lessons.show', $lesson->id) }}">
+                                                                href="{{ $lessonUrl }}"
+                                                                @if(!blank($lesson->video_url)) target="_blank" @endif>
                                                                     {{ $lesson->title }}
                                                                 </a>
 
                                                                 <div class="mt-2 flex flex-wrap gap-2">
-                                                                    <a href="{{ route('portal.learner.lessons.show', $lesson->id) }}"
-                                                                        class="ds-action">
+                                                                    {{-- OPEN --}}
+                                                                    <a href="{{ $lessonUrl }}"
+                                                                    class="ds-action"
+                                                                    @if(!blank($lesson->video_url)) target="_blank" @endif>
                                                                         Open
                                                                     </a>
 
+                                                                    {{-- FILE / SHAREPOINT --}}
                                                                     @if (!blank($file))
                                                                         @if ($isUrl)
                                                                             <a href="{{ $file }}" target="_blank"
-                                                                                class="ds-action-outline">File</a>
+                                                                            class="ds-action-outline">File</a>
+
                                                                         @elseif($hasSpItem)
                                                                             <a href="{{ route('portal.learner.lesson.file.inline', $lesson->id) }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">Online</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">Online</a>
+
                                                                             <a href="{{ route('portal.learner.lesson.file.download', $lesson->id) }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">Download</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">Download</a>
+
                                                                         @elseif($hasSpUrl)
                                                                             <a href="{{ $lesson->sharepoint_url }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">File</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">File</a>
                                                                         @endif
                                                                     @endif
-
-                                                                    {{-- @if (!blank($lesson->video_url))
-                                                                        <a href="{{ $lesson->video_url }}" target="_blank"
-                                                                            class="ds-action-outline">
-                                                                            Lesson
-                                                                        </a>
-                                                                    @endif --}}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -789,7 +798,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                             @if ($brief)
                                                                 <a href="{{ $brief->file_path }}" target="_blank"
                                                                     class="ds-action-outline ds-brief-btn">
-                                                                    Open brief
+                                                                    Open Assignment
                                                                 </a>
                                                             @endif
                                                         </div>
@@ -1015,6 +1024,14 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                 ]);
                                                             $hasSpItem = !blank($lesson->sharepoint_item_id ?? null);
                                                             $hasSpUrl = !blank($lesson->sharepoint_url ?? null);
+
+                                                            // ✅ NEW: primary link (video preferred)
+                                                            $primaryUrl = !blank($lesson->video_url)
+                                                                ? $lesson->video_url
+                                                                : route('portal.learner.lessons.show', $lesson->id);
+
+                                                            $primaryTarget = !blank($lesson->video_url) ? '_blank' : null;
+                                                            $badgeText = !blank($lesson->video_url) ? 'Lesson' : 'Lesson';
                                                         @endphp
 
                                                         <div id="lesson-{{ $lesson->id }}" class="ds-anchor ds-row">
@@ -1022,55 +1039,60 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
                                                                 <div class="flex items-start gap-3 min-w-0 flex-1">
                                                                     <div
                                                                         class="h-9 w-9 rounded-xl flex items-center justify-center font-bold ds-soft ds-lesson-ico">
-                                                                        📄
+                                                                        {{ !blank($lesson->video_url) ? '📚' : '📚' }}
                                                                     </div>
 
                                                                     <div class="min-w-0">
                                                                         <div class="flex items-center gap-2 flex-wrap">
-                                                                            <a href="{{ route('portal.learner.lessons.show', $lesson->id) }}"
-                                                                                class="text-sm font-semibold ds-title-navy hover:underline hover:text-[var(--ds-pink)]">
+                                                                            {{-- ✅ TITLE now goes to video if available --}}
+                                                                            <a href="{{ $primaryUrl }}"
+                                                                            @if($primaryTarget) target="{{ $primaryTarget }}" @endif
+                                                                            class="text-sm font-semibold ds-title-navy hover:underline hover:text-[var(--ds-pink)]">
                                                                                 {{ $lesson->title }}
                                                                             </a>
 
-                                                                            <span
-                                                                                class="text-[11px] px-2 py-0.5 rounded-full"
+                                                                            <span class="text-[11px] px-2 py-0.5 rounded-full"
                                                                                 style="background: rgba(1,52,91,.08); color: var(--ds-navy); border:1px solid rgba(1,52,91,.16);">
-                                                                                Lesson
+                                                                                {{ $badgeText }}
                                                                             </span>
                                                                         </div>
                                                                     </div>
                                                                 </div>
 
-                                                                <div
-                                                                    class="flex flex-wrap gap-2 justify-start sm:justify-end">
-                                                                    @if ($hasContent)
-                                                                        <a href="{{ route('portal.learner.lessons.show', $lesson->id) }}"
-                                                                            class="ds-action">Open</a>
+                                                                <div class="flex flex-wrap gap-2 justify-start sm:justify-end">
+                                                                    {{-- ✅ OPEN now goes to video if available, otherwise lesson page --}}
+                                                                    @if ($hasContent || !blank($lesson->video_url))
+                                                                        <a href="{{ $primaryUrl }}"
+                                                                        @if($primaryTarget) target="{{ $primaryTarget }}" @endif
+                                                                        class="ds-action-outline">
+                                                                            Open Lesson
+                                                                        </a>
                                                                     @endif
 
                                                                     @if (!blank($file))
                                                                         @if ($isUrl)
                                                                             <a href="{{ $file }}" target="_blank"
-                                                                                class="ds-action-outline">File</a>
+                                                                            class="ds-action-outline">File</a>
                                                                         @elseif($hasSpItem)
                                                                             <a href="{{ route('portal.learner.lesson.file.inline', $lesson->id) }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">Online</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">Online</a>
                                                                             <a href="{{ route('portal.learner.lesson.file.download', $lesson->id) }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">Download</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">Download</a>
                                                                         @elseif($hasSpUrl)
                                                                             <a href="{{ $lesson->sharepoint_url }}"
-                                                                                target="_blank"
-                                                                                class="ds-action-outline">File</a>
+                                                                            target="_blank"
+                                                                            class="ds-action-outline">File</a>
                                                                         @endif
                                                                     @endif
 
-                                                                    @if (!blank($lesson->video_url))
-                                                                        <a href="{{ $lesson->video_url }}"
-                                                                            target="_blank"
-                                                                            class="ds-action-outline">Lesson</a>
-                                                                    @endif
+                                                                    {{-- OPTIONAL: if you want to keep a separate Video button, keep this.
+                                                                        If you don't want duplicate, remove this whole block. --}}
+                                                                    {{-- @if (!blank($lesson->video_url))
+                                                                        <a href="{{ $lesson->video_url }}" target="_blank"
+                                                                        class="ds-action-outline">Lesson</a>
+                                                                    @endif --}}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1112,7 +1134,7 @@ details[open] .ds-right-chev{ transform: rotate(180deg); }
 
                                                                 @if ($brief)
                                                                     <a href="{{ $brief->file_path }}" target="_blank"
-                                                                        class="ds-action-outline">Open brief</a>
+                                                                        class="ds-action-outline">Open Assignment</a>
                                                                 @endif
                                                             </div>
 
