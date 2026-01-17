@@ -148,8 +148,8 @@
 
             {{-- Footer Text --}}
             <p class="text-center text-xs text-slate-400 mt-8">
-                By signing in, you agree to our <a href="#" class="underline hover:text-slate-600">Terms of Service</a>
-                and <a href="#" class="underline hover:text-slate-600">Privacy Policy</a>.
+                By signing in, you agree to our <a href="https://directskills.co.uk/terms-and-conditions" class="underline hover:text-slate-600">Terms of Service</a>
+                and <a href="https://directskills.co.uk/gdpr-and-retention-of-records-policy" class="underline hover:text-slate-600">Privacy Policy</a>.
             </p>
         </div>
     </div>
