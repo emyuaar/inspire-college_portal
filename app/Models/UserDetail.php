@@ -8,15 +8,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class UserDetail extends Model
 {
     use SoftDeletes;
+    protected $connection = 'mysql_crm';
+    protected $table = 'user_detail';
 
-    protected $table = 'user_details';
-
-    protected $fillable = [
-        'user_id', 'gender', 'd_o_b', 'address', 'country', 'city', 'state',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
-        'd_o_b' => 'date',
+        'dob' => 'date',
     ];
 
     public function user()

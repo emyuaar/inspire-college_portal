@@ -43,6 +43,7 @@ class ProfileController extends Controller
 
         $request->validate([
             'contact'        => ['nullable', 'string', 'max:30'],
+            'personal_email' => ['required', 'email', 'max:100'], // Required as per issue desc
             'dob'            => ['nullable', 'date'],
             'gender'         => ['nullable', 'in:male,female,other'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
@@ -60,6 +61,7 @@ class ProfileController extends Controller
         $detail = UserDetail::firstOrNew(['learner_id' => $user->id]);
         $detail->fill($request->only([
             'contact',
+            'personal_email',
             'dob',
             'gender',
             'address_line_1',

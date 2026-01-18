@@ -58,8 +58,8 @@
                 class="h-10 mb-8">
 
             <h1 class="text-4xl font-bold leading-tight mb-4">
-                Welcome to your <br>
-                <span class="text-[#A91A6A] text-pink-400">Learning Portal</span>
+                Welcome to <br>
+                <span class="text-[#A91A6A] text-pink-400">LMS Portal</span>
             </h1>
             <p class="text-slate-300 text-lg max-w-md leading-relaxed">
                 Access your courses, track your progress, and manage your assignments all in one place.

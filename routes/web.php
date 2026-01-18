@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LearnerCourseController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB; // Added for debug route
 
 // ========== AUTH ROUTES ==========
 Route::get('/', [AuthController::class, 'showLoginForm'])
@@ -14,6 +15,19 @@ Route::post('/login', [AuthController::class, 'login'])
 
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('portal.logout');
+
+// DEBUG ROUTE
+Route::get('/debug-webhook', function() {
+    $statuses = \App\Models\Crm\EnrolmentStatus::all();
+    $output = "";
+    foreach($statuses as $s) {
+        $output .= "ID: {$s->id} - Status: {$s->status} <br>";
+    }
+    return $output;
+});
+// Public Webhook (Stripe)
+Route::post('/stripe/webhook', [\App\Http\Controllers\Payment\StripeWebhookController::class, 'handle'])
+    ->name('stripe.webhook');
 
 // ========== PROTECTED ROUTES (AFTER LOGIN) ==========
 Route::middleware('auth')->group(function () {
@@ -27,8 +41,39 @@ Route::middleware('auth')->group(function () {
         ->name('portal.learner.dashboard');
 
     // Organization specific
-    Route::get('/organization/dashboard', [DashboardController::class, 'organization'])
-        ->name('portal.organization.dashboard');
+    // Route::get('/organization/dashboard', [DashboardController::class, 'organization'])
+    //     ->name('portal.organization.dashboard');
+
+    // PARTNER / ORGANIZATION ROUTES
+    Route::prefix('partner')->name('partner.')->group(function() {
+        Route::get('/dashboard', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
+            ->name('learners.index'); // Treating this as the main dashboard
+        
+        Route::get('/learners/create', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'create'])
+            ->name('learners.create');
+
+        Route::post('/learners', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'store'])
+            ->name('learners.store');
+
+        Route::get('/learners/{learner}', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'show'])
+            ->name('learners.show');
+
+        Route::get('/learners/{learner}/courses/create', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'create'])
+            ->name('courses.create');
+
+        Route::post('/learners/{learner}/courses', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'store'])
+            ->name('courses.store');
+
+        // Course Plan Selection
+        Route::get('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlan'])
+            ->name('enrolments.choose_plan');
+        
+        Route::post('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'updatePlan'])
+            ->name('enrolments.update_plan');
+
+        Route::post('/learners/{learner}/pay', [\App\Http\Controllers\Payment\CheckoutController::class, 'createCheckoutSession'])
+            ->name('checkout');
+    });
 
     // Learner all courses
     Route::get('/learner/courses', [DashboardController::class, 'allCourses'])

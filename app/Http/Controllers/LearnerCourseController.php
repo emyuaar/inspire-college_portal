@@ -14,6 +14,43 @@ use App\Services\SharePointService;
 
 class LearnerCourseController extends Controller
 {
+    /**
+     * Strict check for enrolment status (User Requirements + CRM Approval).
+     * Payment is NOT a blocker for access (Content Gate).
+     */
+    private function checkAccess($enrolment)
+    {
+        // 1. Requirements Check
+        $user = Auth::user();
+
+        // STRICT GATE: Use the consolidated verification check
+        if (!$user->isVerified()) {
+            return false;
+        }
+
+        // 2. Enrolment Status Hard Block & Payment Gate
+        // Policy A (Strict): Must be Active/Paid/Approved. Unpaid logic returns false.
+        
+        $allowedStatuses = ['active', 'paid', 'approved'];
+        $statusStr = strtolower($enrolment->status->status ?? '');
+        
+        // Block if Denied/Archived
+        if ($statusStr === 'denied' || $statusStr === 'archived') {
+            return false;
+        }
+        
+        // Strict Payment/Status Check
+        // If it's NOT in allowed statuses, check if Order is Paid (ID 1)
+        if (!in_array($statusStr, $allowedStatuses)) {
+            $enrolment->load('latestOrder');
+            if (!$enrolment->latestOrder || $enrolment->latestOrder->status_id !== 1) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
     public function show(Enrolment $enrolment)
     {
         $user = Auth::user();
@@ -22,18 +59,23 @@ class LearnerCourseController extends Controller
             abort(403, 'You are not allowed to view this course.');
         }
 
-        if ((int) $enrolment->status_id !== 2) {
+        // Eager load status to allow string check
+        if (!$enrolment->relationLoaded('status')) {
+            $enrolment->load('status');
+        }
+
+        if (!$this->checkAccess($enrolment)) {
 
             // Optional: better messages
-            if ((int) $enrolment->status_id === 3) {
+            if (($enrolment->status->status ?? '') === 'denied') {
                 return redirect()
                     ->route('portal.learner.dashboard')
-                    ->with('error', 'Your enrolment was denied. Please refill your information and submit again.');
+                    ->with('error', 'Your enrolment was denied.');
             }
 
             return redirect()
                 ->route('portal.learner.dashboard')
-                ->with('error', 'Your enrolment is awaiting approval.');
+                ->with('error', 'Your enrolment is awaiting approval or payment.');
         }
 
         $enrolment->load('course');
@@ -67,13 +109,13 @@ class LearnerCourseController extends Controller
         $user = Auth::user();
 
         // enrolment check (CRM DB)
-        $enrolment = Enrolment::with('course') // so we can access $enrolment->course->title if needed
+        $enrolment = Enrolment::with(['course', 'status'])
             ->where('learner_id', $user->id)
             ->where('course_id', $assignment->course_id)
             ->firstOrFail();
 
-        if ((int) $enrolment->status_id !== 2) {
-            return back()->with('error', 'Your enrolment is not approved yet.');
+        if (!$this->checkAccess($enrolment)) {
+            return back()->with('error', 'Your enrolment is not active or payment is pending.');
         }
 
         $request->validate([
@@ -182,10 +224,10 @@ class LearnerCourseController extends Controller
             ->where('course_id', $lesson->course_id)
             ->firstOrFail();
 
-        if ((int) $enrolment->status_id !== 2) {
+        if (!$this->checkAccess($enrolment)) {
             return redirect()
                 ->route('portal.learner.dashboard')
-                ->with('error', 'Your enrolment is not approved yet.');
+                ->with('error', 'Your enrolment is not active or payment is pending.');
         }
 
         // published only
@@ -224,7 +266,7 @@ class LearnerCourseController extends Controller
             ->where('course_id', $lesson->course_id)
             ->firstOrFail();
 
-        if ((int)$enrolment->status_id !== 2) {
+        if (!$this->checkAccess($enrolment)) {
             abort(403);
         }
 
@@ -249,7 +291,7 @@ class LearnerCourseController extends Controller
             ->where('course_id', $assignment->course_id)
             ->firstOrFail();
 
-        if ((int)$enrolment->status_id !== 2) {
+        if (!$this->checkAccess($enrolment)) {
             abort(403);
         }
 
@@ -275,7 +317,7 @@ class LearnerCourseController extends Controller
             ->where('course_id', $assignment->course_id)
             ->firstOrFail();
 
-        if ((int)$enrolment->status_id !== 2) {
+        if (!$this->checkAccess($enrolment)) {
             abort(403);
         }
 

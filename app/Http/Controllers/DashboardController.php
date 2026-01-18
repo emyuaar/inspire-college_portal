@@ -13,7 +13,7 @@ class DashboardController extends Controller
         $user = Auth::user();
 
         if ($user->isOrganization()) {
-            return redirect()->route('portal.organization.dashboard');
+            return redirect()->route('partner.learners.index');
         }
 
         return redirect()->route('portal.learner.dashboard');
@@ -23,7 +23,7 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        $enrolments = Enrolment::with('course')
+        $enrolments = Enrolment::with(['course', 'status', 'latestOrder'])
             ->where('learner_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();

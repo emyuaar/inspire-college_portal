@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class UserDetail extends Model
 {
     protected $connection = 'mysql_crm';
-    protected $table = 'user_detail'; // existing table
+    protected $table = 'user_detail';
 
     protected $fillable = [
         'learner_id',
+        'personal_email',
         'contact',
         'dob',
         'gender',

@@ -1,124 +1,124 @@
-@extends('layouts.learner')
+<x-app-layout page-title="{{ Str::limit($lesson->title, 30) }}" active-page="courses">
 
-@section('title', $lesson->title ?? 'Lesson')
+    <div class="max-w-4xl mx-auto space-y-6">
 
-@push('styles')
-<style>
-/* ===========================
-   LMS Lesson Content Fix
-   =========================== */
-
-/* Only inside lesson content */
-.lms-content table{
-    width: 100% !important;
-    border-collapse: collapse !important;
-    table-layout: fixed; /* columns equal + controlled */
-}
-
-.lms-content td,
-.lms-content th{
-    padding: 8px 10px !important;   /* reduce extra gap */
-    vertical-align: top;
-    word-break: break-word;
-}
-
-/* remove big margins added by prose */
-.lms-content .prose table { margin: 0 !important; }
-.lms-content .prose p { margin: 0 0 10px !important; }
-
-/* optional: remove extra top/bottom gaps */
-.lms-content .prose { padding: 0 !important; }
-.lms-content .prose > :first-child { margin-top: 0 !important; }
-.lms-content .prose > :last-child { margin-bottom: 0 !important; }
-</style>
-@endpush
-
-@section('content')
-<div class="min-h-screen bg-slate-100">
-    <main class="max-w-5xl mx-auto px-4 py-6 space-y-5">
-
-        {{-- Back link --}}
-        <a href="{{ route('portal.learner.course.show', $enrolment->id) }}"
-           class="inline-flex items-center text-sm text-slate-500 hover:text-slate-700">
-            ← Back to course
-        </a>
-
-        {{-- Header --}}
-        <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <h1 class="text-xl sm:text-2xl font-semibold text-slate-900">
-                        {{ $lesson->title }}
-                    </h1>
-                    <p class="text-xs text-slate-500 mt-1">
-                        {{ $module->title ?? 'Module' }}
-                    </p>
-                </div>
-
-                <span class="inline-flex px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
-                    Lesson
-                </span>
+        {{-- Top Bar / Back Link --}}
+        <div class="flex items-center justify-between">
+            <a href="{{ route('portal.learner.course.show', $enrolment->id) }}"
+               class="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-ds-navy transition-colors">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                Back to Course
+            </a>
+            
+            <div class="text-xs text-slate-400 font-medium">
+                {{ $module->title ?? 'Module Content' }}
             </div>
+        </div>
 
-            {{-- Actions --}}
-            <div class="mt-4 flex flex-wrap gap-2 text-sm">
-                @php
-                    $file  = $lesson->file_path;
-                    $isUrl = $file && \Illuminate\Support\Str::startsWith($file, ['http://','https://']);
-                @endphp
+        {{-- Lesson Card --}}
+        <x-ui.card padding="p-0" class="overflow-hidden">
+            
+            {{-- Header --}}
+            <div class="bg-slate-50 border-b border-slate-100 p-6 md:p-8">
+                <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-2">
+                             <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-ds-navy/10 text-ds-navy uppercase tracking-wide">
+                                Lesson
+                            </span>
+                            @if($lesson->video_url)
+                                 <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-ds-pink uppercase tracking-wide">
+                                    Video
+                                </span>
+                            @endif
+                        </div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-ds-navy leading-tight">
+                            {{ $lesson->title }}
+                        </h1>
+                    </div>
 
-                @if($file)
-                    <a href="{{ $isUrl ? $file : asset('storage/'.$file) }}"
-                       target="_blank"
-                       class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-                        📂 View file
-                    </a>
-                @endif
+                    {{-- Actions --}}
+                    <div class="flex flex-wrap gap-2">
+                        @php
+                            $file  = $lesson->file_path;
+                            $isUrl = $file && \Illuminate\Support\Str::startsWith($file, ['http://','https://']);
+                        @endphp
 
-                @if($lesson->video_url)
-                    <a href="{{ $lesson->video_url }}"
-                       target="_blank"
-                       class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-                        🔗 Open link / video
-                    </a>
-                @endif
-            </div>
-        </section>
+                        @if($file)
+                            <x-ui.button href="{{ $isUrl ? $file : asset('storage/'.$file) }}" target="_blank" variant="outline" size="sm">
+                                <x-slot name="icon">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                </x-slot>
+                                View File
+                            </x-ui.button>
+                        @endif
 
-        {{-- CONTENT (HTML allowed) --}}
-        <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            @if(!empty($lesson->content))
-                <div class="lms-content">
-                    <div class="prose prose-slate max-w-none">
-                        {!! $lesson->content !!}
+                        @if($lesson->video_url)
+                            <x-ui.button href="{{ $lesson->video_url }}" target="_blank" variant="primary" size="sm">
+                                <x-slot name="icon">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </x-slot>
+                                Open Video
+                            </x-ui.button>
+                        @endif
                     </div>
                 </div>
-            @else
-                <p class="text-slate-500 text-sm">No lesson content available.</p>
-            @endif
-        </section>
+            </div>
 
-        {{-- Prev / Next --}}
-        <section class="flex items-center justify-between gap-3">
+            {{-- Content --}}
+            <div class="p-6 md:p-8 bg-white min-h-[300px]">
+                @if(!empty($lesson->content))
+                    <div class="prose prose-slate max-w-none prose-headings:text-ds-navy prose-a:text-ds-pink hover:prose-a:text-pink-700 prose-img:rounded-xl">
+                        {!! $lesson->content !!}
+                    </div>
+                @else
+                    <div class="flex flex-col items-center justify-center h-40 text-center">
+                        <div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                            <svg class="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                        <p class="text-slate-500 text-sm">No additional written content for this lesson.</p>
+                        @if($lesson->video_url || $lesson->file_path)
+                            <p class="text-xs text-slate-400 mt-1">Check the buttons above for materials.</p>
+                        @endif
+                    </div>
+                @endif
+            </div>
+
+        </x-ui.card>
+
+        {{-- Navigation Footer --}}
+        <div class="grid grid-cols-2 gap-4">
             @if($prev)
                 <a href="{{ route('portal.learner.lessons.show', $prev->id) }}"
-                   class="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-sm">
-                    ← Previous
+                   class="flex items-center gap-3 p-4 rounded-xl bg-white border border-slate-200 hover:border-ds-navy/30 hover:shadow-md transition-all group text-left">
+                    <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-ds-navy group-hover:text-white transition-colors shrink-0">
+                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase font-bold text-slate-400 group-hover:text-ds-navy transition-colors">Previous</div>
+                        <div class="text-sm font-bold text-slate-700 group-hover:text-ds-navy truncate transition-colors">{{ $prev->title }}</div>
+                    </div>
                 </a>
             @else
-                <div class="flex-1"></div>
+                <div></div>
             @endif
 
             @if($next)
                 <a href="{{ route('portal.learner.lessons.show', $next->id) }}"
-                   class="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-sm">
-                    Next →
+                   class="flex items-center justify-end gap-3 p-4 rounded-xl bg-white border border-slate-200 hover:border-ds-navy/30 hover:shadow-md transition-all group text-right">
+                    <div>
+                        <div class="text-[10px] uppercase font-bold text-slate-400 group-hover:text-ds-navy transition-colors">Next Lesson</div>
+                        <div class="text-sm font-bold text-slate-700 group-hover:text-ds-navy truncate transition-colors">{{ $next->title }}</div>
+                    </div>
+                    <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-ds-navy group-hover:text-white transition-colors shrink-0">
+                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </div>
                 </a>
             @else
-                <div class="flex-1"></div>
+                 <div></div>
             @endif
-        </section>
+        </div>
 
-    </main>
-</div>
-@endsection
+    </div>
+
+</x-app-layout>

@@ -10,6 +10,7 @@ class User extends Authenticatable
 {
     use Notifiable;
 
+    protected $connection = 'mysql_portal'; // Ensure this matches DB_CONNECTION in .env
     protected $table = 'users';
 
     protected $fillable = [
@@ -21,6 +22,17 @@ class User extends Authenticatable
         'email_address',
         'password',
         'status_id',
+        'crm_approved',
+        'crm_approved_at',
+        'ms_user_id',
+        'ms_provisioned_at',
+        'ms_license_assigned',
+        'ms_error_message',
+    ];
+
+    protected $casts = [
+        'crm_approved' => 'boolean',
+        'crm_approved_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -46,6 +58,13 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'org_id');
     }
 
+    // Learner Enrolments (CRM linked)
+    public function enrolments()
+    {
+        // Enrolment model in Portal namespace (App\Models\Crm\Enrolment)
+        return $this->hasMany(\App\Models\Crm\Enrolment::class, 'learner_id');
+    }
+
     // Helper: account type
     public function isOrganization(): bool
     {
@@ -62,6 +81,22 @@ class User extends Authenticatable
         return $this->org_id > 0 && $this->org_id !== $this->id;
     }
 
+    // Scopes
+    public function scopePartner($query)
+    {
+        return $query->whereColumn('id', 'org_id');
+    }
+
+    public function scopeLearner($query)
+    {
+        return $query->whereColumn('id', '!=', 'org_id');
+    }
+
+    public function scopeMyLearners($query, $partnerId)
+    {
+        return $query->where('org_id', $partnerId)->where('id', '!=', $partnerId);
+    }
+
     public function role()
     {
         return $this->belongsTo(Role::class);
@@ -70,5 +105,42 @@ class User extends Authenticatable
     public function detail()
     {
         return $this->hasOne(UserDetail::class);
+    }
+
+    /**
+     * Strict Verification Check.
+     * Returns true ONLY if all requirements are marked as VERIFIED in CRM.
+     * Completing them is not enough.
+     */
+    public function isVerified(): bool
+    {
+        // 1. Global Check (Legacy or Manual Override)
+        if (!$this->crm_approved) {
+            return false;
+        }
+
+        // 2. Granular Verification Check
+        $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $this->id)->first();
+        
+        if (!$onboarding) {
+            return false;
+        }
+
+        return $onboarding->personal_verified
+            && $onboarding->rpl_verified
+            && $onboarding->disability_verified;
+    }
+
+    /**
+     * Helper to check if requirements are completed (submitted).
+     */
+    public function areRequirementsMet(): bool
+    {
+        $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $this->id)->first();
+        
+        return $onboarding 
+            && $onboarding->personal_info_completed 
+            && $onboarding->rpl_info_completed 
+            && $onboarding->disability_info_completed;
     }
 }
