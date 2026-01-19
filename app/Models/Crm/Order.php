@@ -15,6 +15,20 @@ class Order extends Model
         'amount',
         'stripe_payment_id',
         'status_id',
+        'payment_mode',
+        'plan_deposit_amount',
+        'plan_months',
+        'plan_monthly_amount',
+        'plan_full_amount',
+        'plan_title',
+        'plan_meta',
+    ];
+
+    protected $casts = [
+        'plan_deposit_amount' => 'decimal:2',
+        'plan_monthly_amount' => 'decimal:2',
+        'plan_full_amount' => 'decimal:2',
+        'plan_meta' => 'array',
     ];
 
     public function learner()

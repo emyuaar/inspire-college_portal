@@ -13,6 +13,7 @@
 
     $variants = [
         'primary' => 'bg-ds-navy text-white hover:bg-[#00203a] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
+        'brand' => 'bg-ds-navy text-white hover:bg-[#00203a] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
         'secondary' => 'bg-ds-pink text-white hover:bg-[#8f165a] focus:ring-ds-pink shadow-lg shadow-pink-900/10 active:scale-[0.98]',
         'outline' => 'bg-white border-2 border-slate-200 text-slate-700 hover:border-ds-navy hover:text-ds-navy focus:ring-ds-navy active:bg-slate-50',
         'danger' => 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600 shadow-md shadow-red-900/10',

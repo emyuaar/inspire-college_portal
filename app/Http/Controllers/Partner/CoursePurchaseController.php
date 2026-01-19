@@ -37,7 +37,7 @@ class CoursePurchaseController extends Controller
 
         // Fetch Courses and apply Pricing Logic
         $rawCourses = Course::with(['promotions', 'activeCoursePromotion', 'activePromotion'])->orderBy('title', 'asc')->get();
-        
+
         $courses = $rawCourses->map(function ($course) {
             return (object) $this->pricingService->getCoursePricing($course);
         });
@@ -67,22 +67,24 @@ class CoursePurchaseController extends Controller
         try {
             // Status: Pending Plan (User needs to select Full vs Installment)
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-plan']);
-            
+
             $count = 0;
             foreach ($request->course_ids as $courseId) {
                 // Prevent duplicates
                 $exists = Enrolment::where('learner_id', $learner->id)
                     ->where('course_id', $courseId)
-                    ->whereHas('status', function($q) {
+                    ->whereHas('status', function ($q) {
                         $q->whereIn('status', ['active', 'pending-payment', 'pending-plan']);
                     })
                     ->exists();
 
-                if ($exists) continue;
+                if ($exists)
+                    continue;
 
                 Enrolment::create([
                     'course_id' => $courseId,
                     'learner_id' => $learner->id,
+                    'partner_id' => $partner->id, // Track Partner
                     'status_id' => $status->id,
                 ]);
                 $count++;
@@ -91,7 +93,7 @@ class CoursePurchaseController extends Controller
             DB::connection('mysql_crm')->commit();
 
             if ($count == 0) {
-                 return redirect()->route('partner.learners.show', $learner->id)
+                return redirect()->route('partner.learners.show', $learner->id)
                     ->with('warning', 'No new courses added (Learner already enrolled).');
             }
 
@@ -120,7 +122,7 @@ class CoursePurchaseController extends Controller
         }
 
         if ($enrolment->status->status !== 'pending-plan') {
-             return redirect()->route('partner.learners.show', $enrolment->learner_id)
+            return redirect()->route('partner.learners.show', $enrolment->learner_id)
                 ->with('warning', 'Plan already selected or enrolment active.');
         }
 
@@ -136,7 +138,7 @@ class CoursePurchaseController extends Controller
     {
         $partner = Auth::user();
         $enrolment = Enrolment::findOrFail($enrolmentId);
-        
+
         // Ownership check
         if ($enrolment->learner->org_id !== $partner->id) {
             abort(403);
@@ -159,7 +161,7 @@ class CoursePurchaseController extends Controller
         try {
             // New Status: Pending Payment
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
-            
+
             // 1. Create Order
             // Amount depends on plan
             // 1. Create Order
@@ -168,7 +170,7 @@ class CoursePurchaseController extends Controller
                 $amount = $pricing->final_full_price;
             } else {
                 // FIX ISSUE 1: Order amount MUST be the DEPOSIT amount (due now)
-                $amount = $installmentPlan->deposit; 
+                $amount = $installmentPlan->deposit;
             }
 
             $order = Order::create([
@@ -176,6 +178,14 @@ class CoursePurchaseController extends Controller
                 'enrolment_id' => $enrolment->id, // Link Enrolment
                 'amount' => $amount,
                 'status_id' => null, // Pending (User requested NULL for pending)
+
+                // PLAN SNAPSHOT
+                'payment_mode' => $request->plan_type,
+                'plan_deposit_amount' => ($request->plan_type == 'installment') ? $installmentPlan->deposit : null,
+                'plan_months' => ($request->plan_type == 'installment') ? $installmentPlan->months : null,
+                'plan_monthly_amount' => ($request->plan_type == 'installment') ? $installmentPlan->monthly_amount : null,
+                'plan_full_amount' => ($request->plan_type == 'full') ? $pricing->final_full_price : null,
+                'plan_title' => ($request->plan_type == 'full') ? 'Full Payment' : ("Deposit + " . $installmentPlan->months . " Installments"),
             ]);
 
             // 2. Create Future Installments (Remaining Months)

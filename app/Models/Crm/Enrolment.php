@@ -13,6 +13,7 @@ class Enrolment extends Model
     protected $fillable = [
         'course_id',
         'learner_id',
+        'partner_id',
         'status_id',
     ];
 
@@ -24,6 +25,11 @@ class Enrolment extends Model
     public function learner()
     {
         return $this->belongsTo(\App\Models\User::class, 'learner_id');
+    }
+
+    public function partner()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'partner_id');
     }
 
     public function status()
@@ -61,10 +67,10 @@ class Enrolment extends Model
         // 2. Order is Paid (status_id = 1)
         // We assume status_id 1 is Paid based on PaymentProcessingService
         if ($order->status_id == 1) {
-            
+
             // Check for Installments
             $installments = $order->installments; // Ensure this is loaded or lazy-loaded
-            
+
             if ($installments->count() > 0) {
                 $total = $installments->count();
                 $paid = $installments->where('payment_status', 'paid')->count();
