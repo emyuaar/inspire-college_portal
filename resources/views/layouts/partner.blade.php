@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -12,18 +13,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    {{-- Scripts & Styles --}}
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    
     {{-- Bootstrap 5 for Modals (Legacy Requirement maintained) --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    {{-- Scripts & Styles --}}
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        [x-cloak] { display: none !important; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
     </style>
 </head>
+
 <body class="h-full bg-slate-50 text-slate-900 antialiased lg:flex lg:overflow-hidden">
 
     {{-- Sidebar Component --}}
@@ -31,7 +38,7 @@
 
     {{-- Main Content Area --}}
     <div class="flex flex-col min-h-screen lg:min-h-0 lg:h-full lg:flex-1 lg:overflow-hidden relative">
-        
+
         {{-- Topbar Component --}}
         <x-layout.topbar :title="trim($__env->yieldContent('title', 'Partner Portal'))" userRole="Partner" />
 
@@ -49,11 +56,12 @@
                         {{ session('error') }}
                     </x-ui.alert>
                 @endif
-                
+
                 @yield('content')
             </div>
         </main>
     </div>
 
 </body>
+
 </html>
