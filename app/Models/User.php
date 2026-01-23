@@ -121,7 +121,7 @@ class User extends Authenticatable
 
         // 2. Granular Verification Check
         $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $this->id)->first();
-        
+
         if (!$onboarding) {
             return false;
         }
@@ -137,10 +137,10 @@ class User extends Authenticatable
     public function areRequirementsMet(): bool
     {
         $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $this->id)->first();
-        
-        return $onboarding 
-            && $onboarding->personal_info_completed 
-            && $onboarding->rpl_info_completed 
+
+        return $onboarding
+            && $onboarding->personal_info_completed
+            && $onboarding->rpl_info_completed
             && $onboarding->disability_info_completed;
     }
 }

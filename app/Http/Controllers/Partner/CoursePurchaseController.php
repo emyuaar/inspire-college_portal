@@ -177,7 +177,7 @@ class CoursePurchaseController extends Controller
                 'learner_id' => $enrolment->learner_id,
                 'enrolment_id' => $enrolment->id, // Link Enrolment
                 'amount' => $amount,
-                'status_id' => null, // Pending (User requested NULL for pending)
+                'status_id' => 0, // Pending (Changed from null to 0 to prevent issues)
 
                 // PLAN SNAPSHOT
                 'payment_mode' => $request->plan_type,
@@ -188,20 +188,54 @@ class CoursePurchaseController extends Controller
                 'plan_title' => ($request->plan_type == 'full') ? 'Full Payment' : ("Deposit + " . $installmentPlan->months . " Installments"),
             ]);
 
-            // 2. Create Future Installments (Remaining Months)
-            // FIX ISSUE 2: Do NOT store deposit in order_installments.
-            // Store ONLY remaining monthly installments.
+            // 2. Create Future Installments (Partner Manual Tracking)
+            // WE NOW USE partner_learner_installments table (in CRM DB).
+            // DO NOT create OrderInstallment (this prevents Stripe Subscription).
             if ($request->plan_type == 'installment') {
-                $months = $installmentPlan->months;
+                $months = (int) $installmentPlan->months;
                 $monthlyAmount = $installmentPlan->monthly_amount;
+                $deposit = $installmentPlan->deposit;
 
+                // Establish strict start date
+                $startDate = now();
+
+                // 2a. Record Deposit (Installment 0) - Linked to Order
+                // This tracks the "Deposit" payment status manually as well.
+                \App\Models\Partner\PartnerLearnerInstallment::create([
+                    'partner_id' => $partner->id,
+                    'learner_id' => $enrolment->learner_id,
+                    'enrolment_id' => $enrolment->id,
+                    'order_id' => $order->id, // Link to the Deposit Order
+                    'course_id' => $enrolment->course_id,
+                    'plan_type' => 'deposit_installments',
+                    'total_amount' => $pricing->final_full_price, // Approx total
+                    'deposit_amount' => $deposit,
+                    'installment_amount' => $deposit, // <--- ERROR CORRECTION: This row IS the deposit
+                    'installments_count' => $months,
+                    'installment_no' => 0, // 0 = Deposit
+                    'due_date' => $startDate, // Due now
+                    'status' => 'pending',
+                ]);
+
+                // 2b. Record Future Installments (1..N)
+                // START FROM START_DATE + 1 MONTH
                 for ($i = 1; $i <= $months; $i++) {
-                    OrderInstallment::create([
-                        'order_id' => $order->id,
-                        'amount' => $monthlyAmount,
-                        'payment_status' => 'pending',
-                        // Optional: Calculate provisional due date (e.g., today + $i months)
-                        'due_date' => now()->addMonths($i),
+                    $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
+
+                    \App\Models\Partner\PartnerLearnerInstallment::create([
+                        'partner_id' => $partner->id,
+                        'learner_id' => $enrolment->learner_id,
+                        'enrolment_id' => $enrolment->id,
+                        'order_id' => null, // Future installments don't have Orders yet
+                        'course_id' => $enrolment->course_id,
+                        'plan_type' => 'deposit_installments',
+                        'total_amount' => $pricing->final_full_price,
+                        'deposit_amount' => $deposit,
+                        'installment_amount' => $monthlyAmount,
+                        'installments_count' => $months,
+                        'installment_no' => $i,
+                        'due_date' => $dueDate,
+                        'status' => 'pending',
                     ]);
                 }
             }

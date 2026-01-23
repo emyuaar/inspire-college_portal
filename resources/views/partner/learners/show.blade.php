@@ -245,5 +245,8 @@
         </div>
     </div>
 
+    {{-- Installments Section (Full Width) --}}
+    @include('partner.learners.partials.installments')
+
 </div>
 @endsection

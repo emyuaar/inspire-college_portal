@@ -17,10 +17,10 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->name('portal.logout');
 
 // DEBUG ROUTE
-Route::get('/debug-webhook', function() {
+Route::get('/debug-webhook', function () {
     $statuses = \App\Models\Crm\EnrolmentStatus::all();
     $output = "";
-    foreach($statuses as $s) {
+    foreach ($statuses as $s) {
         $output .= "ID: {$s->id} - Status: {$s->status} <br>";
     }
     return $output;
@@ -45,10 +45,10 @@ Route::middleware('auth')->group(function () {
     //     ->name('portal.organization.dashboard');
 
     // PARTNER / ORGANIZATION ROUTES
-    Route::prefix('partner')->name('partner.')->group(function() {
+    Route::prefix('partner')->name('partner.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
             ->name('learners.index'); // Treating this as the main dashboard
-        
+
         Route::get('/learners/create', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'create'])
             ->name('learners.create');
 
@@ -67,17 +67,24 @@ Route::middleware('auth')->group(function () {
         // Course Plan Selection
         Route::get('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlan'])
             ->name('enrolments.choose_plan');
-        
+
         Route::post('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'updatePlan'])
             ->name('enrolments.update_plan');
 
         Route::post('/learners/{learner}/pay', [\App\Http\Controllers\Payment\CheckoutController::class, 'createCheckoutSession'])
             ->name('checkout');
+
+        // Manual Installment Payment
+        Route::get('/installments/{installment}/checkout', [\App\Http\Controllers\Partner\InstallmentController::class, 'createCheckoutSession'])
+            ->name('installments.checkout');
+
+        Route::post('/installments/{installment}/pay', [\App\Http\Controllers\Partner\InstallmentController::class, 'storePayment'])
+            ->name('installments.pay');
     });
 
     // Learner all courses
     Route::get('/learner/courses', [DashboardController::class, 'allCourses'])
-    ->name('portal.learner.courses.all');
+        ->name('portal.learner.courses.all');
 
     // Account Settings (Profile + Password)
     Route::get('/settings/profile', [App\Http\Controllers\ProfileController::class, 'editAccount'])
@@ -95,17 +102,18 @@ Route::middleware('auth')->group(function () {
     // RPL Information
     Route::get('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'editRpl'])
         ->name('portal.profile.rpl');
-    Route::post('/profile/rpl', [App\Http\Controllers\ProfileController::class,'updateRpl'])
+    Route::post('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'updateRpl'])
         ->name('portal.profile.rpl.update');
 
     // Disability Information
     Route::get('/profile/disability', [App\Http\Controllers\ProfileController::class, 'editDisability'])
         ->name('portal.profile.disability');
-    Route::post('/profile/disability', [App\Http\Controllers\ProfileController::class,'updateDisability'])
+    Route::post('/profile/disability', [App\Http\Controllers\ProfileController::class, 'updateDisability'])
         ->name('portal.profile.disability.update');
 
     // Learner Courses
     Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
+        ->middleware('installment.access')
         ->name('portal.learner.course.show');
 
     // assignment submission
@@ -114,7 +122,7 @@ Route::middleware('auth')->group(function () {
 
     // Route::get('/learner/submissions/{submission}/view', [LearnerCourseController::class, 'viewSubmission'])
     //     ->name('portal.learner.submission.view');
-    
+
     Route::get('/learner/submissions/{submission}/download', [LearnerCourseController::class, 'viewSubmission'])
         ->name('portal.learner.submission.view');
 
@@ -123,7 +131,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
         ->name('portal.learner.submission.direct');
-    
+
     Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
         ->name('portal.learner.lessons.show');
 
@@ -141,7 +149,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/learner/assignment-brief/{brief}/inline', [LearnerCourseController::class, 'downloadAssignmentBrief'])
         ->name('portal.learner.assignment.brief.inline');
-    
+
     Route::get('/learner/assignment-brief/{brief}/local', [LearnerCourseController::class, 'downloadAssignmentBriefLocal'])
         ->name('portal.learner.assignment.brief.local');
 });

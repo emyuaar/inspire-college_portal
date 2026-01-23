@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Stripe\Stripe;
-use Stripe\Checkout\Session AS StripeSession;
+use Stripe\Checkout\Session as StripeSession;
 use App\Services\PaymentProcessingService;
 use App\Services\PricingService;
 
@@ -22,9 +22,9 @@ class PartnerLearnerController extends Controller
     public function index()
     {
         $partner = Auth::user();
-        
+
         // Ensure only partners can access
-        if (! $partner->isOrganization()) {
+        if (!$partner->isOrganization()) {
             abort(403, 'Unauthorized. Partners only.');
         }
 
@@ -46,14 +46,14 @@ class PartnerLearnerController extends Controller
 
         // Check for synchronous payment confirmation (Fix for localhost/missed webhooks)
         if ($request->has('payment') && $request->payment === 'success' && $request->filled('session_id')) {
-             try {
+            try {
                 Stripe::setApiKey(env('STRIPE_SECRET'));
                 $session = StripeSession::retrieve($request->session_id);
 
                 if ($session->payment_status === 'paid') {
                     // Process payment (idempotent service)
                     $paymentService->processOrderPayment($session, $session->metadata);
-                    
+
                     // Flash specific success only if not already there to avoid dupes or confusion
                     session()->flash('success', 'Payment confirmed! Enrolment is now active.');
                 }
@@ -72,12 +72,18 @@ class PartnerLearnerController extends Controller
         $rawCourses = \App\Models\Website\Course::with(['promotions', 'activeCoursePromotion', 'activePromotion'])
             ->orderBy('title', 'asc')
             ->get();
-        
+
         $courses = $rawCourses->map(function ($course) use ($pricingService) {
             return (object) $pricingService->getCoursePricing($course);
         });
 
-        return view('partner.learners.show', compact('learner', 'enrolments', 'courses'));
+        // Fetch Partner Installments (Manual Plan)
+        $installments = \App\Models\Partner\PartnerLearnerInstallment::where('learner_id', $learner->id)
+            ->with('course') // meaningful info
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        return view('partner.learners.show', compact('learner', 'enrolments', 'courses', 'installments'));
     }
 
     /**
@@ -155,7 +161,7 @@ class PartnerLearnerController extends Controller
             ]);
 
             \Illuminate\Support\Facades\DB::commit();
-        
+
             return redirect()->route('partner.learners.index')
                 ->with('success', "Learner created successfully. Login Email: {$dsEmail} (Pending Approval).");
 
