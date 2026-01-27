@@ -10,6 +10,7 @@ use App\Models\Lesson;
 use App\Models\Assignment;
 use App\Models\AssignmentFile;
 use App\Models\AssignmentSubmission;
+use App\Models\Crm\GradeSheetCell; // Added CRM Grade Model
 use App\Services\SharePointService;
 
 class LearnerCourseController extends Controller
@@ -30,15 +31,15 @@ class LearnerCourseController extends Controller
 
         // 2. Enrolment Status Hard Block & Payment Gate
         // Policy A (Strict): Must be Active/Paid/Approved. Unpaid logic returns false.
-        
+
         $allowedStatuses = ['active', 'paid', 'approved'];
         $statusStr = strtolower($enrolment->status->status ?? '');
-        
+
         // Block if Denied/Archived
         if ($statusStr === 'denied' || $statusStr === 'archived') {
             return false;
         }
-        
+
         // Strict Payment/Status Check
         // If it's NOT in allowed statuses, check if Order is Paid (ID 1)
         if (!in_array($statusStr, $allowedStatuses)) {
@@ -47,7 +48,7 @@ class LearnerCourseController extends Controller
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -82,25 +83,62 @@ class LearnerCourseController extends Controller
         $course = $enrolment->course;
 
         $modules = CourseModule::with([
-                'lessons' => function ($q) {
-                    $q->where('is_published', true)
+            'lessons' => function ($q) {
+                $q->where('is_published', true)
                     ->orderBy('sort_order');
-                },
-                'assignments.files',
-                'assignments.submissions' => function ($q) use ($user) {
-                    $q->where('learner_id', $user->id)
+            },
+            'assignments.files',
+            'assignments.submissions' => function ($q) use ($user) {
+                $q->where('learner_id', $user->id)
                     ->latest();
-                },
-            ])
+            },
+            'assignments.gradeResets' => function ($q) use ($user) {
+                $q->where('learner_id', $user->id)
+                    ->latest('reset_at');
+            },
+        ])
             ->where('course_id', $course->id)
             ->orderBy('sort_order')
             ->get();
 
+        // ------------------------------------------------------------------
+        // NEW: Fetch CRM Grading Data (Cross-DB)
+        // ------------------------------------------------------------------
+        // Collect all assignment IDs
+        $assignmentIds = $modules->pluck('assignments')->flatten()->pluck('id')->filter();
+
+        if ($assignmentIds->isNotEmpty()) {
+            // Fetch Cells (Grade + Feedback)
+            $gradeCells = GradeSheetCell::with(['latestAttempt.assessor', 'latestAttempt.attachments'])
+                ->whereIn('portal_assignment_id', $assignmentIds)
+                ->whereHas('row', function ($q) use ($user) {
+                    $q->where('learner_id', $user->id);
+                })
+                ->get()
+                ->keyBy('portal_assignment_id');
+
+            // 1. Attach Grades to Assignments
+            $allAssignments = collect();
+            foreach ($modules as $module) {
+                foreach ($module->assignments as $assignment) {
+
+                    if ($gradeCells->has($assignment->id)) {
+                        $cell = $gradeCells->get($assignment->id);
+                        $assignment->setRelation('grade_cell', $cell);
+                        if ($cell->latestAttempt) {
+                            $assignment->setRelation('latest_grade', $cell->latestAttempt);
+                        }
+                    }
+                }
+            }
+        }
+        // ------------------------------------------------------------------
+
         return view('learner.courses.show', [
-            'user'      => $user,
+            'user' => $user,
             'enrolment' => $enrolment,
-            'course'    => $course,
-            'modules'   => $modules,
+            'course' => $course,
+            'modules' => $modules,
         ]);
     }
 
@@ -123,7 +161,7 @@ class LearnerCourseController extends Controller
         ]);
 
         // file + original name
-        $file         = $request->file('submission_file');
+        $file = $request->file('submission_file');
         $originalName = $file->getClientOriginalName();
 
         // load relations (must exist on Assignment model)
@@ -134,14 +172,14 @@ class LearnerCourseController extends Controller
 
         // folder names
         $courseFolder = $sp->safeName($courseTitle);                          // Course_Name
-        $dsFolder     = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // DS_ID_00001
-        $modFolder    = $sp->safeName($moduleTitle);                          // Module_1
-        $assFolder    = $sp->safeName($assignment->title);                    // Assignment_1
+        $dsFolder = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // DS_ID_00001
+        $modFolder = $sp->safeName($moduleTitle);                          // Module_1
+        $assFolder = $sp->safeName($assignment->title);                    // Assignment_1
 
         // file name safe
-        $baseName  = pathinfo($originalName, PATHINFO_FILENAME);
-        $ext       = strtolower($file->getClientOriginalExtension());
-        $fileName  = $sp->safeName($baseName) . '.' . $ext;
+        $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+        $ext = strtolower($file->getClientOriginalExtension());
+        $fileName = $sp->safeName($baseName) . '.' . $ext;
 
         // create folder structure
         $path1 = $sp->ensureFolder('', $courseFolder);
@@ -158,26 +196,39 @@ class LearnerCourseController extends Controller
             $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
         }
 
+        // Calculate Attempt No
+        $attemptNo = AssignmentSubmission::where('assignment_id', $assignment->id)
+            ->where('learner_id', $user->id)
+            ->max('attempt_no') ?? 0;
+
+        if ($attemptNo == 0) {
+            $count = AssignmentSubmission::where('assignment_id', $assignment->id)
+                ->where('learner_id', $user->id)
+                ->count();
+            $attemptNo = $count;
+        }
+
         // DB save (NO file_path)
         AssignmentSubmission::create([
-            'assignment_id'      => $assignment->id,
-            'learner_id'         => $user->id,
-            'file_name'          => $originalName,
-            'status'             => 'submitted',
+            'assignment_id' => $assignment->id,
+            'learner_id' => $user->id,
+            'file_name' => $originalName,
+            'status' => 'submitted',
+            'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $uploaded['id'] ?? null,
-            'sharepoint_path'    => $courseFolder.'/'.$dsFolder.'/'.$modFolder.'/'.$assFolder.'/'.$fileName,
-            'sharepoint_url'     => $uploaded['webUrl'] ?? null,
+            'sharepoint_path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
+            'sharepoint_url' => $uploaded['webUrl'] ?? null,
         ]);
 
-        return back()->with('success', 'Your assignment file has been submitted (uploaded to SharePoint).');
+        return back()->with('success', 'Your assignment file has been submitted');
     }
 
     public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
     {
         $user = Auth::user();
 
-        if ((int)$submission->learner_id !== (int)$user->id) {
+        if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
         }
 
@@ -199,7 +250,7 @@ class LearnerCourseController extends Controller
     {
         $user = Auth::user();
 
-        if ((int)$submission->learner_id !== (int)$user->id) {
+        if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
         }
 
@@ -231,7 +282,7 @@ class LearnerCourseController extends Controller
         }
 
         // published only
-        if (!(int)$lesson->is_published) {
+        if (!(int) $lesson->is_published) {
             abort(404);
         }
 
@@ -249,11 +300,11 @@ class LearnerCourseController extends Controller
             ->first();
 
         return view('learner.lessons.show', [
-            'lesson'   => $lesson,
-            'module'   => $module,
-            'enrolment'=> $enrolment,
-            'prev'     => $prev,
-            'next'     => $next,
+            'lesson' => $lesson,
+            'module' => $module,
+            'enrolment' => $enrolment,
+            'prev' => $prev,
+            'next' => $next,
         ]);
     }
 
@@ -285,7 +336,8 @@ class LearnerCourseController extends Controller
         $user = Auth::user();
 
         $assignment = $brief->assignment;
-        if (!$assignment) abort(404);
+        if (!$assignment)
+            abort(404);
 
         $enrolment = Enrolment::where('learner_id', $user->id)
             ->where('course_id', $assignment->course_id)
@@ -350,5 +402,86 @@ class LearnerCourseController extends Controller
         $downloadName = $brief->file_name ?: basename($fullReal);
 
         return response()->download($fullReal, $downloadName);
+    }
+
+    public function downloadGradingFile(Request $request, Assignment $assignment)
+    {
+        $user = Auth::user();
+        $type = $request->query('type'); // 'marking_sheet' or 'feedback_file'
+
+        // 1. Enrolment Check
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $assignment->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            abort(403);
+        }
+
+        // 2. Fetch Grade Attempt (CRM)
+        // Using CRM GradeSheetCell model
+        $gradeCell = GradeSheetCell::where('portal_assignment_id', $assignment->id)
+            ->whereHas('row', function ($q) use ($user) {
+                $q->where('learner_id', $user->id);
+            })
+            ->first();
+
+        if (!$gradeCell) {
+            abort(404, 'No grading record found.');
+        }
+
+        $attempt = $gradeCell->latestAttempt;
+        if (!$attempt) {
+            abort(404, 'No attempt found.');
+        }
+
+        // 3. Determine Path
+        $path = null;
+        if ($type === 'marking_sheet') {
+            $path = $attempt->marking_sheet_path;
+        } elseif ($type === 'feedback_file') {
+            $path = $attempt->feedback_file_path;
+        }
+
+        if (blank($path)) {
+            return back()->with('error', 'File not available.');
+        }
+
+        // 4. Download Logic
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return redirect()->away($path);
+        }
+
+        // Local Storage via CRM Root
+        $crmRoot = config('services.crm.storage_root');
+        if (!$crmRoot) {
+            // Try absolute check if no config
+            if (file_exists($path)) {
+                return response()->download($path);
+            }
+            abort(500, 'CRM storage path not configured.');
+        }
+
+        // Sanitize path (remove crm_storage if present in DB path to avoid duplication if DB has absolute or relative logic)
+        // Usually DB path is relative e.g. "learners/123/sheet.pdf"
+        $crmRootReal = realpath($crmRoot);
+        if (!$crmRootReal) {
+            abort(500, 'CRM storage path invalid.');
+        }
+
+        $relative = ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path), '\\/');
+        $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $relative;
+
+        if (!file_exists($fullPath)) {
+            abort(404, 'File not found on server.');
+        }
+
+        // Security check
+        $realFullPath = realpath($fullPath);
+        if (!$realFullPath || strpos($realFullPath, $crmRootReal) !== 0) {
+            abort(403);
+        }
+
+        return response()->download($realFullPath);
     }
 }

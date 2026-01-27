@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Assignment extends Model
 {
     protected $connection = 'mysql_portal';        // CRM DB connection
-    protected $table      = 'lms_assignments';  // CRM table name
+    protected $table = 'lms_assignments';  // CRM table name
 
     protected $guarded = [];
 
@@ -29,5 +29,10 @@ class Assignment extends Model
     public function submissions()
     {
         return $this->hasMany(AssignmentSubmission::class, 'assignment_id');
+    }
+
+    public function gradeResets()
+    {
+        return $this->setConnection('mysql_crm')->hasMany(\App\Models\Crm\GradeReset::class, 'portal_assignment_id');
     }
 }

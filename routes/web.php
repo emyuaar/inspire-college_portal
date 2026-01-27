@@ -152,4 +152,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/learner/assignment-brief/{brief}/local', [LearnerCourseController::class, 'downloadAssignmentBriefLocal'])
         ->name('portal.learner.assignment.brief.local');
+
+    // CRM Grading - File Download
+    Route::get('/learner/assignment/{assignment}/grade-file', [LearnerCourseController::class, 'downloadGradingFile'])
+        ->name('portal.learner.assignment.grading.download');
 });
