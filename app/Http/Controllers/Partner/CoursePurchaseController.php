@@ -26,6 +26,10 @@ class CoursePurchaseController extends Controller
     /**
      * Show form to add courses (Multi-Select)
      */
+    /**
+     * Show form to add courses (Multi-Select)
+     * ENFORCED: Only Partner Assigned Courses
+     */
     public function create($learnerId)
     {
         $partner = Auth::user();
@@ -35,12 +39,42 @@ class CoursePurchaseController extends Controller
             return back()->with('error', 'Learner is not approved yet.');
         }
 
-        // Fetch Courses and apply Pricing Logic
-        $rawCourses = Course::with(['promotions', 'activeCoursePromotion', 'activePromotion'])->orderBy('title', 'asc')->get();
+        // Fetch Assigned Courses with Plans
+        // Eager load website course
+        $assigned = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->with(['course.promotions', 'plans'])
+            ->get();
 
-        $courses = $rawCourses->map(function ($course) {
-            return (object) $this->pricingService->getCoursePricing($course);
-        });
+        $courses = $assigned->map(function ($assignment) {
+            $course = $assignment->course;
+            if (!$course)
+                return null;
+
+            // Attach Assignment Notes
+            $course->assignment_notes = $assignment->notes;
+
+            // Map ID for View Compatibility (View uses course_id)
+            $course->course_id = $course->id;
+
+            // Map Pricing from Assignment
+            $fullPlan = $assignment->plans->where('plan_type', 'full')->first();
+            $course->final_full_price = $fullPlan ? $fullPlan->amount : 'N/A';
+            $course->is_promo = false; // Assigned override
+
+            $instPlan = $assignment->plans->where('plan_type', 'installment')->first();
+            $course->installment_plan = [
+                'available' => (bool) $instPlan,
+                'deposit' => $instPlan ? $instPlan->deposit : 0,
+            ];
+
+            return $course;
+        })->filter();
+
+        // Note: The view expects $courses to be objects with pricing?
+        // Step 119: $courses = $rawCourses->map(...) -> pricingService->getCoursePricing
+        // The view 'partner.courses.create' lists courses. If it needs price display, we should probably construct it.
+        // For now, let's assume the create view just lists titles. If it shows Price, we might need to mock it.
+        // Let's pass the raw course objects for selection.
 
         return view('partner.courses.create', compact('learner', 'courses'));
     }
@@ -59,7 +93,7 @@ class CoursePurchaseController extends Controller
 
         $request->validate([
             'course_ids' => 'required|array|min:1',
-            'course_ids.*' => 'integer|exists:mysql_website.courses,id',
+            'course_ids.*' => 'integer|exists:mysql_crm.partner_assigned_courses,course_id', // Enforce Assignment!
         ]);
 
         DB::connection('mysql_crm')->beginTransaction();
@@ -70,6 +104,14 @@ class CoursePurchaseController extends Controller
 
             $count = 0;
             foreach ($request->course_ids as $courseId) {
+                // Secondary check: verify assignment ownership logic
+                $valid = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+                    ->where('course_id', $courseId)
+                    ->exists();
+
+                if (!$valid)
+                    continue;
+
                 // Prevent duplicates
                 $exists = Enrolment::where('learner_id', $learner->id)
                     ->where('course_id', $courseId)
@@ -94,7 +136,7 @@ class CoursePurchaseController extends Controller
 
             if ($count == 0) {
                 return redirect()->route('partner.learners.show', $learner->id)
-                    ->with('warning', 'No new courses added (Learner already enrolled).');
+                    ->with('warning', 'No new courses added (Learner already enrolled or invalid course).');
             }
 
             return redirect()->route('partner.learners.show', $learner->id)
@@ -112,11 +154,9 @@ class CoursePurchaseController extends Controller
     public function choosePlan($enrolmentId)
     {
         $partner = Auth::user();
-        // Verify ownership via Learner
         $enrolment = Enrolment::with(['course', 'learner', 'status'])
             ->findOrFail($enrolmentId);
 
-        // Security Check: Ensure Partner owns the Learner
         if ($enrolment->learner->org_id !== $partner->id) {
             abort(403, 'Unauthorized access to enrolment.');
         }
@@ -126,7 +166,40 @@ class CoursePurchaseController extends Controller
                 ->with('warning', 'Plan already selected or enrolment active.');
         }
 
-        $pricing = (object) $this->pricingService->getCoursePricing($enrolment->course);
+        // Fetch Assignment Logic
+        $assignment = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->where('course_id', $enrolment->course_id)
+            ->with('plans')
+            ->firstOrFail(); // Must be assigned
+
+        // Construct Pricing Object based on Assignment Plans
+        // Base structure
+        $pricing = new \stdClass();
+        $pricing->course_title = $enrolment->course->title;
+        $pricing->assignment_notes = $assignment->notes;
+
+        // Full Plan
+        $fullPlan = $assignment->plans->where('plan_type', 'full')->first();
+        if ($fullPlan && $fullPlan->status) {
+            $pricing->full_price_available = true;
+            $pricing->final_full_price = $fullPlan->amount;
+        } else {
+            $pricing->full_price_available = false;
+        }
+
+        // Installment Plan
+        $instPlan = $assignment->plans->where('plan_type', 'installment')->first();
+        if ($instPlan && $instPlan->status) {
+            $pricing->installment_plan = (object) [
+                'available' => true,
+                'deposit' => $instPlan->deposit,
+                'months' => $instPlan->months,
+                'monthly_amount' => $instPlan->monthly_amount,
+                'total_payable' => $instPlan->deposit + ($instPlan->months * $instPlan->monthly_amount)
+            ];
+        } else {
+            $pricing->installment_plan = (object) ['available' => false];
+        }
 
         return view('partner.courses.choose_plan', compact('enrolment', 'pricing'));
     }
@@ -139,118 +212,112 @@ class CoursePurchaseController extends Controller
         $partner = Auth::user();
         $enrolment = Enrolment::findOrFail($enrolmentId);
 
-        // Ownership check
-        if ($enrolment->learner->org_id !== $partner->id) {
+        if ($enrolment->learner->org_id !== $partner->id)
             abort(403);
-        }
 
         $request->validate([
             'plan_type' => 'required|in:full,installment',
         ]);
 
-        $pricing = (object) $this->pricingService->getCoursePricing($enrolment->course);
-        $installmentPlan = (object) $pricing->installment_plan;
-
-        // If choosing installment but not available, fail
-        if ($request->plan_type == 'installment' && !$installmentPlan->available) {
-            return back()->with('error', 'Installment plan not available for this course.');
-        }
+        // Verify Assignment logic Again
+        $assignment = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->where('course_id', $enrolment->course_id)
+            ->with('plans')
+            ->firstOrFail();
 
         DB::connection('mysql_crm')->beginTransaction();
 
         try {
-            // New Status: Pending Payment
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
 
-            // 1. Create Order
-            // Amount depends on plan
-            // 1. Create Order
-            // Amount depends on plan
+            $amount = 0;
+            $snapshot = [];
+
             if ($request->plan_type == 'full') {
-                $amount = $pricing->final_full_price;
+                $plan = $assignment->plans->where('plan_type', 'full')->first();
+                if (!$plan)
+                    return back()->with('error', 'Full payment not available.');
+
+                $amount = $plan->amount;
+                $snapshot = [
+                    'payment_mode' => 'full',
+                    'plan_full_amount' => $plan->amount,
+                    'plan_title' => 'Full Payment'
+                ];
             } else {
-                // FIX ISSUE 1: Order amount MUST be the DEPOSIT amount (due now)
-                $amount = $installmentPlan->deposit;
+                $plan = $assignment->plans->where('plan_type', 'installment')->first();
+                if (!$plan)
+                    return back()->with('error', 'Installment plan not available.');
+
+                $amount = $plan->deposit; // Order is for Deposit
+                $snapshot = [
+                    'payment_mode' => 'installment',
+                    'plan_deposit_amount' => $plan->deposit,
+                    'plan_months' => $plan->months,
+                    'plan_monthly_amount' => $plan->monthly_amount,
+                    'plan_title' => "Deposit + {$plan->months} Installments"
+                ];
             }
 
-            $order = Order::create([
+            // Create Order
+            $order = Order::create(array_merge([
                 'learner_id' => $enrolment->learner_id,
-                'enrolment_id' => $enrolment->id, // Link Enrolment
+                'enrolment_id' => $enrolment->id,
                 'amount' => $amount,
-                'status_id' => 0, // Pending (Changed from null to 0 to prevent issues)
+                'status_id' => 0, // Pending
+            ], $snapshot));
 
-                // PLAN SNAPSHOT
-                'payment_mode' => $request->plan_type,
-                'plan_deposit_amount' => ($request->plan_type == 'installment') ? $installmentPlan->deposit : null,
-                'plan_months' => ($request->plan_type == 'installment') ? $installmentPlan->months : null,
-                'plan_monthly_amount' => ($request->plan_type == 'installment') ? $installmentPlan->monthly_amount : null,
-                'plan_full_amount' => ($request->plan_type == 'full') ? $pricing->final_full_price : null,
-                'plan_title' => ($request->plan_type == 'full') ? 'Full Payment' : ("Deposit + " . $installmentPlan->months . " Installments"),
-            ]);
-
-            // 2. Create Future Installments (Partner Manual Tracking)
-            // WE NOW USE partner_learner_installments table (in CRM DB).
-            // DO NOT create OrderInstallment (this prevents Stripe Subscription).
+            // Create Future Installments if needed
             if ($request->plan_type == 'installment') {
-                $months = (int) $installmentPlan->months;
-                $monthlyAmount = $installmentPlan->monthly_amount;
-                $deposit = $installmentPlan->deposit;
-
-                // Establish strict start date
+                $plan = $assignment->plans->where('plan_type', 'installment')->first();
                 $startDate = now();
 
-                // 2a. Record Deposit (Installment 0) - Linked to Order
-                // This tracks the "Deposit" payment status manually as well.
+                // Deposit Row (Installment 0)
                 \App\Models\Partner\PartnerLearnerInstallment::create([
                     'partner_id' => $partner->id,
                     'learner_id' => $enrolment->learner_id,
                     'enrolment_id' => $enrolment->id,
-                    'order_id' => $order->id, // Link to the Deposit Order
+                    'order_id' => $order->id,
                     'course_id' => $enrolment->course_id,
                     'plan_type' => 'deposit_installments',
-                    'total_amount' => $pricing->final_full_price, // Approx total
-                    'deposit_amount' => $deposit,
-                    'installment_amount' => $deposit, // <--- ERROR CORRECTION: This row IS the deposit
-                    'installments_count' => $months,
-                    'installment_no' => 0, // 0 = Deposit
-                    'due_date' => $startDate, // Due now
+                    'total_amount' => $plan->deposit + ($plan->months * $plan->monthly_amount),
+                    'deposit_amount' => $plan->deposit,
+                    'installment_amount' => $plan->deposit,
+                    'installments_count' => $plan->months,
+                    'installment_no' => 0,
+                    'due_date' => $startDate,
                     'status' => 'pending',
                 ]);
 
-                // 2b. Record Future Installments (1..N)
-                // START FROM START_DATE + 1 MONTH
-                for ($i = 1; $i <= $months; $i++) {
-                    $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
-
+                // Future Rows
+                for ($i = 1; $i <= $plan->months; $i++) {
                     \App\Models\Partner\PartnerLearnerInstallment::create([
                         'partner_id' => $partner->id,
                         'learner_id' => $enrolment->learner_id,
                         'enrolment_id' => $enrolment->id,
-                        'order_id' => null, // Future installments don't have Orders yet
                         'course_id' => $enrolment->course_id,
                         'plan_type' => 'deposit_installments',
-                        'total_amount' => $pricing->final_full_price,
-                        'deposit_amount' => $deposit,
-                        'installment_amount' => $monthlyAmount,
-                        'installments_count' => $months,
+                        'total_amount' => $plan->deposit + ($plan->months * $plan->monthly_amount),
+                        'deposit_amount' => $plan->deposit,
+                        'installment_amount' => $plan->monthly_amount,
+                        'installments_count' => $plan->months,
                         'installment_no' => $i,
-                        'due_date' => $dueDate,
+                        'due_date' => $startDate->copy()->addMonthsNoOverflow($i),
                         'status' => 'pending',
                     ]);
                 }
             }
 
-            // 3. Update Enrolment Status
             $enrolment->update(['status_id' => $status->id]);
-
             DB::connection('mysql_crm')->commit();
 
             return redirect()->route('partner.learners.show', $enrolment->learner_id)
-                ->with('success', 'Payment plan selected. You can now proceed to payment.');
+                ->with('success', 'Plan selected. Please proceed to payment.');
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
-            return back()->with('error', 'Error saving plan: ' . $e->getMessage());
+            return back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
+
 }

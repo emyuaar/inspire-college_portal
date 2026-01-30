@@ -204,10 +204,64 @@
                                         </x-ui.button>
                                     
                                     @elseif($statusName == 'pending-payment' && $learner->crm_approved)
-                                        <form action="{{ route('partner.checkout', $learner->id) }}" method="POST">
+                                        <form action="{{ route('partner.checkout', $learner->id) }}" method="POST" 
+                                              x-data="{ 
+                                                expanded: false, 
+                                                code: '', 
+                                                status: 'idle', 
+                                                msg: '',
+                                                validate() {
+                                                    if(!this.code) return;
+                                                    this.status = 'loading';
+                                                    fetch('{{ route('partner.coupon.validate') }}', {
+                                                        method: 'POST',
+                                                        headers: { 
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-TOKEN': document.head.querySelector('meta[name=csrf-token]').content
+                                                        },
+                                                        body: JSON.stringify({ code: this.code })
+                                                    })
+                                                    .then(r => r.json())
+                                                    .then(d => {
+                                                        this.status = d.valid ? 'valid' : 'invalid';
+                                                        this.msg = d.message;
+                                                    })
+                                                    .catch(() => {
+                                                        this.status = 'invalid';
+                                                        this.msg = 'System error';
+                                                    });
+                                                }
+                                            }">
                                             @csrf
                                             <input type="hidden" name="enrolment_id" value="{{ $enrolment->id }}">
-                                            <x-ui.button variant="primary" size="sm" type="submit">
+                                            
+                                            <div class="flex flex-col items-end gap-2 mb-2">
+                                                 <!-- Trigger -->
+                                                 <button type="button" 
+                                                    x-show="!expanded" 
+                                                    @click="expanded = true" 
+                                                    class="text-xs text-slate-500 hover:text-brand-600 underline">
+                                                    Add Coupon?
+                                                 </button>
+                                        
+                                                 <!-- Input Area -->
+                                                 <div x-show="expanded" class="flex flex-col items-end gap-1" x-cloak x-transition>
+                                                     <div class="flex items-center gap-1">
+                                                         <input type="text" name="coupon_code" x-model="code" 
+                                                            class="text-xs border-slate-300 rounded focus:ring-brand-500 focus:border-brand-500 w-32 py-1 px-2" 
+                                                            placeholder="Enter code">
+                                                         <button type="button" @click="validate()" 
+                                                            class="bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 text-xs py-1 px-2 rounded transition-colors"
+                                                            :disabled="status === 'loading'">
+                                                            Apply
+                                                         </button>
+                                                     </div>
+                                                     <div x-show="msg" x-text="msg" class="text-[10px] font-medium"
+                                                        :class="status === 'valid' ? 'text-emerald-600' : 'text-rose-600'"></div>
+                                                 </div>
+                                            </div>
+
+                                            <x-ui.button variant="primary" size="sm" type="submit" class="w-full justify-center">
                                                 Pay Now
                                             </x-ui.button>
                                         </form>

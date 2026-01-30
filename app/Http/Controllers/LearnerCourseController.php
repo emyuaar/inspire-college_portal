@@ -208,6 +208,32 @@ class LearnerCourseController extends Controller
             $attemptNo = $count;
         }
 
+        // --- ENFORCE RESUBMISSION RULES ---
+        if ($attemptNo >= 2) {
+            return back()->with('error', 'Maximum attempts reached for this assignment.');
+        }
+
+        if ($attemptNo > 0) {
+            // This is a re-submission. Check if authorized.
+            // We need a GradeReset that is newer than the last submission.
+            $lastSubmission = AssignmentSubmission::where('assignment_id', $assignment->id)
+                ->where('learner_id', $user->id)
+                ->latest()
+                ->first();
+
+            $hasReset = \App\Models\Crm\GradeReset::where('portal_assignment_id', $assignment->id)
+                ->where('learner_id', $user->id)
+                ->where('reset_at', '>', $lastSubmission->created_at)
+                ->exists();
+
+            if (!$hasReset) {
+                // Determine if the last grade was actually "Pass" (which shouldn't happen here usually)
+                // But if it was "Refer", we strictly need a reset.
+                return back()->with('error', 'Re-submission is not yet approved by the assessor.');
+            }
+        }
+        // ----------------------------------
+
         // DB save (NO file_path)
         AssignmentSubmission::create([
             'assignment_id' => $assignment->id,

@@ -274,6 +274,44 @@ class PaymentProcessingService
                 }
             }
 
+            // 5. COUPON REDEMPTION LOGGING
+            $couponId = $metaArray['coupon_id'] ?? null;
+            if ($couponId) {
+                $partnerId = $metaArray['partner_id'] ?? null;
+                $coupon = DB::connection('mysql_website')->table('coupons')->find($couponId);
+
+                if ($coupon) {
+                    // Determine Amounts
+                    $finalAmountPence = $session->amount_total;
+                    $subtotalPence = $session->amount_subtotal;
+                    $discountPence = $subtotalPence - $finalAmountPence;
+
+                    DB::connection('mysql_website')->table('coupon_redemptions')->insert([
+                        'coupon_id' => $couponId,
+                        // If partner_id is missing, assume the learner is the partner/payer
+                        'partner_id' => $partnerId ?? $learnerId,
+                        'student_id' => $learnerId,
+                        'enrolment_id' => $enrolmentId,
+                        'order_reference' => $orderId ? "Order #{$orderId}" : "Session {$session->id}",
+                        'original_amount' => $subtotalPence / 100,
+                        'discount_amount' => $discountPence / 100,
+                        'final_amount' => $finalAmountPence / 100,
+                        'stripe_session_id' => $session->id,
+                        'stripe_payment_intent' => $session->payment_intent,
+                        'status' => 'paid',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    // Increment Usage
+                    DB::connection('mysql_website')->table('coupons')
+                        ->where('id', $couponId)
+                        ->increment('times_redeemed');
+
+                    Log::info("PaymentProcessingService: Logged redemption for Coupon {$couponId}");
+                }
+            }
+
             DB::connection('mysql_crm')->commit();
             DB::connection('mysql_portal')->commit();
 

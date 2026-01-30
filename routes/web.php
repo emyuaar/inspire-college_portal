@@ -80,6 +80,10 @@ Route::middleware('auth')->group(function () {
 
         Route::post('/installments/{installment}/pay', [\App\Http\Controllers\Partner\InstallmentController::class, 'storePayment'])
             ->name('installments.pay');
+
+        // Coupon Validation
+        Route::post('/coupon/validate', [\App\Http\Controllers\Api\CouponValidationController::class, 'validateCoupon'])
+            ->name('coupon.validate');
     });
 
     // Learner all courses
