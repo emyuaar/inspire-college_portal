@@ -68,14 +68,41 @@ class PartnerLearnerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Fetch Courses for the "Add Course" Modal
-        $rawCourses = \App\Models\Website\Course::with(['promotions', 'activeCoursePromotion', 'activePromotion'])
-            ->orderBy('title', 'asc')
+        // Fetch Only Assigned Courses for the "Add Course" Modal
+        $assignedCourses = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->with(['course', 'plans'])
             ->get();
 
-        $courses = $rawCourses->map(function ($course) use ($pricingService) {
-            return (object) $pricingService->getCoursePricing($course);
-        });
+        // Get IDs of currently enrolled courses to filter them out
+        $enrolledCourseIds = $enrolments->pluck('course_id')->unique();
+
+        $courses = $assignedCourses->map(function ($assignment) use ($enrolledCourseIds) {
+            $course = $assignment->course;
+            if (!$course)
+                return null;
+
+            // Exclude if already enrolled
+            if ($enrolledCourseIds->contains($course->id)) {
+                return null;
+            }
+
+            // Pricing & Plans from Assignment
+            $fullPlan = $assignment->plans->where('plan_type', 'full')->where('status', true)->first();
+            $instPlan = $assignment->plans->where('plan_type', 'installment')->where('status', true)->first();
+
+            // Construct Data Object for Frontend (matches `add_modal.blade.php` expectations)
+            return (object) [
+                'course_id' => $course->id,
+                'title' => $course->title,
+                'is_promo' => false, // Partner assignments have fixed pricing, ignoring standard promos for now
+                'final_full_price' => $fullPlan ? number_format($fullPlan->amount, 2) : 'N/A', // Display string
+                'full_payment_available' => (bool) $fullPlan,
+                'installment_plan' => (object) [
+                    'available' => (bool) $instPlan,
+                    'deposit' => $instPlan ? $instPlan->deposit : 0,
+                ],
+            ];
+        })->filter()->values(); // Filter nulls and re-index
 
         // Fetch Partner Installments (Manual Plan)
         $installments = \App\Models\Partner\PartnerLearnerInstallment::where('learner_id', $learner->id)

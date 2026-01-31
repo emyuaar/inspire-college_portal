@@ -93,7 +93,18 @@ class CoursePurchaseController extends Controller
 
         $request->validate([
             'course_ids' => 'required|array|min:1',
-            'course_ids.*' => 'integer|exists:mysql_crm.partner_assigned_courses,course_id', // Enforce Assignment!
+            'course_ids.*' => [
+                'integer',
+                // Custom rule to ensure the course is assigned to THIS partner
+                function ($attribute, $value, $fail) use ($partner) {
+                    $exists = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+                        ->where('course_id', $value)
+                        ->exists();
+                    if (!$exists) {
+                        $fail("The selected course (ID: $value) is not assigned to your account.");
+                    }
+                },
+            ],
         ]);
 
         DB::connection('mysql_crm')->beginTransaction();
@@ -104,14 +115,6 @@ class CoursePurchaseController extends Controller
 
             $count = 0;
             foreach ($request->course_ids as $courseId) {
-                // Secondary check: verify assignment ownership logic
-                $valid = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
-                    ->where('course_id', $courseId)
-                    ->exists();
-
-                if (!$valid)
-                    continue;
-
                 // Prevent duplicates
                 $exists = Enrolment::where('learner_id', $learner->id)
                     ->where('course_id', $courseId)
