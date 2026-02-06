@@ -58,6 +58,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/learners/{learner}', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'show'])
             ->name('learners.show');
 
+        // Partner Courses List
+        Route::get('/courses', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'index'])
+            ->name('courses.index');
+
         Route::get('/learners/{learner}/courses/create', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'create'])
             ->name('courses.create');
 

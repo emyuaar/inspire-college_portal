@@ -26,6 +26,44 @@ class CoursePurchaseController extends Controller
     /**
      * Show form to add courses (Multi-Select)
      */
+    public function index()
+    {
+        $partner = Auth::user();
+
+        // Fetch Assigned Courses with Plans
+        $assigned = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->with(['course.promotions', 'plans'])
+            ->get();
+
+        $courses = $assigned->map(function ($assignment) {
+            $course = $assignment->course;
+            if (!$course)
+                return null;
+
+            // Attach Assignment Notes
+            $course->assignment_notes = $assignment->notes;
+
+            // Map Pricing from Assignment
+            $fullPlan = $assignment->plans->where('plan_type', 'full')->first();
+            $course->full_plan = [
+                'available' => (bool) $fullPlan,
+                'amount' => $fullPlan ? $fullPlan->amount : null,
+            ];
+
+            $instPlan = $assignment->plans->where('plan_type', 'installment')->first();
+            $course->installment_plan = [
+                'available' => (bool) $instPlan,
+                'deposit' => $instPlan ? $instPlan->deposit : 0,
+                'months' => $instPlan ? $instPlan->months : 0,
+                'monthly_amount' => $instPlan ? $instPlan->monthly_amount : 0,
+            ];
+
+            return $course;
+        })->filter();
+
+        return view('partner.courses.index', compact('courses'));
+    }
+
     /**
      * Show form to add courses (Multi-Select)
      * ENFORCED: Only Partner Assigned Courses
