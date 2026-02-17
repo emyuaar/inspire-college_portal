@@ -105,29 +105,40 @@ class Enrolment extends Model
             ];
         }
 
-        // 2. Order is Paid (status_id = 1)
-        // We assume status_id 1 is Paid based on PaymentProcessingService
+        // 2. Order is Paid (status_id = 1) OR Installment Plan
+        // We assume status_id 1 is Paid/Active.
         if ($order->status_id == 1) {
 
-            // Check for Installments
-            $installments = $order->installments; // Ensure this is loaded or lazy-loaded
-
-            if ($installments->count() > 0) {
-                $total = $installments->count();
-                $paid = $installments->where('payment_status', 'paid')->count();
-
-                if ($paid >= $total) {
+            // Check if it's an installment order
+            if ($order->payment_mode === 'installment') {
+                // Check if access is allowed (gating logic)
+                if (!$this->installment_access_allowed) {
                     return [
-                        'status' => 'paid',
-                        'label' => 'Paid in Full',
-                        'color' => 'emerald',
+                        'status' => 'pending_payment',
+                        'label' => 'Payment Overdue',
+                        'color' => 'red',
                     ];
-                } else {
-                    return [
-                        'status' => 'installments_active',
-                        'label' => "Installment {$paid}/{$total} Paid",
-                        'color' => 'blue',
-                    ];
+                }
+
+                // If access allowed, detailed status
+                $installments = $order->installments;
+                if ($installments->count() > 0) {
+                    $total = $installments->count();
+                    $paid = $installments->where('payment_status', 'paid')->count();
+
+                    if ($paid >= $total) {
+                        return [
+                            'status' => 'paid',
+                            'label' => 'Paid in Full',
+                            'color' => 'emerald',
+                        ];
+                    } else {
+                        return [
+                            'status' => 'installments_active',
+                            'label' => "Installment {$paid}/{$total} Paid",
+                            'color' => 'blue',
+                        ];
+                    }
                 }
             }
 
@@ -158,6 +169,10 @@ class Enrolment extends Model
      * - Partner: Block if Overdue unpaid OR Current Month due unpaid.
      * - Website: Block if "Derived Due Date" < Today and Installment N not paid.
      */
+    /**
+     * Determine if learning access is allowed based on installments.
+     * Uses explicit database fields (due_date, payment_status, grace_until).
+     */
     public function getInstallmentAccessAllowedAttribute(): bool
     {
         // ------------------------------------
@@ -174,10 +189,6 @@ class Enrolment extends Model
                 return false;
 
             // Current Month Due (Due in current month & Unpaid)
-            // Even if due date is later this month, if it EXISTS and is unpaid, we block?
-            // "If there is OR current month unpaid installment -> hide 'Continue Learning'"
-            // Usually "Current Month Unpaid" means: It is due this month, and we want them to pay it to see content.
-            // Let's stick to strict: If due_date is in current month and status != paid, Block.
             $currentMonth = $partnerInstallments->filter(function ($inst) {
                 return $inst->status !== 'paid' &&
                     $inst->due_date &&
@@ -190,54 +201,47 @@ class Enrolment extends Model
         }
 
         // ------------------------------------
-        // 2. WEBSITE LOGIC (Derived Due Dates)
+        // 2. WEBSITE LOGIC (Order Installments)
         // ------------------------------------
-        // Check if latest order is Installment plan
         $order = $this->latestOrder;
 
-        // If no order, or order is Paid (1), allow? 
-        // If status_id is 1 (Paid/Active), does that mean ALL are paid? 
-        // In our new logic, status_id=1 just means "Not Blocked" / "Active".
-        // So we must check installments if payment_mode is installment.
-
         if ($order && $order->payment_mode === 'installment') {
-            // Plan Details
-            $planMonths = $order->plan_months ?? 0;
-            // If plan_months is 0/null, maybe it's full pay labeled wrong? Assume safe if 0.
-            if ($planMonths < 1)
-                return true;
 
-            // Count Paid Installments (from order_installments table - Website flow)
-            // Note: Website flow populates `order_installments`.
-            $paidCount = $order->installments()->where('payment_status', 'paid')->count();
+            // Fetch installments that are NOT paid
+            $unpaidInstallments = $order->installments()
+                ->where('payment_status', '!=', 'paid')
+                ->get();
 
-            // "Deposit" is usually usually covered by the main Order payment or first installment?
-            // Website flow: Order created = Deposit Paid? 
-            // Usually yes. If Order exists, Deposit is paid.
-            // So we are checking "Monthly Installments" 1..N.
+            if ($unpaidInstallments->isEmpty()) {
+                return true; // All paid
+            }
 
-            // Derive Due Dates
-            // Month 1 Due = Order Created + 1 Month
-            // Month N Due = Order Created + N Months
+            $now = now(); // Use full datetime for precision if needed, or startOfDay
 
-            $now = now()->startOfDay();
-            $orderDate = $order->created_at->startOfDay();
-
-            // Check each month 1 to N
-            for ($i = 1; $i <= $planMonths; $i++) {
-                $dueDate = $orderDate->copy()->addMonths($i);
-
-                // If Due Date is in the past (Overdue) OR Current Month
-                // And we verify if we have enough paid installments to cover it.
-                // Assuming sequential payment: PaidCount >= i means Month i is paid.
-
-                if ($dueDate <= $now || $dueDate->isCurrentMonth()) {
-                    // This month (or past month) is Due.
-                    // Do we have payment for it?
-                    if ($paidCount < $i) {
-                        return false; // Blocked: Installment $i is due/overdue and not paid.
-                    }
+            foreach ($unpaidInstallments as $inst) {
+                // If grace period exists and is valid, allow access even if overdue/pending
+                if ($inst->grace_until && $inst->grace_until > $now) {
+                    continue;
                 }
+
+                // If Overdue
+                // 'overdue' status OR (due_date passed AND no grace)
+                if ($inst->payment_status === 'overdue' || ($inst->due_date && $inst->due_date < $now->startOfDay())) {
+                    return false; // Block access
+                }
+
+                // Strict "Current Month" blocking? 
+                // If due_date is this month, block until paid?
+                // User said: "If payment_status is 'partial' or 'pending', CHECK GRACE PERIOD. If grace derived > now, allow. Else block."
+                // This implies that assuming due_date has passed or is "now".
+                // If due_date is in FUTURE, we shouldn't block.
+
+                if ($inst->due_date && $inst->due_date > $now) {
+                    continue; // Future due date, don't block
+                }
+
+                // If due_date is today or past, and no grace -> Block
+                return false;
             }
         }
 
