@@ -10,9 +10,11 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::connection('mysql_portal')->table('assignment_submissions', function (Blueprint $table) {
-            $table->integer('attempt_no')->default(1)->after('status');
-        });
+        if (!Schema::connection('mysql_portal')->hasColumn('assignment_submissions', 'attempt_no')) {
+            Schema::connection('mysql_portal')->table('assignment_submissions', function (Blueprint $table) {
+                $table->integer('attempt_no')->default(1)->after('status_id');
+            });
+        }
     }
 
     /**

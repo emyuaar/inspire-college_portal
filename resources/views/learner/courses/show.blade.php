@@ -429,8 +429,13 @@
                                                                     <div class="text-amber-800">
                                                                         <span class="block font-bold text-xs uppercase">Your
                                                                             Submission</span>
-                                                                        <span class="text-xs">Uploaded:
-                                                                            {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                        @if(($submission->submitted_by_type ?? 'learner') === 'writer')
+                                                                            <span class="text-xs">Uploaded by Writer:
+                                                                                <strong>{{ $submission->submitted_by_name ?? 'Internal Team' }}</strong></span>
+                                                                        @else
+                                                                            <span class="text-xs">Uploaded:
+                                                                                {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                        @endif
                                                                     </div>
                                                                     <x-ui.button
                                                                         href="{{ route('portal.learner.submission.view', $submission->id) }}"

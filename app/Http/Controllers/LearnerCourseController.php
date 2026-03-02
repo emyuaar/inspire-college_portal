@@ -239,7 +239,7 @@ class LearnerCourseController extends Controller
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
             'file_name' => $originalName,
-            'status' => 'submitted',
+            'status_id' => 1, // Submitted
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $uploaded['id'] ?? null,

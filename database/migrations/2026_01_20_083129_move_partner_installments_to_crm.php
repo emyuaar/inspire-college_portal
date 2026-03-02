@@ -14,41 +14,43 @@ return new class extends Migration {
         Schema::connection('mysql_portal')->dropIfExists('partner_learner_installments');
 
         // Create in CRM DB (Correct location)
-        Schema::connection('mysql_crm')->create('partner_learner_installments', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('partner_id');
-            $table->unsignedBigInteger('learner_id');
-            $table->unsignedBigInteger('enrolment_id');
-            $table->unsignedBigInteger('order_id')->nullable();
-            $table->unsignedBigInteger('course_id');
+        if (!Schema::connection('mysql_crm')->hasTable('partner_learner_installments')) {
+            Schema::connection('mysql_crm')->create('partner_learner_installments', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('partner_id');
+                $table->unsignedBigInteger('learner_id');
+                $table->unsignedBigInteger('enrolment_id');
+                $table->unsignedBigInteger('order_id')->nullable();
+                $table->unsignedBigInteger('course_id');
 
-            $table->string('plan_type')->default('installments_only');
-            $table->decimal('total_amount', 10, 2);
-            $table->decimal('deposit_amount', 10, 2)->nullable();
+                $table->string('plan_type')->default('installments_only');
+                $table->decimal('total_amount', 10, 2);
+                $table->decimal('deposit_amount', 10, 2)->nullable();
 
-            $table->decimal('installment_amount', 10, 2);
-            $table->integer('installments_count');
-            $table->integer('installment_no');
+                $table->decimal('installment_amount', 10, 2);
+                $table->integer('installments_count');
+                $table->integer('installment_no');
 
-            $table->date('due_date');
+                $table->date('due_date');
 
-            $table->string('status')->default('pending');
+                $table->string('status')->default('pending');
 
-            $table->decimal('paid_amount', 10, 2)->default(0);
-            $table->timestamp('paid_at')->nullable();
+                $table->decimal('paid_amount', 10, 2)->default(0);
+                $table->timestamp('paid_at')->nullable();
 
-            $table->string('payment_reference')->nullable();
-            $table->string('stripe_payment_intent_id')->nullable();
-            $table->string('receipt_path')->nullable();
+                $table->string('payment_reference')->nullable();
+                $table->string('stripe_payment_intent_id')->nullable();
+                $table->string('receipt_path')->nullable();
 
-            $table->text('notes')->nullable();
+                $table->text('notes')->nullable();
 
-            $table->timestamps();
+                $table->timestamps();
 
-            $table->index('partner_id');
-            $table->index('learner_id');
-            $table->index('status');
-        });
+                $table->index('partner_id');
+                $table->index('learner_id');
+                $table->index('status');
+            });
+        }
     }
 
     /**
