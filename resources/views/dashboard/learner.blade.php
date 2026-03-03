@@ -210,6 +210,8 @@
                                 $accessStatus = $enrolment->installment_access_status;
                                 $blockReason = null;
                                 $dueInfo = null;
+                                $graceActive = $accessStatus->grace_active ?? false;
+                                $graceUntil = $accessStatus->grace_until ?? null;
 
                                 if (!$accessStatus->allowed) {
                                     $showContinue = false;
@@ -229,6 +231,8 @@
                                                 <x-ui.badge variant="neutral" size="sm">Under Review (CRM)</x-ui.badge>
                                             @elseif($blockReason)
                                                 <x-ui.badge variant="error" size="sm">PAYMENT OVERDUE</x-ui.badge>
+                                            @elseif($graceActive)
+                                                <x-ui.badge variant="warning" size="sm">GRACE PERIOD ACTIVE</x-ui.badge>
                                             @elseif($isPaid || in_array($statusStr, ['active', 'paid', 'approved']))
                                                 <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
                                                 @php $showContinue = true; @endphp
@@ -265,35 +269,47 @@
                                                 Continue Learning
                                             </x-ui.button>
                                         @elseif ($blockReason)
-                                            {{-- Blocked with no UI elements in the action area (Minimalist 2.0) --}}
-                                                        {{-- Status badge is visible near course title --}}
-                                        @elseif ($latestOrder && !$isOrderPaid)
-                                                    <span class="text-xs font-semibold text-amber-600">Please contact Partner</span>
-                                                @elseif (!$requirementsMet)
-                                                    <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
-                                                        Complete Requirements
-                                                    </x-ui.button>
-                                                @elseif (!$isVerified)
-                                                    <span class="text-xs font-semibold text-slate-500 italic">Awaiting Admin Approval</span>
-                                                @elseif ($denied)
-                                                    <x-ui.button size="sm" variant="outline" href="{{ route('portal.settings.profile') }}"
-                                                        class="text-red-600 border-red-200 hover:bg-red-50">
-                                                        Update Details
-                                                    </x-ui.button>
-                                                @endif
+                                            <div class="flex flex-col items-end">
+                                                <span class="text-xs font-semibold text-red-600">Payment Overdue</span>
+                                                <span class="text-[10px] text-slate-500">Please pay to restore access</span>
                                             </div>
-                                        </div>
+                                        @elseif ($graceActive)
+                                            <div class="flex flex-col items-end">
+                                                <x-ui.button size="sm"
+                                                    href="{{ route('portal.learner.course.show', $enrolment->id) }}">
+                                                    Continue Learning
+                                                </x-ui.button>
+                                                <span class="text-[10px] text-amber-600 mt-1 font-medium">
+                                                    Grace period ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
+                                                </span>
+                                            </div>
+                                        @elseif ($latestOrder && !$isOrderPaid)
+                                            <span class="text-xs font-semibold text-amber-600">Please contact Partner</span>
+                                        @elseif (!$requirementsMet)
+                                            <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
+                                                Complete Requirements
+                                            </x-ui.button>
+                                        @elseif (!$isVerified)
+                                            <span class="text-xs font-semibold text-slate-500 italic">Awaiting Admin Approval</span>
+                                        @elseif ($denied)
+                                            <x-ui.button size="sm" variant="outline" href="{{ route('portal.settings.profile') }}"
+                                                class="text-red-600 border-red-200 hover:bg-red-50">
+                                                Update Details
+                                            </x-ui.button>
+                                        @endif
                                     </div>
-                        @endforeach
-                        </div>
-
-                        @if ($enrolments->count() > 3)
-                            <div class="mt-4 text-center">
-                                <x-ui.button variant="ghost" size="sm" href="{{ route('portal.learner.courses.all') }}">
-                                    View All Courses
-                                </x-ui.button>
+                                </div>
                             </div>
-                        @endif
+                        @endforeach
+                    </div>
+
+                    @if ($enrolments->count() > 3)
+                        <div class="mt-4 text-center">
+                            <x-ui.button variant="ghost" size="sm" href="{{ route('portal.learner.courses.all') }}">
+                                View All Courses
+                            </x-ui.button>
+                        </div>
+                    @endif
                 @else
                     <div class="text-center py-8">
                         <div class="mx-auto w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">

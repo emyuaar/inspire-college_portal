@@ -422,30 +422,34 @@ class Enrolment extends Model
         $order = $this->latestOrder;
         if ($order && $order->payment_mode === 'installment') {
             $status->has_plan = true;
-            $planMonths = $order->plan_months ?? 0;
-            if ($planMonths < 1)
-                return $status;
 
-            $paidCount = $order->installments()->where('payment_status', 'paid')->count();
+            // Fetch pending installments
+            $unpaidInstallments = $order->installments()
+                ->where('payment_status', '!=', 'paid')
+                ->get();
+
             $now = now()->startOfDay();
-            $orderDate = $order->created_at->startOfDay();
 
-            // Check months 1..N
-            for ($i = 1; $i <= $planMonths; $i++) {
-                $dueDate = $orderDate->copy()->addMonths($i);
-
-                // If Due (Past or Current Month)
-                if ($dueDate <= $now || $dueDate->isCurrentMonth()) {
-                    // Check payment
-                    if ($paidCount < $i) {
-                        // Blocked
-                        $status->allowed = false;
-                        $type = ($dueDate < $now) ? "Overdue" : "Due Now";
-                        $status->reason = "{$type}: Month {$i}";
+            foreach ($unpaidInstallments as $inst) {
+                if ($inst->due_date && $inst->due_date < $now) {
+                    if ($inst->grace_until && $inst->grace_until >= $now) {
+                        // Wait, overdue but within grace -> GRACE ACTIVE
+                        $status->grace_active = true;
+                        $status->grace_until = $inst->grace_until;
                         $status->due_info = [
-                            'date' => $dueDate,
-                            'amount' => $order->plan_monthly_amount,
-                            'label' => "Month {$i}"
+                            'date' => $inst->due_date,
+                            'amount' => $inst->amount - ($inst->amount_paid ?? 0),
+                            'label' => $inst->installment_no == 0 ? "Deposit" : "Month {$inst->installment_no}"
+                        ];
+                    } else {
+                        // Grace expired or missing -> BLOCKED
+                        $status->allowed = false;
+                        $status->grace_active = false;
+                        $status->reason = "Overdue: " . ($inst->installment_no == 0 ? "Deposit" : "Month {$inst->installment_no}");
+                        $status->due_info = [
+                            'date' => $inst->due_date,
+                            'amount' => $inst->amount - ($inst->amount_paid ?? 0),
+                            'label' => $inst->installment_no == 0 ? "Deposit" : "Month {$inst->installment_no}"
                         ];
                         return $status;
                     }
