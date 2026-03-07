@@ -3,10 +3,12 @@
 namespace App\Models\Crm;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Website\Course;
 
 class Enrolment extends Model
 {
+    use SoftDeletes;
     protected $connection = 'mysql_crm';
     protected $table = 'enrolments';
 
