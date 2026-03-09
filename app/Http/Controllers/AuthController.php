@@ -24,21 +24,32 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
         // humara column email_address hai
         $user = User::where('email_address', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return back()
                 ->withErrors(['email' => 'Invalid email or password.'])
                 ->withInput($request->only('email'));
         }
 
-        // Optional: status check (only active users)
-        // if ($user->status_id != SOME_ACTIVE_ID) { ... }
+        // Block pending users (status_id = 1)
+        if ($user->status_id == 1) {
+            return back()
+                ->withErrors(['email' => 'Your account is on hold. Please contact support.'])
+                ->withInput($request->only('email'));
+        }
+
+        // Block disabled users (status_id = 4)
+        if ($user->status_id == 4) {
+            return back()
+                ->withErrors(['email' => 'Your account has been disabled. Please contact support.'])
+                ->withInput($request->only('email'));
+        }
 
         Auth::login($user, $request->boolean('remember'));
 
