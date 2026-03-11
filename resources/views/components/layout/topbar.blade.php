@@ -60,7 +60,7 @@
                     <p class="text-sm font-bold text-slate-800">{{ $user->first_name ?? 'User' }}</p>
                     <p class="text-xs text-slate-500 truncate">{{ $user->email_address ?? '' }}</p>
                 </div>
-                <a href="{{ route('portal.settings.profile') }}" class="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-ds-navy">
+                <a href="{{ $userRole === 'Partner' ? route('partner.profile.edit') : route('portal.settings.profile') }}" class="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-ds-navy">
                     My Profile
                 </a>
                 <a href="#" class="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-ds-navy">

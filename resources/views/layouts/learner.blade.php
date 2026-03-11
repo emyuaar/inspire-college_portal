@@ -476,6 +476,19 @@
 
     {{-- ================= MAIN CONTENT WRAPPER ================ --}}
     <main class="w-full px-6 py-6 pwa-main">
+        <div class="max-w-7xl mx-auto space-y-6">
+            @if(session('success'))
+                <x-ui.alert variant="success" dismissible title="Success">
+                    {{ session('success') }}
+                </x-ui.alert>
+            @endif
+
+            @if(session('error'))
+                <x-ui.alert variant="error" dismissible title="Error">
+                    {{ session('error') }}
+                </x-ui.alert>
+            @endif
+        </div>
 
         @hasSection('page-title')
             <h1 class="text-xl font-semibold text-slate-800 mb-4">

@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'installment.access' => \App\Http\Middleware\CheckInstallmentAccess::class,
             'check.status' => \App\Http\Middleware\CheckUserStatus::class,
+            'role' => \App\Http\Middleware\CheckRole::class,
         ]);
         $middleware->appendToGroup('web', \App\Http\Middleware\CheckUserStatus::class);
     })

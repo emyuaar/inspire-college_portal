@@ -222,7 +222,6 @@ class ProfileController extends Controller
         }
     }
 
-    // ============================================
     // ACCOUNT SETTINGS (simple profile + password)
     // ============================================
     public function editAccount()
