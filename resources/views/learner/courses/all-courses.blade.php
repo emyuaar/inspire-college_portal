@@ -24,41 +24,43 @@
                 @foreach ($enrolments as $enrolment)
                     @php
                         $showContinue = false; // Safe default
+                        $course = $enrolment->course ?? null;
 
-                        // Always define status first
                         $statusStr = strtolower($enrolment->status->status ?? '');
-
-                        // Access Logic
                         $requirementsMet = Auth::user()->areRequirementsMet();
                         $isVerified = Auth::user()->isVerified();
 
-                        // Payment Logic via Model Helper
+                        $latestOrder = $enrolment->latestOrder;
                         $accessAllowed = $enrolment->installment_access_allowed;
 
-                        // If access is BLOCKED by installments, force status to pending-payment
                         if (!$accessAllowed) {
                             $statusStr = 'pending-payment';
                         }
 
-                        // Determine if Paid (for badge purposes)
                         $paymentDetails = $enrolment->payment_status_details;
                         $isPaid = $paymentDetails['status'] === 'paid';
 
-                        // Gate: Verified AND (Active/Paid/Approved) AND AccessAllowed
-                        // If accessAllowed is false, statusStr is pending-payment, so check below handles it.
                         $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved', 'installments_active']);
-
                         $showContinue = $isVerified && $isActiveOrPaid && $accessAllowed;
-
-                        // Visuals
-                        $isPaymentPending = $statusStr === 'pending-payment';
-                        $isUnderReview = $requirementsMet && !$isVerified;
-                        $isPaidPending = $isPaid && $isUnderReview;
 
                         $denied = $statusStr === 'denied';
 
-                        // Course (you are using $course below, so define it)
-                        $course = $enrolment->course ?? null;
+                        // Installment Access Logic (Unified Status)
+                        $accessStatus = $enrolment->installment_access_status;
+                        $blockReason = null;
+                        $dueInfo = null;
+                        $graceActive = $accessStatus->grace_active ?? false;
+                        $graceUntil = $accessStatus->grace_until ?? null;
+
+                        if (!$accessStatus->allowed) {
+                            $showContinue = false;
+                            $blockReason = $accessStatus->reason;
+                            $dueInfo = $accessStatus->due_info;
+                        }
+
+                        $isPaymentPending = $statusStr === 'pending-payment';
+                        $isUnderReview = $requirementsMet && !$isVerified;
+                        $isPaidPending = $isPaid && $isUnderReview;
                     @endphp
 
                     <x-ui.card class="h-full flex flex-col hover:shadow-md transition-shadow duration-200" padding="p-0">
@@ -74,24 +76,23 @@
                                     <span></span>
                                 @endif
 
-                                @if($showContinue)
+                                @if(!$requirementsMet)
+                                    <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
+                                @elseif(!$isVerified)
+                                    <x-ui.badge variant="neutral" size="sm">Under Review</x-ui.badge>
+                                @elseif($blockReason)
+                                    <x-ui.badge variant="error" size="sm">PAYMENT OVERDUE</x-ui.badge>
+                                @elseif($graceActive)
+                                    <x-ui.badge variant="warning" size="sm">GRACE PERIOD ACTIVE</x-ui.badge>
+                                @elseif($isActiveOrPaid)
                                     <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
+                                    @php $showContinue = true; @endphp
                                 @elseif($isPaymentPending)
                                     <x-ui.badge variant="warning" size="sm">Payment Pending</x-ui.badge>
-                                @elseif($isPaidPending)
-                                    @if(!$requirementsMet)
-                                        <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                    @elseif(!$isVerified)
-                                        <x-ui.badge variant="neutral" size="sm">Under Review</x-ui.badge>
-                                    @endif
                                 @elseif($denied)
                                     <x-ui.badge variant="error" size="sm">Denied</x-ui.badge>
                                 @else
-                                    @if(!$requirementsMet)
-                                        <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                    @else
-                                        <x-ui.badge variant="neutral" size="sm">{{ ucfirst($statusStr) }}</x-ui.badge>
-                                    @endif
+                                    <x-ui.badge variant="neutral" size="sm">Pending</x-ui.badge>
                                 @endif
                             </div>
 
@@ -118,14 +119,30 @@
                                             </svg></x-slot>
                                     </x-ui.button>
                                 </a>
+                            @elseif ($blockReason)
+                                <div class="flex flex-col items-center w-full">
+                                    <span class="text-xs font-semibold text-red-600">Payment Overdue</span>
+                                    <span class="text-[10px] text-slate-500">Please pay to restore access</span>
+                                </div>
+                            @elseif ($graceActive)
+                                <div class="flex flex-col items-center w-full gap-1">
+                                    <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
+                                        <x-ui.button fullWidth size="sm">
+                                            Continue Learning
+                                        </x-ui.button>
+                                    </a>
+                                    <span class="text-[10px] text-amber-600 font-medium">
+                                        Grace period ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
+                                    </span>
+                                </div>
                             @elseif ($isPaymentPending)
                                 <span class="text-xs font-semibold text-amber-600 w-full text-center">Contact Partner for
                                     Payment</span>
-                            @elseif ($isPaidPending && !$requirementsMet)
+                            @elseif (!$requirementsMet)
                                 <x-ui.button fullWidth size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
                                     Complete Requirements
                                 </x-ui.button>
-                            @elseif ($isPaidPending && !$isVerified)
+                            @elseif (!$isVerified)
                                 <span class="text-xs font-semibold text-slate-500 italic w-full text-center">Awaiting Admin
                                     Approval</span>
                             @elseif ($denied)

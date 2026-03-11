@@ -187,22 +187,22 @@
                                 $showContinue = false; // Safe default
                                 $course = $enrolment->course ?? null;
 
-                                $status = strtolower($enrolment->status->status ?? '');
+                                $statusStr = strtolower($enrolment->status->status ?? '');
                                 $requirementsMet = $user->areRequirementsMet();
                                 $isVerified = $user->isVerified();
 
                                 $latestOrder = $enrolment->latestOrder;
-                                $isOrderPaid = $latestOrder && (int) $latestOrder->status_id === 1;
+                                $accessAllowed = $enrolment->installment_access_allowed;
 
-                                $statusStr = strtolower($enrolment->status->status ?? '');
-                                $isPaid = $latestOrder ? $isOrderPaid : in_array($statusStr, ['active', 'paid', 'approved']);
-
-                                if ($latestOrder && !$isOrderPaid) {
+                                if (!$accessAllowed) {
                                     $statusStr = 'pending-payment';
                                 }
 
-                                $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved']);
-                                $showContinue = $isVerified && $isActiveOrPaid;
+                                $paymentDetails = $enrolment->payment_status_details;
+                                $isPaid = $paymentDetails['status'] === 'paid';
+
+                                $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved', 'installments_active']);
+                                $showContinue = $isVerified && $isActiveOrPaid && $accessAllowed;
 
                                 $denied = $statusStr === 'denied';
 
@@ -218,6 +218,10 @@
                                     $blockReason = $accessStatus->reason;
                                     $dueInfo = $accessStatus->due_info;
                                 }
+
+                                $isPaymentPending = $statusStr === 'pending-payment';
+                                $isUnderReview = $requirementsMet && !$isVerified;
+                                $isPaidPending = $isPaid && $isUnderReview;
                             @endphp
 
                             {{-- ✅ ITEM WRAPPER --}}
@@ -233,10 +237,10 @@
                                                 <x-ui.badge variant="error" size="sm">PAYMENT OVERDUE</x-ui.badge>
                                             @elseif($graceActive)
                                                 <x-ui.badge variant="warning" size="sm">GRACE PERIOD ACTIVE</x-ui.badge>
-                                            @elseif($isPaid || in_array($statusStr, ['active', 'paid', 'approved']))
+                                            @elseif($isActiveOrPaid)
                                                 <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
                                                 @php $showContinue = true; @endphp
-                                            @elseif($latestOrder && !$isOrderPaid)
+                                            @elseif($isPaymentPending)
                                                 <x-ui.badge variant="warning" size="sm">Payment Pending</x-ui.badge>
                                             @else
                                                 <x-ui.badge variant="neutral" size="sm">Pending</x-ui.badge>
@@ -283,7 +287,7 @@
                                                     Grace period ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
                                                 </span>
                                             </div>
-                                        @elseif ($latestOrder && !$isOrderPaid)
+                                        @elseif ($isPaymentPending)
                                             <span class="text-xs font-semibold text-amber-600">Please contact Partner</span>
                                         @elseif (!$requirementsMet)
                                             <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
