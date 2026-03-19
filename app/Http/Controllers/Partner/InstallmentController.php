@@ -107,6 +107,12 @@ class InstallmentController extends Controller
                         'partner_installment_id' => $installment->id,
                     ],
                     'description' => $description,
+                    'setup_future_usage' => 'off_session',
+                ],
+                'payment_method_options' => [
+                    'card' => [
+                        'setup_future_usage' => 'off_session',
+                    ],
                 ],
                 'success_url' => route('partner.learners.show', $learner->id) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => route('partner.learners.show', $learner->id) . '?payment=cancelled',
