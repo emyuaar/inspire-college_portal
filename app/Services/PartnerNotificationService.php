@@ -168,7 +168,40 @@ class PartnerNotificationService
             'installment_due_soon',
             'plan_required',
             'learner_pending_approval',
+            'support_unread',
         ];
+    }
+
+    private function syncStandardNotifications(User $partner)
+    {
+        $this->syncInstallmentAlerts($partner);
+        $this->syncPlanAlerts($partner);
+        $this->syncLearnerApprovals($partner);
+        $this->syncSupportTickets($partner); // Added
+    }
+
+    private function syncSupportTickets(User $partner)
+    {
+        $unreadCount = \App\Models\Crm\SupportTicket::where('partner_id', $partner->id)
+            ->where('unread_for_partner', true)
+            ->count();
+
+        if ($unreadCount > 0) {
+            $this->ensure(
+                $partner->id,
+                'support_unread',
+                'You have unread support messages.',
+                null,
+                'info',
+                'support'
+            );
+        } else {
+            // Cleanup unread notification if all read
+            \App\Models\Partner\PartnerNotification::where('user_id', $partner->id)
+                ->where('type', 'support_unread')
+                ->where('is_auto', true)
+                ->delete();
+        }
     }
 
     private function learnerName(?\App\Models\User $user): string

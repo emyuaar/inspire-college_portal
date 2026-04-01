@@ -99,6 +99,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Partner\PartnerProfileController::class, 'update'])
             ->name('profile.update');
 
+        // Support Tickets
+        Route::get('/support', [\App\Http\Controllers\Partner\SupportTicketController::class, 'index'])
+            ->name('support.index');
+        Route::get('/support/create', [\App\Http\Controllers\Partner\SupportTicketController::class, 'create'])
+            ->name('support.create');
+        Route::post('/support', [\App\Http\Controllers\Partner\SupportTicketController::class, 'store'])
+            ->name('support.store');
+        Route::get('/support/{ticket}', [\App\Http\Controllers\Partner\SupportTicketController::class, 'show'])
+            ->name('support.show');
+        Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Partner\SupportTicketController::class, 'reply'])
+            ->name('support.reply');
+
         // Partner Notifications
         Route::get('/notifications', [\App\Http\Controllers\Partner\NotificationController::class, 'index'])
             ->name('notifications.index');
