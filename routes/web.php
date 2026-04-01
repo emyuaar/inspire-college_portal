@@ -98,6 +98,16 @@ Route::middleware('auth')->group(function () {
             ->name('profile.edit');
         Route::post('/profile', [\App\Http\Controllers\Partner\PartnerProfileController::class, 'update'])
             ->name('profile.update');
+
+        // Partner Notifications
+        Route::get('/notifications', [\App\Http\Controllers\Partner\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::get('/notifications/dropdown', [\App\Http\Controllers\Partner\NotificationController::class, 'dropdown'])
+            ->name('notifications.dropdown');
+        Route::get('/notifications/{notification}/read', [\App\Http\Controllers\Partner\NotificationController::class, 'markRead'])
+            ->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Partner\NotificationController::class, 'markAllRead'])
+            ->name('notifications.read_all');
     });
 
     // LEARNER SPECIFIC ROUTES
