@@ -53,9 +53,11 @@ class DashboardController extends Controller
             ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
             ->count();
         
-        // 5. Pending Plan Decisions & Unsettled Enrolments (Status IDs: 1 (Pending), 5 (Pending Plan), 6 (Pending Payment))
+        // 5. Pending Plan Selection (Only those without any plan yet)
         $pendingPlansCount = Enrolment::whereIn('learner_id', $learnerIds)
-            ->whereIn('status_id', [1, 5, 6])
+            ->whereIn('status_id', [1, 5]) // Standard pending/pending-plan statuses
+            ->whereDoesntHave('orders')
+            ->whereDoesntHave('partnerInstallments')
             ->count();
 
         // 5. Recent Learners
@@ -65,12 +67,39 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 6. Recent Orders
-        $recentOrders = Order::whereIn('learner_id', $learnerIds)
-            ->with(['enrolment.course', 'learner'])
-            ->orderBy('created_at', 'desc')
-            ->take(5)
+        // 6. Recent Transactions (Unifying logic with TransactionController)
+        $txInstallments = PartnerLearnerInstallment::whereIn('learner_id', $learnerIds)
+            ->where('status', 'paid')
+            ->where('installment_no', '>', 0) // Deposits covered by Order query below
+            ->with(['learner', 'course'])
+            ->latest('paid_at')
+            ->take(10)
             ->get();
+
+        $txOrders = Order::whereIn('learner_id', $learnerIds)
+            ->where('status_id', 1)
+            ->with(['learner', 'enrolment.course'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        $recentTransactions = $txInstallments->map(function($i) {
+            return (object)[
+                'learner' => $i->learner,
+                'course_title' => $i->course->title ?? 'Course',
+                'amount' => $i->paid_amount,
+                'date' => $i->paid_at ?? $i->updated_at,
+                'type' => 'Installment #' . $i->installment_no
+            ];
+        })->concat($txOrders->map(function($o) {
+            return (object)[
+                'learner' => $o->learner,
+                'course_title' => $o->enrolment->course->title ?? 'Course',
+                'amount' => $o->amount,
+                'date' => $o->updated_at ?? $o->created_at,
+                'type' => ($o->payment_mode === 'full' ? 'Full Payment' : 'Deposit')
+            ];
+        }))->sortByDesc('date')->take(5);
 
         return view('partner.dashboard', compact(
             'partner',
@@ -83,7 +112,7 @@ class DashboardController extends Controller
             'dueSoonInstallmentsCount',
             'pendingPlansCount',
             'recentLearners',
-            'recentOrders'
+            'recentTransactions'
         ));
     }
 }

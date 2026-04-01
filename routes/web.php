@@ -90,6 +90,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/coupon/validate', [\App\Http\Controllers\Api\CouponValidationController::class, 'validateCoupon'])
             ->name('coupon.validate');
 
+        Route::get('/transactions', [\App\Http\Controllers\Partner\TransactionController::class, 'index'])
+            ->name('transactions.index');
+
         // Partner Profile
         Route::get('/profile', [\App\Http\Controllers\Partner\PartnerProfileController::class, 'edit'])
             ->name('profile.edit');

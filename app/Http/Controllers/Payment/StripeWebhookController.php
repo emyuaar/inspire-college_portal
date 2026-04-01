@@ -52,7 +52,7 @@ class StripeWebhookController extends Controller
             $session = $event->data->object;
             $metadata = $session->metadata ?? [];
 
-            if (isset($metadata->type) && ($metadata->type == 'course_purchase' || $metadata->type == 'order_payment')) {
+            if (isset($metadata->type) && in_array($metadata->type, ['course_purchase', 'order_payment', 'partner_installment_payment'])) {
                 // Delegate to Service
                 try {
                     $this->paymentService->processOrderPayment($session, $metadata);

@@ -68,6 +68,7 @@
         </x-ui.card>
 
         {{-- Pending Plans (DECISION Metric) --}}
+        @if($pendingPlansCount > 0)
         <x-ui.card class="h-full border-ds-pink/20 shadow-sm relative overflow-hidden group bg-ds-pink/5">
             <div class="flex items-start justify-between">
                 <div>
@@ -82,6 +83,7 @@
                 </div>
             </div>
         </x-ui.card>
+        @endif
 
         {{-- Active Accounts --}}
         <x-ui.card class="h-full border-slate-200 shadow-sm relative overflow-hidden group">
@@ -258,7 +260,7 @@
                     <h3 class="text-sm font-bold text-slate-900">Recent Transactions</h3>
                     <p class="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Payments received for your learners</p>
                 </div>
-                <button class="text-xs font-bold text-ds-pink hover:text-pink-700 transition-colors">View Reports</button>
+                <a href="{{ route('partner.transactions.index') }}" class="text-xs font-bold text-ds-pink hover:text-pink-700 transition-colors">View Reports</a>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -270,22 +272,22 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($recentOrders as $order)
+                        @forelse($recentTransactions as $tx)
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="px-4 py-3">
-                                    <div class="text-xs font-bold text-slate-900 truncate">{{ $order->learner->first_name }} {{ $order->learner->sur_name }}</div>
-                                    <div class="text-[9px] text-slate-500 font-medium truncate">{{ $order->enrolment->course->title ?? 'Payment' }}</div>
+                                    <div class="text-xs font-bold text-slate-900 truncate">{{ $tx->learner->first_name }} {{ $tx->learner->sur_name }}</div>
+                                    <div class="text-[9px] text-slate-500 font-medium truncate">{{ $tx->course_title }}</div>
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-500 italic">
-                                    {{ $order->created_at->format('d M, H:i') }}
+                                    {{ $tx->date->format('d M, H:i') }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <span class="text-xs font-black text-slate-900">£{{ number_format($order->amount, 2) }}</span>
+                                    <span class="text-xs font-black text-slate-900">£{{ number_format($tx->amount, 2) }}</span>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-4 py-8 text-center text-slate-400 text-xs italic">No transactions found</td>
+                                <td colspan="3" class="px-4 py-12 text-center text-slate-400 text-xs italic">No transactions recorded</td>
                             </tr>
                         @endforelse
                     </tbody>

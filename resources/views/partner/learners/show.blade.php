@@ -206,7 +206,9 @@
                                 <div class="shrink-0 pt-1">
                                     {{-- Actions --}}
                                     @php 
-                                       $canReview = in_array($statusName, ['pending-plan', 'pending', 'pending-payment']);
+                                       // Only allow plan selection if no plan was previously chosen/locked-in
+                                       $selectedPlan = $enrolment->orders()->exists() || \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->exists();
+                                       $canReview = in_array($statusName, ['pending-plan', 'pending']) && !$selectedPlan;
                                     @endphp
 
                                     @if($canReview && $learner->crm_approved)

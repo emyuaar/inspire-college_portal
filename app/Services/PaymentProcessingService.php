@@ -37,13 +37,14 @@ class PaymentProcessingService
         // In Webhook it is passed as $session->metadata (StripeObject).
         // In Controller it is passed as $session->metadata (StripeObject).
 
-        $metaArray = is_object($metadata) && method_exists($metadata, 'toArray') ? $metadata->toArray() : (array) $metadata;
-
-        $learnerId = $metaArray['learner_id'] ?? null;
-        $orderId = $metaArray['order_id'] ?? null;
-        $installmentId = $metaArray['installment_id'] ?? null;
-        $enrolmentId = $metaArray['enrolment_id'] ?? null;
-        $partnerInstallmentId = $metaArray['partner_installment_id'] ?? null;
+        // Robust metadata extraction
+        $meta = is_object($metadata) ? $metadata : (object) $metadata;
+        
+        $learnerId = $meta->learner_id ?? null;
+        $orderId = $meta->order_id ?? null;
+        $installmentId = $meta->installment_id ?? null;
+        $enrolmentId = $meta->enrolment_id ?? null;
+        $partnerInstallmentId = $meta->partner_installment_id ?? null;
 
         Log::info("PaymentProcessingService: Extracted IDs", [
             'learner_id' => $learnerId,
@@ -51,6 +52,7 @@ class PaymentProcessingService
             'installment_id' => $installmentId,
             'enrolment_id' => $enrolmentId,
             'partner_installment_id' => $partnerInstallmentId,
+            'type' => $meta->type ?? 'unknown'
         ]);
 
         if (!$learnerId) {
@@ -71,11 +73,18 @@ class PaymentProcessingService
             if (!$existingPayment) {
                 DB::connection('mysql_crm')->table('payments')->insertGetId([
                     'stripe_session_id' => $session->id,
+                    'stripe_payment_intent_id' => $session->payment_intent,
+                    'student_id' => $learnerId,
+                    'order_id' => $orderId,
                     'amount_pence' => $session->amount_total,
+                    'amount' => $session->amount_total / 100,
                     'email' => $session->customer_details->email ?? null,
                     'full_name' => $session->customer_details->name ?? null,
                     'status' => 'succeeded',
                     'payment_type' => 'stripe_checkout',
+                    'method' => 'stripe',
+                    'currency' => 'gbp',
+                    'paid_at' => now(),
                     'meta' => json_encode($metadata),
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -149,6 +158,19 @@ class PaymentProcessingService
                         'status_id' => 1, // Paid
                         'stripe_payment_id' => $session->payment_intent,
                     ]);
+
+                    // SYNC: If this was a deposit order, mark installment #0 as paid
+                    if ($order->payment_mode === 'installment') {
+                        \App\Models\Partner\PartnerLearnerInstallment::where('order_id', $order->id)
+                            ->where('installment_no', 0)
+                            ->update([
+                                'status' => 'paid',
+                                'paid_at' => now(),
+                                'paid_amount' => $order->amount,
+                                'stripe_payment_intent_id' => $session->payment_intent,
+                                'payment_reference' => $session->id,
+                            ]);
+                    }
 
                     // --- INSTALLMENT SUBSCRIPTION LOGIC ---
                     // If this was a Deposit for an Installment Plan, we must create the Subscription now.
@@ -275,9 +297,9 @@ class PaymentProcessingService
             }
 
             // 5. COUPON REDEMPTION LOGGING
-            $couponId = $metaArray['coupon_id'] ?? null;
+            $couponId = $meta->coupon_id ?? null;
             if ($couponId) {
-                $partnerId = $metaArray['partner_id'] ?? null;
+                $partnerId = $meta->partner_id ?? null;
                 $coupon = DB::connection('mysql_website')->table('coupons')->find($couponId);
 
                 if ($coupon) {

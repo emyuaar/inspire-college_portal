@@ -33,7 +33,7 @@ class CoursePurchaseController extends Controller
         
         $enrolments = Enrolment::with(['course', 'learner', 'status'])
             ->whereIn('learner_id', $learnerIds)
-            ->whereIn('status_id', [1, 5, 6]) // Include 1, 5 (Pending/Pending Plan) and 6 (Pending Payment)
+            ->whereIn('status_id', [1, 5]) // Removed status 6 (Pending Payment)
             ->latest()
             ->get();
 
@@ -219,6 +219,13 @@ class CoursePurchaseController extends Controller
             abort(403, 'Unauthorized access to enrolment.');
         }
 
+        // Guard: Prevent re-selection if a plan is already locked in
+        $hasExistingPlan = $enrolment->orders()->exists() || \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->exists();
+        if ($hasExistingPlan) {
+            return redirect()->route('partner.learners.show', $enrolment->learner_id)
+                ->with('warning', 'A payment plan has already been selected for this enrolment.');
+        }
+
         if (!in_array($enrolment->status->status, ['pending-plan', 'pending', 'pending-payment'])) {
             return redirect()->route('partner.learners.show', $enrolment->learner_id)
                 ->with('warning', 'Enrolment is active and cannot be reviewed.');
@@ -272,6 +279,13 @@ class CoursePurchaseController extends Controller
 
         if ($enrolment->learner->org_id !== $partner->id)
             abort(403);
+
+        // Guard: Prevent re-submission if a plan is already locked in
+        $hasExistingPlan = $enrolment->orders()->exists() || \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->exists();
+        if ($hasExistingPlan) {
+            return redirect()->route('partner.learners.show', $enrolment->learner_id)
+                ->with('warning', 'A payment plan has already been selected for this enrolment.');
+        }
 
         $request->validate([
             'plan_type' => 'required|in:full,installment',

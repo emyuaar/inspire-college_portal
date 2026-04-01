@@ -49,6 +49,11 @@ class Enrolment extends Model
         return $this->hasMany(Order::class, 'enrolment_id');
     }
 
+    public function partnerInstallments()
+    {
+        return $this->hasMany(\App\Models\Partner\PartnerLearnerInstallment::class, 'enrolment_id');
+    }
+
     /**
      * Get dynamic payment status details for UI
      * Returns array: ['status' => string, 'label' => string, 'color' => string]
@@ -208,7 +213,7 @@ class Enrolment extends Model
             $currentMonth = $partnerInstallments->filter(function ($inst) {
                 return $inst->status !== 'paid' &&
                     $inst->due_date &&
-                    $inst->due_date->isCurrentMonth();
+                    $inst->due_date->isSameMonth(now());
             });
             if ($currentMonth->isNotEmpty())
                 return false;
@@ -409,7 +414,7 @@ class Enrolment extends Model
 
             // Current Due (Due in Current Month) - Strict Rule: "If due in current month, must be paid to continue"
             $currentDue = $partnerInstallments->filter(function ($inst) {
-                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isCurrentMonth();
+                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isSameMonth(now());
             })->reject(function ($inst) use ($overdue) {
                 return $overdue->contains('id', $inst->id); // Avoid duplicates in priority logic
             });

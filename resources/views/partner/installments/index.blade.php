@@ -114,9 +114,14 @@
                             <td class="px-6 py-4">
                                 <div class="flex flex-col">
                                     <span class="text-sm font-black text-slate-900">£{{ number_format($installment->installment_amount, 2) }}</span>
-                                    @if($installment->paid_amount > 0)
+                                    @if($installment->status === 'partial')
+                                        @php $balance = $installment->installment_amount - $installment->paid_amount; @endphp
+                                        <span class="text-[10px] text-rose-600 font-bold">
+                                            Balance: £{{ number_format($balance, 2) }}
+                                        </span>
+                                    @elseif($installment->status === 'paid')
                                         <span class="text-[10px] text-emerald-600 font-bold">
-                                            Paid: £{{ number_format($installment->paid_amount, 2) }}
+                                            Fully Paid
                                         </span>
                                     @endif
                                 </div>

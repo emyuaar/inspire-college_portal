@@ -36,7 +36,7 @@ class InstallmentController extends Controller
             $query->where('status', '!=', 'paid')
                 ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()]);
         } elseif ($status === 'pending') {
-            $query->where('status', 'pending');
+            $query->where('status', '!=', 'paid');
         } elseif ($status === 'paid') {
             $query->where('status', 'paid');
         }
@@ -64,7 +64,7 @@ class InstallmentController extends Controller
                 ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
                 ->count(),
             'pending' => PartnerLearnerInstallment::where('partner_id', $partner->id)
-                ->where('status', 'pending')
+                ->where('status', '!=', 'paid')
                 ->count(),
         ];
 
@@ -237,6 +237,7 @@ class InstallmentController extends Controller
             $installment->update([
                 'paid_amount' => $newPaidAmount,
                 'status' => $status,
+                'paid_at' => ($status === 'paid' && !$installment->paid_at) ? now() : $installment->paid_at,
                 'payment_reference' => $request->payment_reference,
                 'receipt_path' => $receiptPath,
             ]);
