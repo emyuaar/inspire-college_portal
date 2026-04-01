@@ -74,7 +74,6 @@
                     <div class="bg-slate-50 rounded-2xl border-2 border-slate-100 focus-within:bg-white focus-within:shadow-xl transition-all overflow-hidden">
                         <textarea x-model="newMessage" rows="2" 
                                   @keydown.enter.prevent="if(!$event.shiftKey) sendReply()"
-                                  border-none focus:ring-0
                                   class="w-full px-6 py-5 bg-transparent border-0 focus:ring-0 text-sm font-bold text-slate-900 placeholder-slate-400 min-h-[100px] resize-none" 
                                   placeholder="Reply to support... (Shift+Enter for newline)"></textarea>
                         
