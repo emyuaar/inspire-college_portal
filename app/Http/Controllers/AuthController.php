@@ -56,7 +56,7 @@ class AuthController extends Controller
         // Redirect based on org_id logic
         if ($user->isOrganization()) {
             // org account (id == org_id)
-            return redirect()->route('partner.learners.index');
+            return redirect()->route('partner.dashboard');
         }
 
         if ($user->isStandaloneLearner()) {

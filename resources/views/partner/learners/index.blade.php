@@ -1,6 +1,7 @@
 @extends('layouts.partner')
 
 @section('title', 'My Learners')
+@section('active-page', 'learners')
 
 @section('content')
 <div class="space-y-6">

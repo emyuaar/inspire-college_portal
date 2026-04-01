@@ -38,8 +38,14 @@ Route::middleware('auth')->group(function () {
 
     // PARTNER / ORGANIZATION ROUTES
     Route::prefix('partner')->name('partner.')->middleware('role:partner')->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
-            ->name('learners.index'); // Treating this as the main dashboard
+        Route::get('/dashboard', [\App\Http\Controllers\Partner\DashboardController::class, 'index'])
+            ->name('dashboard');
+            
+        Route::get('/enrolments/pending-plans', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'pendingPlans'])
+            ->name('enrolments.pending_plans');
+
+        Route::get('/learners', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
+            ->name('learners.index');
 
         Route::get('/learners/create', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'create'])
             ->name('learners.create');

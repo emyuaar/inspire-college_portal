@@ -13,7 +13,7 @@ class DashboardController extends Controller
         $user = Auth::user();
 
         if ($user->isOrganization()) {
-            return redirect()->route('partner.learners.index');
+            return redirect()->route('partner.dashboard');
         }
 
         return redirect()->route('portal.learner.dashboard');

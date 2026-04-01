@@ -1,6 +1,7 @@
 @extends('layouts.partner')
 
 @section('title', 'Learner Details')
+@section('active-page', 'learners')
 
 @section('content')
 <div class="space-y-6">
@@ -102,13 +103,19 @@
                     <div class="flex justify-between pt-3 border-t border-slate-50">
                         <dt class="text-slate-500">Financial Status</dt>
                         <dd class="text-right">
-                           @php
+                            @php
                                $overallStatus = 'paid';
                                $label = 'All Settled';
                                $color = 'success'; // badge variant
 
                                foreach($enrolments as $e) {
                                    $p = $e->payment_status_details; 
+                                   if ($e->status_id == 5) { // Pending Plan
+                                       $overallStatus = 'review';
+                                       $label = 'Plan Review Pending';
+                                       $color = 'brand';
+                                       break;
+                                   }
                                    if ($p['status'] === 'pending_payment') {
                                        $overallStatus = 'pending';
                                        $label = 'Action Required';
@@ -198,13 +205,27 @@
                                 
                                 <div class="shrink-0 pt-1">
                                     {{-- Actions --}}
-                                    @if($statusName == 'pending-plan' && $learner->crm_approved)
-                                        <x-ui.button variant="brand" size="sm" href="{{ route('partner.enrolments.choose_plan', $enrolment->id) }}">
-                                            Select Plan
-                                        </x-ui.button>
+                                    @php 
+                                       $canReview = in_array($statusName, ['pending-plan', 'pending', 'pending-payment']);
+                                    @endphp
+
+                                    @if($canReview && $learner->crm_approved)
+                                        <div class="flex flex-col gap-2">
+                                            @if($statusName == 'pending-payment')
+                                                <x-ui.button variant="outline" size="sm" href="{{ route('partner.enrolments.choose_plan', $enrolment->id) }}">
+                                                    Review Plan
+                                                </x-ui.button>
+                                            @else
+                                                <x-ui.button variant="brand" size="sm" href="{{ route('partner.enrolments.choose_plan', $enrolment->id) }}">
+                                                    Review Plan
+                                                </x-ui.button>
+                                            @endif
+                                        </div>
+                                    @endif
                                     
-                                    @elseif($statusName == 'pending-payment' && $learner->crm_approved)
-                                        <form action="{{ route('partner.checkout', $learner->id) }}" method="POST" 
+                                    @if($statusName == 'pending-payment' && $learner->crm_approved)
+                                        <div class="mt-2">
+                                           <form action="{{ route('partner.checkout', $learner->id) }}" method="POST" 
                                               x-data="{ 
                                                 expanded: false, 
                                                 code: '', 
@@ -265,6 +286,7 @@
                                                 Pay Now
                                             </x-ui.button>
                                         </form>
+                                    </div>
 
                                     @elseif($statusName == 'pending')
                                          @php

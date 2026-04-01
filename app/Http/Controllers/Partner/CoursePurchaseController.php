@@ -24,6 +24,23 @@ class CoursePurchaseController extends Controller
     }
 
     /**
+     * List all Enrolments awaiting a Plan Selection
+     */
+    public function pendingPlans()
+    {
+        $partner = Auth::user();
+        $learnerIds = User::myLearners($partner->id)->pluck('id');
+        
+        $enrolments = Enrolment::with(['course', 'learner', 'status'])
+            ->whereIn('learner_id', $learnerIds)
+            ->whereIn('status_id', [1, 5, 6]) // Include 1, 5 (Pending/Pending Plan) and 6 (Pending Payment)
+            ->latest()
+            ->get();
+
+        return view('partner.enrolments.pending_plans', compact('enrolments'));
+    }
+
+    /**
      * Show form to add courses (Multi-Select)
      */
     public function index()
@@ -202,9 +219,9 @@ class CoursePurchaseController extends Controller
             abort(403, 'Unauthorized access to enrolment.');
         }
 
-        if ($enrolment->status->status !== 'pending-plan') {
+        if (!in_array($enrolment->status->status, ['pending-plan', 'pending', 'pending-payment'])) {
             return redirect()->route('partner.learners.show', $enrolment->learner_id)
-                ->with('warning', 'Plan already selected or enrolment active.');
+                ->with('warning', 'Enrolment is active and cannot be reviewed.');
         }
 
         // Fetch Assignment Logic
@@ -269,6 +286,10 @@ class CoursePurchaseController extends Controller
         DB::connection('mysql_crm')->beginTransaction();
 
         try {
+            // Cleanup existing unpaid orders/installments for this enrolment if any
+            Order::where('enrolment_id', $enrolment->id)->where('status_id', 0)->forceDelete();
+            \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->delete();
+
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
 
             $amount = 0;
