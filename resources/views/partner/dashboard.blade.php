@@ -134,7 +134,7 @@
 
     {{-- 3. ALERTS SECTION (Conditional) --}}
     @php 
-        $hasAlerts = $pendingApprovals > 0 || $pendingInstallmentsCount > 0 || $pendingPlansCount > 0;
+        $hasAlerts = $pendingApprovals > 0 || $overdueInstallmentsCount > 0 || $dueSoonInstallmentsCount > 0 || $pendingPlansCount > 0;
     @endphp
 
     @if($hasAlerts)
@@ -165,16 +165,30 @@
         </div>
         @endif
 
-        @if($pendingInstallmentsCount > 0)
-        <div class="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-            <div class="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">
+        @if($overdueInstallmentsCount > 0)
+        <a href="{{ route('partner.installments.index', ['status' => 'overdue']) }}" class="flex items-center gap-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl hover:bg-rose-100 transition-colors group border-l-4 border-l-rose-500">
+            <div class="flex-shrink-0 w-10 h-10 bg-rose-100 text-rose-700 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+            </div>
+            <div class="flex-1">
+                <h4 class="text-xs font-bold text-rose-900 leading-tight uppercase tracking-tight">Overdue Payments</h4>
+                <p class="text-[11px] text-rose-700 mt-0.5">{{ $overdueInstallmentsCount }} payments are past their due date.</p>
+            </div>
+            <span class="text-[11px] font-bold text-rose-800 hover:underline">Settle Now</span>
+        </a>
+        @endif
+
+        @if($dueSoonInstallmentsCount > 0)
+        <a href="{{ route('partner.installments.index', ['status' => 'due_soon']) }}" class="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl hover:bg-blue-100 transition-colors group">
+            <div class="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <i class="fa-solid fa-credit-card text-base"></i>
             </div>
             <div class="flex-1">
-                <h4 class="text-xs font-bold text-blue-900 leading-tight uppercase tracking-tight">Installments Due</h4>
-                <p class="text-[11px] text-blue-700 mt-0.5">{{ $pendingInstallmentsCount }} payments due within 7 days.</p>
+                <h4 class="text-xs font-bold text-blue-900 leading-tight uppercase tracking-tight">Payments Due Soon</h4>
+                <p class="text-[11px] text-blue-700 mt-0.5">{{ $dueSoonInstallmentsCount }} payments due within 7 days.</p>
             </div>
-        </div>
+            <span class="text-[11px] font-bold text-blue-800 hover:underline">Manage</span>
+        </a>
         @endif
     </div>
     @endif

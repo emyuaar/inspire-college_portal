@@ -42,11 +42,16 @@ class DashboardController extends Controller
         // 3. Courses Metric
         $assignedCoursesCount = PartnerAssignedCourse::where('partner_id', $partnerId)->count();
 
-        // 4. Pending Installments (Directly in CRM table)
-        $pendingInstallmentsCount = PartnerLearnerInstallment::whereIn('learner_id', $learnerIds)
-          ->where('status', 'pending')
-          ->where('due_date', '<', now()->addDays(7)) // Due within next 7 days
-          ->count();
+        // 4. Installment Metrics (Shared logic with InstallmentController)
+        $overdueInstallmentsCount = PartnerLearnerInstallment::whereIn('learner_id', $learnerIds)
+            ->where('status', '!=', 'paid')
+            ->where('due_date', '<', now()->startOfDay())
+            ->count();
+
+        $dueSoonInstallmentsCount = PartnerLearnerInstallment::whereIn('learner_id', $learnerIds)
+            ->where('status', '!=', 'paid')
+            ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
+            ->count();
         
         // 5. Pending Plan Decisions & Unsettled Enrolments (Status IDs: 1 (Pending), 5 (Pending Plan), 6 (Pending Payment))
         $pendingPlansCount = Enrolment::whereIn('learner_id', $learnerIds)
@@ -74,7 +79,8 @@ class DashboardController extends Controller
             'pendingApprovals',
             'totalRevenue',
             'assignedCoursesCount',
-            'pendingInstallmentsCount',
+            'overdueInstallmentsCount',
+            'dueSoonInstallmentsCount',
             'pendingPlansCount',
             'recentLearners',
             'recentOrders'

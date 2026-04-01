@@ -77,6 +77,9 @@ Route::middleware('auth')->group(function () {
             ->name('checkout');
 
         // Manual Installment Payment
+        Route::get('/installments', [\App\Http\Controllers\Partner\InstallmentController::class, 'index'])
+            ->name('installments.index');
+
         Route::get('/installments/{installment}/checkout', [\App\Http\Controllers\Partner\InstallmentController::class, 'createCheckoutSession'])
             ->name('installments.checkout');
 

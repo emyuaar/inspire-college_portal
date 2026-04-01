@@ -47,6 +47,30 @@ class PartnerLearnerInstallment extends Model
         'paid_amount' => 'decimal:2',
     ];
 
+    /**
+     * Get the urgency status of the installment
+     * Returns: 'overdue', 'due_soon', or 'normal'
+     */
+    public function getUrgencyAttribute()
+    {
+        if ($this->status === 'paid') {
+            return 'paid';
+        }
+
+        $today = now()->startOfDay();
+        $nextWeek = now()->addDays(7)->endOfDay();
+
+        if ($this->due_date->lt($today)) {
+            return 'overdue';
+        }
+
+        if ($this->due_date->isBetween($today, $nextWeek)) {
+            return 'due_soon';
+        }
+
+        return 'normal';
+    }
+
     public function partner()
     {
         return $this->belongsTo(User::class, 'partner_id');

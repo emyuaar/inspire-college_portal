@@ -16,6 +16,62 @@ use Stripe\Checkout\Session;
 class InstallmentController extends Controller
 {
     /**
+     * List and Filter Installments
+     */
+    public function index(Request $request)
+    {
+        $partner = Auth::user();
+        $status = $request->get('status', 'all');
+        $search = $request->get('search');
+
+        $query = PartnerLearnerInstallment::where('partner_id', $partner->id)
+            ->with(['learner', 'course', 'enrolment'])
+            ->latest('due_date');
+
+        // Apply Status Filters
+        if ($status === 'overdue') {
+            $query->where('status', '!=', 'paid')
+                ->where('due_date', '<', now()->startOfDay());
+        } elseif ($status === 'due_soon') {
+            $query->where('status', '!=', 'paid')
+                ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()]);
+        } elseif ($status === 'pending') {
+            $query->where('status', 'pending');
+        } elseif ($status === 'paid') {
+            $query->where('status', 'paid');
+        }
+
+        // Apply Search (Learner name or email)
+        if ($search) {
+            $query->whereHas('learner', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('sur_name', 'like', "%{$search}%")
+                    ->orWhere('email_address', 'like', "%{$search}%");
+            });
+        }
+
+        $installments = $query->paginate(15)->withQueryString();
+
+        // Counts for tabs
+        $counts = [
+            'all' => PartnerLearnerInstallment::where('partner_id', $partner->id)->count(),
+            'overdue' => PartnerLearnerInstallment::where('partner_id', $partner->id)
+                ->where('status', '!=', 'paid')
+                ->where('due_date', '<', now()->startOfDay())
+                ->count(),
+            'due_soon' => PartnerLearnerInstallment::where('partner_id', $partner->id)
+                ->where('status', '!=', 'paid')
+                ->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
+                ->count(),
+            'pending' => PartnerLearnerInstallment::where('partner_id', $partner->id)
+                ->where('status', 'pending')
+                ->count(),
+        ];
+
+        return view('partner.installments.index', compact('installments', 'counts', 'status', 'search'));
+    }
+
+    /**
      * Create Stripe Checkout Session for a specific installment
      */
     public function createCheckoutSession(Request $request, $installmentId)

@@ -31,7 +31,9 @@
                             course_id: {{ $inst->course_id ?? 'null' }},
                             due_date: {!! json_encode(optional($inst->due_date)->format('c')) !!}, // ISO 8601 full
                             due_date_formatted: {!! json_encode(optional($inst->due_date)->format("M d, Y") ?? 'N/A') !!},
-                            is_overdue: {!! json_encode($inst->due_date && $inst->due_date->lt(now()) && $inst->status != 'paid') !!},
+                            urgency: {!! json_encode($inst->urgency) !!},
+                            is_overdue: {!! json_encode($inst->urgency === 'overdue') !!},
+                            is_due_soon: {!! json_encode($inst->urgency === 'due_soon') !!},
                             label: {!! json_encode($inst->installment_no == 0 ? "Deposit" : "Month " . $inst->installment_no) !!},
                             course_title: {!! json_encode($inst->course->title ?? "Course") !!},
                             amount: {!! json_encode((float) ($inst->installment_amount ?? 0)) !!},
@@ -131,7 +133,7 @@
         }
     </script>
 
-    <div class="mt-8" x-data="installmentTable()">
+    <div class="mt-8" x-data="installmentTable()" id="financial-section">
         <div class="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <h3 class="text-lg font-bold text-slate-800">Installment Plan</h3>
 
@@ -241,6 +243,9 @@
                                     <div class="font-medium text-slate-700" x-text="formatDate(row.due_date)"></div>
                                     <div x-show="row.is_overdue"
                                         class="text-[10px] text-red-500 font-bold uppercase tracking-wider mt-0.5">Overdue
+                                    </div>
+                                    <div x-show="row.is_due_soon"
+                                        class="text-[10px] text-amber-500 font-bold uppercase tracking-wider mt-0.5">Due Soon
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 align-top">
