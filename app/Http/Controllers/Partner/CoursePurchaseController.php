@@ -43,14 +43,22 @@ class CoursePurchaseController extends Controller
     /**
      * Show form to add courses (Multi-Select)
      */
-    public function index()
+    public function index(Request $request)
     {
         $partner = Auth::user();
+        $search = $request->get('search');
 
         // Fetch Assigned Courses with Plans
-        $assigned = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
-            ->with(['course.promotions', 'plans'])
-            ->get();
+        $query = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
+            ->with(['course.category', 'plans']);
+
+        if ($search) {
+            $query->whereHas('course', function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%");
+            });
+        }
+
+        $assigned = $query->get();
 
         $courses = $assigned->map(function ($assignment) {
             $course = $assignment->course;
@@ -78,7 +86,7 @@ class CoursePurchaseController extends Controller
             return $course;
         })->filter();
 
-        return view('partner.courses.index', compact('courses'));
+        return view('partner.courses.index', compact('courses', 'search'));
     }
 
     /**
