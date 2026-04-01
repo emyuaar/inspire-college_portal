@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\Crm\SupportTicket;
 use App\Models\Crm\SupportMessage;
+use App\Traits\SupportTimezoneTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class SupportTicketController extends Controller
 {
+    use SupportTimezoneTrait;
     private function notifyCrmStaff($ticket, $message)
     {
         try {
@@ -112,7 +114,7 @@ class SupportTicketController extends Controller
                 'id' => $msg->id,
                 'body' => $msg->body,
                 'sender_type' => $msg->sender_type,
-                'created_at' => $msg->created_at->format('d M, H:i'),
+                'created_at' => $this->localizeDate($msg->created_at),
                 'is_self' => $msg->sender_type === 'partner'
             ];
         });
@@ -176,7 +178,7 @@ class SupportTicketController extends Controller
                     'id' => $message->id,
                     'body' => $message->body,
                     'sender_type' => $message->sender_type,
-                    'created_at' => $message->created_at->format('d M, H:i'),
+                    'created_at' => $this->localizeDate($message->created_at),
                     'is_self' => true
                 ]
             ]);

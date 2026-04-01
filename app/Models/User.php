@@ -35,6 +35,11 @@ class User extends Authenticatable
         'crm_approved_at' => 'datetime',
     ];
 
+    public function getNameAttribute()
+    {
+        return trim($this->first_name . ' ' . $this->sur_name);
+    }
+
     protected $hidden = [
         'password',
         'remember_token',

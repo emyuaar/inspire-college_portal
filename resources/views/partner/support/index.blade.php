@@ -67,7 +67,7 @@
                             </td>
                             <td class="px-6 py-4 text-center">
                                 <div class="text-xs font-bold text-slate-700">
-                                    {{ $ticket->last_message_at ? $ticket->last_message_at->diffForHumans() : $ticket->created_at->diffForHumans() }}
+                                    {{ $ticket->last_message_at ? \Carbon\Carbon::parse($ticket->last_message_at)->setTimezone('Asia/Karachi')->diffForHumans() : \Carbon\Carbon::parse($ticket->created_at)->setTimezone('Asia/Karachi')->diffForHumans() }}
                                 </div>
                                 <div class="text-[9px] text-slate-500 font-bold uppercase">
                                     By {{ $ticket->last_message_by === 'partner' ? 'You' : 'Support' }}
