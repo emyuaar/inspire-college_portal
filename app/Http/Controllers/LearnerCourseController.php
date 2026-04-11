@@ -15,41 +15,19 @@ use App\Services\SharePointService;
 
 class LearnerCourseController extends Controller
 {
+    protected $accessService;
+
+    public function __construct(SharePointService $sp, \App\Services\EnrolmentAccessService $accessService)
+    {
+        $this->accessService = $accessService;
+    }
+
     /**
-     * Strict check for enrolment status (User Requirements + CRM Approval).
-     * Payment is NOT a blocker for access (Content Gate).
+     * Strict check for enrolment status (User Requirements + Admissions Approval + Payment).
      */
     private function checkAccess($enrolment)
     {
-        // 1. Requirements Check
-        $user = Auth::user();
-
-        // STRICT GATE: Use the consolidated verification check
-        if (!$user->isVerified()) {
-            return false;
-        }
-
-        // 2. Enrolment Status Hard Block & Payment Gate
-        // Policy A (Strict): Must be Active/Paid/Approved. Unpaid logic returns false.
-
-        $allowedStatuses = ['active', 'paid', 'approved'];
-        $statusStr = strtolower($enrolment->status->status ?? '');
-
-        // Block if Denied/Archived
-        if ($statusStr === 'denied' || $statusStr === 'archived') {
-            return false;
-        }
-
-        // Strict Payment/Status Check
-        // If it's NOT in allowed statuses, check if Order is Paid (ID 1)
-        if (!in_array($statusStr, $allowedStatuses)) {
-            $enrolment->load('latestOrder');
-            if (!$enrolment->latestOrder || $enrolment->latestOrder->status_id !== 1) {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->accessService->canAccessLearning($enrolment, Auth::user());
     }
 
     public function show(Enrolment $enrolment)

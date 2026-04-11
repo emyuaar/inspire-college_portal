@@ -100,7 +100,7 @@ class PartnerNotificationService
                 'related_id'    => $learner->id,
                 'related_type'  => 'learner',
                 'title'         => 'Learner Awaiting Approval',
-                'body'          => $this->learnerName($learner) . "'s account is pending CRM review.",
+                'body'          => $this->learnerName($learner) . "'s account is awaiting approval by the admissions team.",
                 'icon'          => 'user',
                 'color'         => 'blue',
                 'action_url'    => route('partner.learners.show', $learner->id),

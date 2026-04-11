@@ -19,14 +19,18 @@ class DashboardController extends Controller
         return redirect()->route('portal.learner.dashboard');
     }
 
-    public function learner()
+    public function learner(\App\Services\EnrolmentAccessService $accessService)
     {
         $user = Auth::user();
 
         $enrolments = Enrolment::with(['course', 'status', 'latestOrder'])
             ->where('learner_id', $user->id)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function($e) use ($accessService, $user) {
+                $e->access_state = $accessService->getAccessState($e, $user);
+                return $e;
+            });
 
         $onboarding = LearnerOnboardingStatus::where('learner_id', $user->id)->first();
 
@@ -67,14 +71,18 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function allCourses()
+    public function allCourses(\App\Services\EnrolmentAccessService $accessService)
     {
         $user = Auth::user();
 
-        $enrolments = Enrolment::with(['course.category'])
+        $enrolments = Enrolment::with(['course.category', 'status', 'latestOrder'])
             ->where('learner_id', $user->id)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function($e) use ($accessService, $user) {
+                $e->access_state = $accessService->getAccessState($e, $user);
+                return $e;
+            });
 
         return view('learner.courses.all-courses', compact('user', 'enrolments'));
     }

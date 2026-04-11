@@ -47,7 +47,7 @@
                         </div>
                     </div>
 
-                    {{-- CRM Status --}}
+                    {{-- Admissions Status --}}
                     <div class="flex justify-between py-1">
                         <dt class="text-slate-500">College Approval</dt>
                         <dd class="text-right">
@@ -303,7 +303,7 @@
                                              <span class="text-xs font-bold text-amber-600 block text-right">Requirements Pending</span>
                                              <span class="text-[10px] text-slate-400 block text-right">Learner must fill forms</span>
                                          @elseif(!$learner->crm_approved)
-                                             <span class="text-xs font-medium text-slate-400 italic">Awaiting Admin Review</span>
+                                             <span class="text-xs font-medium text-slate-400 italic">Awaiting Admissions Review</span>
                                          @else
                                              <span class="text-xs font-medium text-slate-400">Processing...</span>
                                          @endif

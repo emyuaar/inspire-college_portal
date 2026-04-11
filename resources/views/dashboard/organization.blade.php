@@ -47,7 +47,7 @@
                 <h2 class="text-sm font-semibold text-slate-800 mb-2">Overview</h2>
                 <p class="text-xs text-slate-500">
                     This section can later show number of linked learners, active courses, and other KPIs
-                    based on CRM/Portal integration.
+                    based on system integration.
                 </p>
             </section>
         </div>
