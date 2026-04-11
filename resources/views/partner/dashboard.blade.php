@@ -17,7 +17,7 @@
                     Welcome back, {{ $partner->first_name }}!
                 </h1>
                 <p class="text-blue-100/80 text-sm max-w-xl leading-relaxed">
-                    Here's a quick overview of your partnership performance. You have <span class="text-white font-bold">{{ $pendingApprovals }}</span> learners awaiting CRM approval.
+                    Here's a quick overview of your partnership performance. You have <span class="text-white font-bold">{{ $pendingApprovals }}</span> learners awaiting college approval.
                 </p>
                 <div class="flex flex-wrap gap-3 mt-4">
                     <div class="flex items-center gap-1.5 px-3 py-1 bg-white/10 border border-white/10 rounded-full text-[11px] font-medium">
@@ -121,7 +121,7 @@
         <x-ui.card class="h-full border-slate-200 shadow-sm relative overflow-hidden group">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Partner Courses</p>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">My Courses</p>
                     <h3 class="text-xl font-black text-slate-900">{{ number_format($assignedCoursesCount) }}</h3>
                     <p class="text-[9px] text-blue-600 font-bold mt-1 uppercase tracking-tighter">Active Pricing</p>
                 </div>
@@ -147,8 +147,8 @@
                 <i class="fa-solid fa-user-clock text-base"></i>
             </div>
             <div class="flex-1">
-                <h4 class="text-xs font-bold text-amber-900 leading-tight uppercase tracking-tight">CRM Review</h4>
-                <p class="text-[11px] text-amber-700 mt-0.5">{{ $pendingApprovals }} learners awaiting admin approval.</p>
+                <h4 class="text-xs font-bold text-amber-900 leading-tight uppercase tracking-tight">College Review</h4>
+                <p class="text-[11px] text-amber-700 mt-0.5">{{ $pendingApprovals }} learners awaiting college approval.</p>
             </div>
             <a href="{{ route('partner.learners.index') }}" class="text-[11px] font-bold text-amber-800 hover:underline">View All</a>
         </div>

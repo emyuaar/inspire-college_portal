@@ -31,24 +31,24 @@ class DashboardController extends Controller
         $onboarding = LearnerOnboardingStatus::where('learner_id', $user->id)->first();
 
         // if any enrolment denied
-        $isDenied = $enrolments->contains(fn($e) => (int)$e->status_id === 3);
+        $isDenied = $enrolments->contains(fn($e) => (int) $e->status_id === 3);
 
-        $personalCompleted   = (bool) ($onboarding->personal_info_completed   ?? false);
-        $rplCompleted        = (bool) ($onboarding->rpl_info_completed        ?? false);
+        $personalCompleted = (bool) ($onboarding->personal_info_completed ?? false);
+        $rplCompleted = (bool) ($onboarding->rpl_info_completed ?? false);
         $disabilityCompleted = (bool) ($onboarding->disability_info_completed ?? false);
 
         $onboardingCompleted = $personalCompleted && $rplCompleted && $disabilityCompleted;
 
         return view('dashboard.learner', [
-            'user'                => $user,
-            'organization'        => $user->isOrgLearner() ? $user->organization : null,
-            'enrolments'          => $enrolments,
-            'onboarding'          => $onboarding,
+            'user' => $user,
+            'organization' => $user->isOrgLearner() ? $user->organization : null,
+            'enrolments' => $enrolments,
+            'onboarding' => $onboarding,
             'onboardingCompleted' => $onboardingCompleted,
-            'personalCompleted'   => $personalCompleted,
-            'rplCompleted'        => $rplCompleted,
+            'personalCompleted' => $personalCompleted,
+            'rplCompleted' => $rplCompleted,
             'disabilityCompleted' => $disabilityCompleted,
-            'isDenied'            => $isDenied,
+            'isDenied' => $isDenied,
         ]);
     }
 
@@ -62,7 +62,7 @@ class DashboardController extends Controller
             ->get();
 
         return view('dashboard.organization', [
-            'user'     => $user,
+            'user' => $user,
             'learners' => $learners,
         ]);
     }

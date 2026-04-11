@@ -49,7 +49,7 @@
 
                     {{-- CRM Status --}}
                     <div class="flex justify-between py-1">
-                        <dt class="text-slate-500">CRM Approval</dt>
+                        <dt class="text-slate-500">College Approval</dt>
                         <dd class="text-right">
                              @if($learner->crm_approved)
                                 <span class="font-bold text-slate-700 flex items-center justify-end gap-1">
