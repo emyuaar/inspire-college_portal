@@ -440,14 +440,36 @@ class LearnerCourseController extends Controller
             ->humanMessage('Learner viewed lesson/downloaded file')
             ->save();
 
-        if (blank($lesson->sharepoint_item_id)) {
-            return back()->with('error', 'Lesson file not available on SharePoint.');
+        if (!blank($lesson->sharepoint_item_id)) {
+            $inline = request()->routeIs('portal.learner.lesson.file.inline');
+            $name = $lesson->file_name ?? $lesson->title . '.pdf';
+            return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline);
         }
 
-        $inline = request()->routeIs('portal.learner.lesson.file.inline');
+        if (!blank($lesson->file_path)) {
+            // 1. Try local Portal storage (if synced)
+            if (\Storage::disk('public')->exists($lesson->file_path)) {
+                return \Storage::disk('public')->download($lesson->file_path, $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
+            }
 
-        $name = $lesson->file_name ?? $lesson->title . '.pdf'; // adjust if you store
-        return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline);
+            // 2. Try CRM storage root
+            $crmRoot = config('services.crm.storage_root');
+            if ($crmRoot) {
+                $crmRootReal = realpath($crmRoot);
+                if ($crmRootReal) {
+                    // LMS resources are on 'public' disk in CRM, so storage/app/public/{file_path}
+                    $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $lesson->file_path), '\\/');
+                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $relative;
+
+                    $fullReal = realpath($fullPath);
+                    if ($fullReal && is_file($fullReal) && strpos($fullReal, $crmRootReal) === 0) {
+                        return response()->download($fullReal, $lesson->title . '.' . pathinfo($fullReal, PATHINFO_EXTENSION));
+                    }
+                }
+            }
+        }
+
+        return back()->with('error', 'File not available.');
     }
 
     public function downloadAssignmentBrief(AssignmentFile $brief, SharePointService $sp)

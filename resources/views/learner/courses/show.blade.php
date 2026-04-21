@@ -131,57 +131,59 @@
                                             <div class="space-y-3">
                                                 @foreach ($module->lessons as $lesson)
                                                     @php
-                                                        $primaryUrl = !blank($lesson->video_url) ? $lesson->video_url : route('portal.learner.lessons.show', $lesson->id);
-                                                        $primaryTarget = !blank($lesson->video_url) ? '_blank' : null;
-                                                        $isFile = !blank($lesson->file_path);
+                                                        $isUrl = !blank($lesson->video_url);
+                                                        $isFileResource = !blank($lesson->file_path) && blank($lesson->content) && blank($lesson->video_url);
+                                                        
+                                                        if ($isFileResource) {
+                                                            $primaryUrl = route('portal.learner.lesson.file.download', $lesson->id);
+                                                            $primaryTarget = null;
+                                                            $typeLabel = 'File / Resource';
+                                                            $actionLabel = 'Download File';
+                                                            $btnIcon = 'download';
+                                                            $typeIcon = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>';
+                                                        } else {
+                                                            $primaryUrl = $isUrl ? $lesson->video_url : route('portal.learner.lessons.show', $lesson->id);
+                                                            $primaryTarget = $isUrl ? '_blank' : null;
+                                                            $typeLabel = $isUrl ? 'External Link' : 'Reading Material';
+                                                            $actionLabel = 'Open Lesson';
+                                                            $btnIcon = null;
+                                                            $typeIcon = '<path d="M3.5 5.5A2.5 2.5 0 0 1 6 3h12.5v18H6a2.5 2.5 0 0 0-2.5 2.5V5.5z"/><path d="M7 3v18"/><path d="M10 7h6"/>';
+                                                        }
                                                     @endphp
                                                     <div
                                                         class="group flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm hover:bg-slate-50 transition-all bg-white">
                                                         <div class="flex items-start gap-4">
                                                             <div
-                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg {{ $isFileResource ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600' }} flex items-center justify-center">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                                     stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
                                                                     stroke-linejoin="round" class="w-5 h-5">
-                                                                    <!-- Book cover -->
-                                                                    <path
-                                                                        d="M3.5 5.5A2.5 2.5 0 0 1 6 3h12.5v18H6a2.5 2.5 0 0 0-2.5 2.5V5.5z" />
-
-                                                                    <!-- Spine -->
-                                                                    <path d="M7 3v18" />
-
-                                                                    <!-- Page line -->
-                                                                    <path d="M10 7h6" />
+                                                                    {!! $typeIcon !!}
                                                                 </svg>
                                                             </div>
                                                             <div>
-                                                                <a href="{{ $primaryUrl }}" @if($primaryTarget)
-                                                                target="{{ $primaryTarget }}" @endif
+                                                                <a href="{{ $primaryUrl }}" @if($primaryTarget) target="{{ $primaryTarget }}" @endif
                                                                     class="font-bold text-slate-800 group-hover:text-ds-navy transition-colors block">
                                                                     {{ $lesson->title }}
                                                                 </a>
                                                                 <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                                                    <span>{{ !blank($lesson->video_url) ? 'Lesson' : 'Reading Material' }}</span>
-                                                                    @if($isFile)
+                                                                    <span>{{ $typeLabel }}</span>
+                                                                    @if(!$isFileResource && !blank($lesson->file_path))
                                                                         <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                                        <span>Includes files</span>
+                                                                        <span>Includes attachment</span>
                                                                     @endif
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div class="flex items-center gap-2 pl-12 md:pl-0">
                                                             <x-ui.button href="{{ $primaryUrl }}" target="{{ $primaryTarget }}"
-                                                                size="sm" variant="outline">
-                                                                Open Lesson
+                                                                size="sm" variant="{{ $isFileResource ? 'primary' : 'outline' }}"
+                                                                icon="{{ $btnIcon }}">
+                                                                {{ $actionLabel }}
                                                             </x-ui.button>
-                                                            @if ($isFile)
-                                                                <x-ui.button href="{{ $lesson->file_path }}" target="_blank" size="sm"
-                                                                    variant="ghost" icon="download">
-                                                                    File
-                                                                </x-ui.button>
-                                                            @endif
                                                         </div>
                                                     </div>
+>
                                                 @endforeach
                                             </div>
                                         </div>

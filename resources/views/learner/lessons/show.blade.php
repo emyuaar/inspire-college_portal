@@ -50,7 +50,8 @@
                         @endphp
 
                         @if($file)
-                            <x-ui.button href="{{ $isUrl ? $file : asset('storage/' . $file) }}" target="_blank"
+                            <x-ui.button href="{{ $isUrl ? $file : route('portal.learner.lesson.file.download', $lesson->id) }}" 
+                                target="_blank"
                                 variant="outline" size="sm">
                                 <x-slot name="icon">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
