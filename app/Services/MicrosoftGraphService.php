@@ -29,9 +29,9 @@ class MicrosoftGraphService
     {
         $response = Http::asForm()->post("https://login.microsoftonline.com/{$this->tenantId}/oauth2/v2.0/token", [
             'grant_type' => 'client_credentials',
-            'client_id'     => $this->clientId,
+            'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'scope'         => 'https://graph.microsoft.com/.default',
+            'scope' => 'https://graph.microsoft.com/.default',
         ]);
 
         if ($response->failed()) {
@@ -48,7 +48,7 @@ class MicrosoftGraphService
     public function provisionLearner(User $user, string $plainPassword = null)
     {
         $token = $this->getAccessToken();
-        
+
         // 1. Determine UPN (DS{id}@domain)
         // Assumption: We want to use the standard DS email format if possible, 
         // to match CRM logic.
@@ -71,41 +71,41 @@ class MicrosoftGraphService
             // A. Create or Get User
             $displayName = trim($user->first_name . ' ' . $user->sur_name);
             if (!$plainPassword) {
-                 // If no password provided (e.g. async job), we might need to reset or skip?
-                 // Current flow in PaymentProcessingService doesn't have plain password of the user easily available 
-                 // UNLESS we are in the flow where user is registering?
-                 // Wait, for payment webhook, we assume user accounts exist.
-                 // If we create a NEW MS account, we need a password.
-                 // We can generate a temporary one or use a distinct one.
-                 // Or we can try to reset it to something known?
-                 // CRM logic requires password.
-                 // Since we don't know the user's plaintext password in Portal (hashed), 
-                 // we might have to generate a random one and save it? 
-                 // modifying the portal password?
-                 // CRM logic line 80: $portalUser->password = Hash::make($plainPassword);
-                 // It RESETS the portal password to the one used for MS.
-                 // This implies we should generate a secure password, set it for MS, and set it for Portal.
-                 // BUT this might disrupt the user if they just signed up?
-                 // If they signed up, they know their password.
-                 // We cannot retrieve it.
-                 // If we use a different password for MS, they have 2 passwords.
-                 // The requirement says "Provision Microsoft account using SAME DS email + SAME password."
-                 // This is tricky if we don't have the plain password.
-                 // However, usually this runs at ONBOARDING where we might have it in session?
-                 // But here it's Payment Webhook.
-                 // Strategy: Generate a random password, set it on MS, and UPDATING Portal password is risky if they are logged in?
-                 // Maybe we only do this if ms_user_id is null?
-                 // If ms_user_id is null, it means they were never provisioned.
-                 // We can generate a password, email it to them?
-                 // OR we leave password management to them via "Forgot Password"?
-                 // Let's generate a strong random password if we are creating the user.
-                 $plainPassword = \Illuminate\Support\Str::random(12) . '!Aa1';
-                 // We will update the local user implementation to match if we want sync.
-                 // But changing user's portal password might lock them out of Portal!
-                 // Better to NOT change Portal password unless we must.
-                 // MS account needs a password. We give it one.
-                 // The user might need to reset it.
-                 // Let's proceed with generated password for MS.
+                // If no password provided (e.g. async job), we might need to reset or skip?
+                // Current flow in PaymentProcessingService doesn't have plain password of the user easily available 
+                // UNLESS we are in the flow where user is registering?
+                // Wait, for payment webhook, we assume user accounts exist.
+                // If we create a NEW MS account, we need a password.
+                // We can generate a temporary one or use a distinct one.
+                // Or we can try to reset it to something known?
+                // CRM logic requires password.
+                // Since we don't know the user's plaintext password in Portal (hashed), 
+                // we might have to generate a random one and save it? 
+                // modifying the portal password?
+                // CRM logic line 80: $portalUser->password = Hash::make($plainPassword);
+                // It RESETS the portal password to the one used for MS.
+                // This implies we should generate a secure password, set it for MS, and set it for Portal.
+                // BUT this might disrupt the user if they just signed up?
+                // If they signed up, they know their password.
+                // We cannot retrieve it.
+                // If we use a different password for MS, they have 2 passwords.
+                // The requirement says "Provision Microsoft account using SAME DS email + SAME password."
+                // This is tricky if we don't have the plain password.
+                // However, usually this runs at ONBOARDING where we might have it in session?
+                // But here it's Payment Webhook.
+                // Strategy: Generate a random password, set it on MS, and UPDATING Portal password is risky if they are logged in?
+                // Maybe we only do this if ms_user_id is null?
+                // If ms_user_id is null, it means they were never provisioned.
+                // We can generate a password, email it to them?
+                // OR we leave password management to them via "Forgot Password"?
+                // Let's generate a strong random password if we are creating the user.
+                $plainPassword = \Illuminate\Support\Str::random(12) . '!Aa1';
+                // We will update the local user implementation to match if we want sync.
+                // But changing user's portal password might lock them out of Portal!
+                // Better to NOT change Portal password unless we must.
+                // MS account needs a password. We give it one.
+                // The user might need to reset it.
+                // Let's proceed with generated password for MS.
             }
 
             $msUser = $this->createUserOrGetExisting($token, $upn, $displayName, $plainPassword);
@@ -142,7 +142,7 @@ class MicrosoftGraphService
             // "Provision Microsoft account using SAME DS email + SAME password."
             // Yes, it seems the intention is to standardize identity.
             if ($user->email_address !== $upn) {
-                $user->email_address = $upn; 
+                $user->email_address = $upn;
                 Log::info("MSGraphService: Updated Portal Email to matches MS UPN.", ['new_email' => $upn]);
             }
             // Update password?
@@ -157,7 +157,7 @@ class MicrosoftGraphService
             // but set it on MS. They can use "Forgot Password" on MS if needed?
             // MS doesn't have easy self-service reset without setup.
             // I will NOT update portal password for safety, but I accepted the $plainPassword arg.
-            
+
             $user->save();
 
             return true;
@@ -177,7 +177,7 @@ class MicrosoftGraphService
     public function createPendingLearner(User $user, string $plainPassword)
     {
         $token = $this->getAccessToken();
-        
+
         $dsNo = $user->id;
         $domain = config('services.ms.domain', 'directskills.co.uk');
         $upn = "DS{$dsNo}@{$domain}"; // Or use $user->email_address if already set to DS email
@@ -192,7 +192,7 @@ class MicrosoftGraphService
     {
         // Try create
         $mailNickname = explode('@', $upn)[0];
-        
+
         $payload = [
             'accountEnabled' => $enabled,
             'displayName' => $displayName,
@@ -263,7 +263,7 @@ class MicrosoftGraphService
 
         if ($response->failed()) {
             // 400 or 409 if already member
-             if (str_contains($response->body(), 'One or more added object references already exist')) {
+            if (str_contains($response->body(), 'One or more added object references already exist')) {
                 return;
             }
             throw new Exception('Failed to add to group: ' . $response->body());
@@ -275,7 +275,7 @@ class MicrosoftGraphService
         $token = $this->getAccessToken();
         return $this->enableUserWithToken($token, $userId);
     }
-    
+
     protected function enableUserWithToken($token, $userId)
     {
         $response = Http::withToken($token)

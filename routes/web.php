@@ -40,7 +40,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('partner')->name('partner.')->middleware('role:partner')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Partner\DashboardController::class, 'index'])
             ->name('dashboard');
-            
+
         Route::get('/enrolments/pending-plans', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'pendingPlans'])
             ->name('enrolments.pending_plans');
 
@@ -127,6 +127,10 @@ Route::middleware('auth')->group(function () {
         // Learner Dashboard
         Route::get('/learner/dashboard', [DashboardController::class, 'learner'])
             ->name('portal.learner.dashboard');
+
+        // Frontend Diagnostic Logging
+        Route::post('/learner/diagnostic-logs', [\App\Http\Controllers\LearnerDiagnosticController::class, 'store'])
+            ->name('portal.learner.diagnostic.store');
 
         // Learner all courses
         Route::get('/learner/courses', [DashboardController::class, 'allCourses'])

@@ -12,6 +12,9 @@ use App\Models\AssignmentFile;
 use App\Models\AssignmentSubmission;
 use App\Models\Crm\GradeSheetCell; // Added CRM Grade Model
 use App\Services\SharePointService;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use App\Services\LearnerLogger;
 
 class LearnerCourseController extends Controller
 {
@@ -44,6 +47,11 @@ class LearnerCourseController extends Controller
         }
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.course.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Course access blocked: Enrolment not active.')
+                ->save();
 
             // Optional: better messages
             if (($enrolment->status->status ?? '') === 'denied') {
@@ -57,10 +65,16 @@ class LearnerCourseController extends Controller
                 ->with('error', 'Your enrolment is awaiting approval or payment.');
         }
 
+        LearnerLogger::log('learner.course.viewed', 'activity')
+            ->humanMessage('Learner viewed course: ' . ($enrolment->course?->title ?? 'Untitled'))
+            ->save();
+
         $enrolment->load('course');
         $course = $enrolment->course;
 
-        $modules = CourseModule::with([
+        $hasExtraAttemptTable = Schema::connection('mysql_crm')->hasTable('grade_extra_attempts');
+
+        $with = [
             'lessons' => function ($q) {
                 $q->where('is_published', true)
                     ->orderBy('sort_order');
@@ -74,7 +88,16 @@ class LearnerCourseController extends Controller
                 $q->where('learner_id', $user->id)
                     ->latest('reset_at');
             },
-        ])
+        ];
+
+        if ($hasExtraAttemptTable) {
+            $with['assignments.extraAttemptGrants'] = function ($q) use ($user) {
+                $q->where('learner_id', $user->id)
+                    ->latest('granted_at');
+            };
+        }
+
+        $modules = CourseModule::with($with)
             ->where('course_id', $course->id)
             ->orderBy('sort_order')
             ->get();
@@ -112,11 +135,26 @@ class LearnerCourseController extends Controller
         }
         // ------------------------------------------------------------------
 
+        $submissionStatusNameById = [];
+        if (Schema::connection('mysql_portal')->hasTable('assignment_submission_statuses')) {
+            $submissionStatusNameById = DB::connection('mysql_portal')
+                ->table('assignment_submission_statuses')
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+        
+        LearnerLogger::log('learner.course.viewed')
+            ->courseId($course->id)
+            ->humanMessage('Learner viewed course')
+            ->save();
+
         return view('learner.courses.show', [
             'user' => $user,
             'enrolment' => $enrolment,
             'course' => $course,
             'modules' => $modules,
+            'hasExtraAttemptTable' => $hasExtraAttemptTable,
+            'submissionStatusNameById' => $submissionStatusNameById,
         ]);
     }
 
@@ -131,6 +169,11 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.assignment.upload.blocked', 'upload')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Upload blocked: Enrolment not active or payment pending.')
+                ->save();
             return back()->with('error', 'Your enrolment is not active or payment is pending.');
         }
 
@@ -138,8 +181,12 @@ class LearnerCourseController extends Controller
             'submission_file' => 'required|file|max:20480',
         ]);
 
-        // file + original name
         $file = $request->file('submission_file');
+        
+        $logger = LearnerLogger::log('learner.assignment.upload.started', 'upload')
+            ->file($file->getClientOriginalName(), $file->getClientMimeType(), $file->getSize())
+            ->humanMessage('Learner started assignment upload logic')
+            ->save();
         $originalName = $file->getClientOriginalName();
 
         // load relations (must exist on Assignment model)
@@ -187,7 +234,16 @@ class LearnerCourseController extends Controller
         }
 
         // --- ENFORCE RESUBMISSION RULES ---
-        if ($attemptNo >= 2) {
+        $standardMaxAttempts = 2;
+        $extraAttemptsGranted = 0;
+        if (Schema::connection('mysql_crm')->hasTable('grade_extra_attempts')) {
+            $extraAttemptsGranted = (int) \App\Models\Crm\GradeExtraAttempt::where('portal_assignment_id', $assignment->id)
+                ->where('learner_id', $user->id)
+                ->sum('additional_attempts');
+        }
+        $maxAllowedAttempts = $standardMaxAttempts + $extraAttemptsGranted;
+
+        if ($attemptNo >= $maxAllowedAttempts) {
             return back()->with('error', 'Maximum attempts reached for this assignment.');
         }
 
@@ -224,6 +280,13 @@ class LearnerCourseController extends Controller
             'sharepoint_path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
             'sharepoint_url' => $uploaded['webUrl'] ?? null,
         ]);
+        
+        LearnerLogger::log('learner.assignment.submission.completed', 'upload')
+            ->courseId($assignment->course_id)
+            ->assignmentId($assignment->id)
+            ->file($originalName, $ext, $size)
+            ->humanMessage('Assignment uploaded and submitted successfully')
+            ->save();
 
         return back()->with('success', 'Your assignment file has been submitted');
     }
@@ -302,6 +365,13 @@ class LearnerCourseController extends Controller
             ->where('sort_order', '>', $lesson->sort_order)
             ->orderBy('sort_order', 'asc')
             ->first();
+            
+        LearnerLogger::log('learner.lesson.view.opened')
+            ->courseId($lesson->course_id)
+            ->moduleId($lesson->module_id)
+            ->lessonId($lesson->id)
+            ->humanMessage('Learner accessed a lesson view')
+            ->save();
 
         return view('learner.lessons.show', [
             'lesson' => $lesson,
@@ -322,8 +392,17 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.lesson.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Lesson access blocked: Enrolment not active.')
+                ->save();
             abort(403);
         }
+
+        LearnerLogger::log('learner.lesson.viewed', 'activity')
+            ->humanMessage('Learner viewed lesson/downloaded file')
+            ->save();
 
         if (blank($lesson->sharepoint_item_id)) {
             return back()->with('error', 'Lesson file not available on SharePoint.');
@@ -348,8 +427,17 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.assignment.brief.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Assignment brief access blocked: Enrolment not active.')
+                ->save();
             abort(403);
         }
+
+        LearnerLogger::log('learner.assignment.brief.viewed', 'activity')
+            ->humanMessage('Learner viewed assignment brief')
+            ->save();
 
         if (blank($brief->sharepoint_item_id)) {
             return back()->with('error', 'Brief not available on SharePoint.');

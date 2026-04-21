@@ -209,6 +209,21 @@
                                                         $res = $latestGrade ? strtolower($latestGrade->result) : null;
                                                         $isRefer = $res === 'refer';
                                                         $isPass = $res === 'pass';
+                                                        $isFail = $res === 'fail';
+
+                                                        $submissionStatusName = null;
+                                                        if ($submission) {
+                                                            $submissionStatusName = $submissionStatusNameById[$submission->status_id] ?? null;
+                                                        }
+
+                                                        // Attempt limits: standard 2 + any assessor-granted overrides (do not reset history)
+                                                        $standardMaxAttempts = 2;
+                                                        $extraAttemptsGranted = 0;
+                                                        if (!empty($hasExtraAttemptTable) && $hasExtraAttemptTable) {
+                                                            $extraAttemptsGranted = (int) $assignment->extraAttemptGrants->sum('additional_attempts');
+                                                        }
+                                                        $maxAllowedAttempts = $standardMaxAttempts + $extraAttemptsGranted;
+                                                        $nextAttemptNo = $attemptCount + 1;
 
                                                         // Check for Active Reset
                                                         // A reset is "active" if it was created AFTER the latest submission
@@ -240,23 +255,53 @@
                                                             $badgeText = 'Submitted';
                                                             $allowUpload = false;
                                                         } elseif ($isPass) {
-                                                            $badgeVariant = 'success';
-                                                            $badgeText = 'Passed';
-                                                            $allowUpload = false;
-                                                        } elseif ($isRefer) {
-                                                            $badgeVariant = 'warning';
-                                                            $badgeText = 'Referred'; // Strict text
+                                                            // Learners must not see Pass until IQA verification is actually completed.
+                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            if ($isVerified) {
+                                                                $badgeVariant = 'success';
+                                                                $badgeText = 'Passed';
+                                                                $allowUpload = false;
+                                                            } else {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                                $bannerType = 'pending_verification';
+                                                                $allowUpload = false;
+                                                            }
+                                                        } elseif ($isFail && !$isActiveReset) {
+                                                            // Learners must not see Fail until IQA verification is actually completed,
+                                                            // unless a resubmission has been granted (then they are in resubmit flow).
+                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            if ($isVerified) {
+                                                                $badgeVariant = 'error';
+                                                                $badgeText = 'Failed';
+                                                                $allowUpload = false;
+                                                            } else {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                                $bannerType = 'pending_verification';
+                                                                $allowUpload = false;
+                                                            }
+                                                        } elseif ($isRefer || $isFail) {
+                                                            // If a resubmission has been granted, the learner is in "try again" flow.
+                                                            // Avoid showing Fail as a final outcome before verification.
+                                                            if ($isActiveReset) {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                            } else {
+                                                                $badgeVariant = $isFail ? 'error' : 'warning';
+                                                                $badgeText = $isFail ? 'Failed' : 'Referred';
+                                                            }
 
-                                                            if ($attemptCount >= 2) {
-                                                                // Max attempts used
+                                                            if ($attemptCount >= $maxAllowedAttempts) {
+                                                                // Max attempts used (including any granted overrides)
                                                                 $bannerType = 'max_attempts';
                                                                 $allowUpload = false;
                                                             } elseif ($isActiveReset) {
-                                                                // Reset active + Attempts < 2
+                                                                // Reset active + Attempts within limit
                                                                 $bannerType = 'reattempt_allowed';
                                                                 $allowUpload = true;
                                                             } else {
-                                                                // Referred, no reset yet
+                                                                // No reset yet
                                                                 $bannerType = 'wait_approval';
                                                                 $allowUpload = false;
                                                             }
@@ -271,15 +316,33 @@
                                                             $badgeText = 'Pending';
                                                             $allowUpload = true;
                                                         }
+
+                                                        // Learner-facing result theme (tint the whole assignment block for quick scanning).
+                                                        // Only apply the strong theme for final outcomes shown to the learner.
+                                                        $resultVariant = match (strtolower((string) $badgeText)) {
+                                                            'passed' => 'success',
+                                                            'failed' => 'error',
+                                                            'referred' => 'warning',
+                                                            default => 'neutral',
+                                                        };
+                                                        $assignmentTheme = \App\Services\Ui\UiVariants::assignmentCard($resultVariant);
+
+                                                        $resultMessage = match (strtolower((string) $badgeText)) {
+                                                            'passed' => 'Your submission has been successfully completed.',
+                                                            'failed' => 'Your submission was not successful and has been reviewed.',
+                                                            'referred' => 'Your submission needs improvement. Please review feedback and resubmit if allowed.',
+                                                            default => null,
+                                                        };
                                                     @endphp
 
-                                                    <div class="bg-white rounded-xl border border-ds-pink/20 shadow-sm overflow-hidden">
+                                                    <div
+                                                        class="rounded-xl border shadow-sm overflow-hidden {{ $assignmentTheme['card'] }} {{ $assignmentTheme['accentBorder'] }}">
                                                         {{-- Assignment Header --}}
                                                         <div
-                                                            class="bg-ds-pink/5 p-4 flex items-center justify-between gap-3 border-b border-ds-pink/10">
+                                                            class="p-4 flex items-center justify-between gap-3 border-b {{ $assignmentTheme['header'] }}">
                                                             <div class="flex items-center gap-3">
                                                                 <div
-                                                                    class="w-8 h-8 rounded-lg bg-ds-pink/10 text-ds-pink flex items-center justify-center">
+                                                                    class="w-8 h-8 rounded-lg {{ $assignmentTheme['icon'] }} flex items-center justify-center">
                                                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                                         stroke="currentColor">
                                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -295,19 +358,67 @@
                                                             </div>
 
                                                             {{-- STATUS BADGE --}}
-                                                            <x-ui.badge variant="{{ $badgeVariant }}" size="sm" rounded="full">
+                                                            <x-ui.badge variant="{{ $badgeVariant }}"
+                                                                size="{{ $resultVariant !== 'neutral' ? 'md' : 'sm' }}" rounded="full">
                                                                 {{ $badgeText }}
                                                             </x-ui.badge>
                                                         </div>
+
+                                                        {{-- RESULT SUMMARY STRIP (dominant learner-facing outcome) --}}
+                                                        @if ($resultVariant !== 'neutral' && $resultMessage)
+                                                            <div class="px-4 py-3 {{ $assignmentTheme['resultStrip'] }}">
+                                                                <div class="flex items-start gap-3">
+                                                                    <div
+                                                                        class="w-10 h-10 rounded-xl flex items-center justify-center {{ $assignmentTheme['resultIconBg'] }}">
+                                                                        @if($resultVariant === 'success')
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                            </svg>
+                                                                        @elseif($resultVariant === 'warning')
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                            </svg>
+                                                                        @else
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728" />
+                                                                            </svg>
+                                                                        @endif
+                                                                    </div>
+                                                                    <div class="min-w-0">
+                                                                        <div
+                                                                            class="text-[10px] font-black tracking-[0.18em] uppercase {{ $assignmentTheme['resultKicker'] }}">
+                                                                            Result
+                                                                        </div>
+                                                                        <div
+                                                                            class="text-lg font-extrabold leading-tight {{ $assignmentTheme['resultTitle'] }}">
+                                                                            {{ strtoupper($badgeText) }}
+                                                                        </div>
+                                                                        <div
+                                                                            class="text-xs leading-relaxed {{ $assignmentTheme['resultBodyText'] }}">
+                                                                            {{ $resultMessage }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @endif
 
                                                         <div class="p-4 bg-white space-y-4">
                                                             {{-- Assignment Brief (Always Visible) --}}
                                                             @if ($brief)
                                                                 <a href="{{ $brief->file_path }}" target="_blank"
-                                                                    class="flex items-center justify-between p-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 hover:bg-white hover:border-ds-pink/30 hover:shadow-md transition-all group">
+                                                                    class="flex items-center justify-between p-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 hover:bg-white {{ $assignmentTheme['uploadInputBorderHover'] }} hover:shadow-md transition-all group">
                                                                     <div class="flex items-center gap-3">
                                                                         <div
-                                                                            class="w-10 h-10 rounded-lg bg-white border border-slate-100 text-ds-pink flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                                                            class="w-10 h-10 rounded-lg bg-white border border-slate-100 {{ $assignmentTheme['accentText'] }} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                                                                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                                                                                 stroke="currentColor">
                                                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -317,13 +428,14 @@
                                                                         </div>
                                                                         <div>
                                                                             <div
-                                                                                class="font-bold text-slate-800 text-sm group-hover:text-ds-pink transition-colors">
+                                                                                class="font-bold text-slate-800 text-sm transition-colors {{ $assignmentTheme['accentHoverText'] }}">
                                                                                 Assignment Brief</div>
                                                                             <div class="text-xs text-slate-500 font-medium">Click to view
                                                                                 instructions & requirements</div>
                                                                         </div>
                                                                     </div>
-                                                                    <div class="text-slate-300 group-hover:text-ds-pink transition-colors">
+                                                                    <div
+                                                                        class="text-slate-300 transition-colors {{ $assignmentTheme['accentHoverText'] }}">
                                                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                                                                             stroke="currentColor">
                                                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -336,13 +448,13 @@
                                                             {{-- FEEDBACK SECTION (Visible if Graded) --}}
                                                             @if ($latestGrade)
                                                                 <details
-                                                                    class="group border border-slate-200 rounded-lg bg-slate-50 overflow-hidden open:ring-2 open:ring-ds-navy/10">
+                                                                    class="group border rounded-lg overflow-hidden open:ring-2 open:ring-ds-navy/10 {{ $assignmentTheme['panel'] }}">
                                                                     <summary
                                                                         class="w-full flex items-center justify-between p-3 bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer list-none select-none">
                                                                         <span
                                                                             class="text-sm font-bold text-ds-navy flex items-center gap-2">
-                                                                            <svg class="w-4 h-4 text-emerald-500" fill="none"
-                                                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <svg class="w-4 h-4 {{ $assignmentTheme['summaryIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                                                     stroke-width="2"
                                                                                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -357,7 +469,8 @@
                                                                             </svg>
                                                                         </span>
                                                                     </summary>
-                                                                    <div class="p-4 space-y-4 text-sm text-slate-600 bg-slate-50/50">
+                                                                    <div
+                                                                        class="p-4 space-y-4 text-sm text-slate-600 {{ $assignmentTheme['panelBody'] }}">
                                                                         <div
                                                                             class="flex items-center gap-4 text-xs text-slate-400 pb-2 border-b border-slate-200">
                                                                             <span>graded: <strong
@@ -425,8 +538,8 @@
                                                             {{-- PREVIOUS SUBMISSION LINK --}}
                                                             @if ($submission)
                                                                 <div
-                                                                    class="flex items-center justify-between p-3 bg-amber-50 rounded border border-amber-100 text-sm">
-                                                                    <div class="text-amber-800">
+                                                                    class="flex items-center justify-between p-3 rounded text-sm {{ $assignmentTheme['submissionBox'] }}">
+                                                                    <div>
                                                                         <span class="block font-bold text-xs uppercase">Your
                                                                             Submission</span>
                                                                         @if(($submission->submitted_by_type ?? 'learner') === 'writer')
@@ -459,9 +572,9 @@
                                                                     </div>
                                                                     <div class="text-xs text-blue-900">
                                                                         <strong class="block font-bold">Please Wait for Approval</strong>
-                                                                        Your submission was referred. Please review the feedback. If you are
-                                                                        eligible for a second attempt, you will see an option here once
-                                                                        approved by an assessor.
+                                                                        Your submission was {{ $isFail ? 'failed' : 'referred' }}. Please
+                                                                        review the feedback. If you are eligible for another attempt, you
+                                                                        will see an option here once approved by an assessor.
                                                                     </div>
                                                                 </div>
                                                             @elseif ($bannerType === 'reattempt_allowed')
@@ -476,8 +589,9 @@
                                                                         </svg>
                                                                     </div>
                                                                     <div class="text-xs text-amber-900">
-                                                                        <strong class="block font-bold">Second Attempt Available</strong>
-                                                                        You have been granted a second attempt. Please upload your revised
+                                                                        <strong class="block font-bold">Attempt {{ $nextAttemptNo }}
+                                                                            Available</strong>
+                                                                        You have been granted another attempt. Please upload your revised
                                                                         work below.
                                                                     </div>
                                                                 </div>
@@ -494,8 +608,27 @@
                                                                     </div>
                                                                     <div class="text-xs text-red-900">
                                                                         <strong class="block font-bold">Maximum Attempts Reached</strong>
-                                                                        Your second attempt was referred. You have used both attempts.
+                                                                        Your latest attempt was {{ $isFail ? 'failed' : 'referred' }}. You
+                                                                        have used all available attempts ({{ $maxAllowedAttempts }}).
                                                                         Please contact support for further guidance.
+                                                                    </div>
+                                                                </div>
+                                                            @elseif ($bannerType === 'pending_verification')
+                                                                <div
+                                                                    class="p-3 bg-slate-50 border border-slate-100 rounded-lg flex items-start gap-3">
+                                                                    <div class="mt-0.5 text-slate-500">
+                                                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                                            stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                stroke-width="2"
+                                                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div class="text-xs text-slate-900">
+                                                                        <strong class="block font-bold">Result Pending</strong>
+                                                                        Your result is being verified. You will see the final outcome once
+                                                                        it
+                                                                        has been completed.
                                                                     </div>
                                                                 </div>
                                                             @endif
@@ -509,15 +642,15 @@
                                                                     @csrf
                                                                     <div class="flex-1 w-full">
                                                                         <label class="block text-xs font-bold text-slate-700 mb-1.5">
-                                                                            {{ $isActiveReset ? 'Upload Attempt 2' : 'Upload Submission' }}
+                                                                            {{ $attemptCount > 0 ? 'Upload Attempt ' . $nextAttemptNo : 'Upload Submission' }}
                                                                         </label>
                                                                         <input type="file" name="submission_file" required
-                                                                            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-ds-pink file:text-white hover:file:bg-pink-700 border border-slate-200 rounded-lg bg-slate-50">
+                                                                            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:text-white border border-slate-200 rounded-lg bg-slate-50 {{ $assignmentTheme['uploadFileButton'] }} {{ $assignmentTheme['uploadFileHoverButton'] }} {{ $assignmentTheme['uploadInputBorderHover'] }}">
                                                                         <p class="text-[10px] text-slate-400 mt-1">Accepts PDF, DOCX. Max
                                                                             20MB.</p>
                                                                     </div>
                                                                     <x-ui.button type="submit" variant="primary" size="sm">
-                                                                        {{ $isActiveReset ? 'Submit Attempt 2' : 'Submit Assignment' }}
+                                                                        {{ $attemptCount > 0 ? 'Submit Attempt ' . $nextAttemptNo : 'Submit Assignment' }}
                                                                     </x-ui.button>
                                                                 </form>
                                                             @endif
@@ -559,7 +692,7 @@
         }
 
         // Auto-select first unit on load if desktop
-        document.addEventListener('DOMCon            tentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', () => {
             const firstBtn = document.querySelector('[data-nav-unit]');
             if (firstBtn && window.innerWidth >= 1024) {
                 firstBtn.classList.add('bg-slate-100', 'ring-2', 'ring-ds-navy');

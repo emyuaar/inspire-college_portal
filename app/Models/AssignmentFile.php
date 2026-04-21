@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AssignmentFile extends Model
 {
     protected $connection = 'mysql_portal';
-    protected $table      = 'assignment_files';
+    protected $table = 'assignment_files';
 
     protected $guarded = [];
 
