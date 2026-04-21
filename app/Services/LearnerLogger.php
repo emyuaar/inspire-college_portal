@@ -300,10 +300,12 @@ class LearnerLoggerBuilder
         return $this; 
     }
 
+    protected static array $firedEvents = [];
+
     public function save()
     {
         try {
-            // Final check on identity if it was missing during init (e.g. login action)
+            // Final check on identity if it was missing during init
             if (empty($this->data['portal_user_id'])) {
                 $this->resolveIdentity();
             }
@@ -313,10 +315,75 @@ class LearnerLoggerBuilder
                 $this->data['elapsed_time_ms'] = (microtime(true) - app('learner_request_start_time')) * 1000;
             }
 
-            return LearnerDiagnosticLog::create($this->data);
+            // --- ANTI-DUPLICATE PROTECTION ---
+            if ($this->isDuplicate()) {
+                return null;
+            }
+
+            $log = LearnerDiagnosticLog::create($this->data);
+            
+            // Track this event for in-request deduplication
+            $this->trackEvent();
+
+            return $log;
         } catch (Throwable $e) {
             Log::error('LearnerLogger failed to save', ['error' => $e->getMessage(), 'payload' => array_keys($this->data)]);
             return null;
         }
+    }
+
+    protected function isDuplicate(): bool
+    {
+        $fingerprint = $this->getFingerprint();
+        
+        // 1. In-request check (Static memory)
+        if (in_array($fingerprint, self::$firedEvents)) {
+            return true;
+        }
+
+        // 2. Cross-request check (Database, recent window)
+        // Only check for meaningful events that shouldn't repeating too fast (page views, access denied, etc.)
+        // We allow rapid successions for things like 'upload.progress' if we ever add it.
+        $ignoredDedupeCategories = ['upload']; 
+        if (in_array($this->data['event_category'], $ignoredDedupeCategories)) {
+            return false;
+        }
+
+        $isRecent = LearnerDiagnosticLog::where($this->getDedupeQueryCriteria())
+            ->where('created_at', '>=', now()->subSeconds(3))
+            ->exists();
+
+        return $isRecent;
+    }
+
+    protected function trackEvent()
+    {
+        self::$firedEvents[] = $this->getFingerprint();
+    }
+
+    protected function getFingerprint(): string
+    {
+        return implode(':', [
+            $this->data['correlation_id'] ?? 'none',
+            $this->data['event_type'],
+            $this->data['learner_id'] ?? 'guest',
+            $this->data['course_id'] ?? '',
+            $this->data['module_id'] ?? '',
+            $this->data['lesson_id'] ?? '',
+            $this->data['assignment_id'] ?? '',
+        ]);
+    }
+
+    protected function getDedupeQueryCriteria(): array
+    {
+        return array_filter([
+            'event_type' => $this->data['event_type'],
+            'learner_id' => $this->data['learner_id'] ?? null,
+            'course_id' => $this->data['course_id'] ?? null,
+            'module_id' => $this->data['module_id'] ?? null,
+            'lesson_id' => $this->data['lesson_id'] ?? null,
+            'assignment_id' => $this->data['assignment_id'] ?? null,
+            'url' => $this->data['url'] ?? null,
+        ]);
     }
 }

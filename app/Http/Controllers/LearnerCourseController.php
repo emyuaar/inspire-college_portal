@@ -143,11 +143,6 @@ class LearnerCourseController extends Controller
                 ->toArray();
         }
         
-        LearnerLogger::log('learner.course.viewed')
-            ->courseId($course->id)
-            ->humanMessage('Learner viewed course')
-            ->save();
-
         return view('learner.courses.show', [
             'user' => $user,
             'enrolment' => $enrolment,
