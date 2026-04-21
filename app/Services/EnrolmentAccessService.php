@@ -64,8 +64,10 @@ class EnrolmentAccessService
         $user = $user ?? $enrolment->learner;
         $accessStatus = $enrolment->installment_access_status;
         
+        $canAccess = $this->canAccessLearning($enrolment, $user);
+
         $state = (object) [
-            'can_access' => $this->canAccessLearning($enrolment, $user),
+            'can_access' => $canAccess,
             'is_verified' => $user->isVerified(),
             'requirements_met' => $user->areRequirementsMet(),
             'block_reason' => $accessStatus->reason,
@@ -75,7 +77,62 @@ class EnrolmentAccessService
             'is_denied' => ($enrolment->status->status === 'denied'),
         ];
 
+        // Add learner-facing status
+        $status = $this->getLearnerStatus($enrolment, $state);
+        $state->status_label = $status['label'];
+        $state->status_variant = $status['variant'];
+
         return $state;
+    }
+
+    /**
+     * Centralized logic for learner-facing status badges.
+     */
+    public function getLearnerStatus(Enrolment $enrolment, object $state): array
+    {
+        $internalStatus = strtolower($enrolment->status->status ?? '');
+        $paymentStatus = $enrolment->payment_status_details['status'] ?? '';
+        $isPaid = $paymentStatus === 'paid';
+        $isInstallmentsActive = $paymentStatus === 'installments_active';
+        
+        // 1. Requirements
+        if (!$state->requirements_met) {
+            return ['label' => 'Requirements Pending', 'variant' => 'brand'];
+        }
+
+        // 2. Verification / Admissions Review
+        if (!$state->is_verified) {
+            return ['label' => 'Under Review', 'variant' => 'neutral'];
+        }
+
+        // 3. Denied
+        if ($state->is_denied) {
+            return ['label' => 'Denied', 'variant' => 'error'];
+        }
+
+        // 4. Grace Period (High Priority: User still has access despite pending payment)
+        if ($state->grace_active) {
+            return ['label' => 'GRACE PERIOD ACTIVE', 'variant' => 'warning'];
+        }
+
+        // 5. Payment Blocking
+        if ($state->block_reason) {
+            return ['label' => 'PAYMENT OVERDUE', 'variant' => 'error'];
+        }
+
+        // 6. Active / Paid (Access allowed and payment is healthy)
+        $isActiveStatus = in_array($internalStatus, ['active', 'paid', 'approved', 'installments_active']);
+        if ($isPaid || $isInstallmentsActive || $isActiveStatus) {
+            return ['label' => 'Active', 'variant' => 'success'];
+        }
+
+        // 7. Payment Pending (Genuine payment issue that might not be blocking yet but is a primary state)
+        if ($paymentStatus === 'pending_payment') {
+            return ['label' => 'Payment Pending', 'variant' => 'warning'];
+        }
+
+        // 8. Fallback to General Pending
+        return ['label' => 'Pending', 'variant' => 'neutral'];
     }
 
     private function isEffectivelyActive(Enrolment $enrolment): bool
@@ -87,8 +144,8 @@ class EnrolmentAccessService
             return true;
         }
 
-        // Also check if they have a paid order but status hasn't synced
+        // Also check if they have a paid order or active installments (deposit paid)
         $paymentDetails = $enrolment->payment_status_details;
-        return $paymentDetails['status'] === 'paid';
+        return in_array($paymentDetails['status'], ['paid', 'installments_active']);
     }
 }
