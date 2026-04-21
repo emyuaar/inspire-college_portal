@@ -179,6 +179,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
             ->name('portal.learner.submission.direct');
 
+        Route::get('/learner/submission-file/{file}/view', [LearnerCourseController::class, 'viewSubmissionFile'])
+            ->name('portal.learner.submission_file.view');
+
         Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
             ->name('portal.learner.lessons.show');
 

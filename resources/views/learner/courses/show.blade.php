@@ -538,23 +538,61 @@
                                                             {{-- PREVIOUS SUBMISSION LINK --}}
                                                             @if ($submission)
                                                                 <div
-                                                                    class="flex items-center justify-between p-3 rounded text-sm {{ $assignmentTheme['submissionBox'] }}">
-                                                                    <div>
-                                                                        <span class="block font-bold text-xs uppercase">Your
-                                                                            Submission</span>
-                                                                        @if(($submission->submitted_by_type ?? 'learner') === 'writer')
-                                                                            <span class="text-xs">Uploaded by Writer:
-                                                                                <strong>{{ $submission->submitted_by_name ?? 'Internal Team' }}</strong></span>
+                                                                    class="flex flex-col gap-2 p-3 rounded text-sm {{ $assignmentTheme['submissionBox'] }}">
+                                                                    <div class="flex items-center justify-between gap-3">
+                                                                        <div>
+                                                                            <span class="block font-bold text-xs uppercase">Your
+                                                                                Submission</span>
+                                                                            @if(($submission->submitted_by_type ?? 'learner') === 'writer')
+                                                                                <span class="text-xs">Uploaded by Writer:
+                                                                                    <strong>{{ $submission->submitted_by_name ?? 'Internal Team' }}</strong></span>
+                                                                            @else
+                                                                                <span class="text-xs">Uploaded:
+                                                                                    {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        <div class="flex items-center gap-2">
+                                                                            <span class="px-2 py-0.5 bg-white/50 border border-slate-200 rounded text-[10px] font-bold text-slate-600 uppercase">
+                                                                                Attempt #{{ $submission->attempt_no }}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="space-y-1.5 mt-1">
+                                                                        @php $subFiles = $submission->files; @endphp
+                                                                        @if($subFiles && $subFiles->isNotEmpty())
+                                                                            @foreach($subFiles as $subFile)
+                                                                                <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50 hover:border-ds-navy/20 transition-colors">
+                                                                                    <div class="flex items-center gap-2 overflow-hidden">
+                                                                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                                        </svg>
+                                                                                        <span class="truncate text-xs font-medium text-slate-700" title="{{ $subFile->file_name }}">{{ $subFile->file_name }}</span>
+                                                                                    </div>
+                                                                                    <a href="{{ route('portal.learner.submission_file.view', $subFile->id) }}" 
+                                                                                        target="_blank" 
+                                                                                        class="text-[10px] font-black uppercase tracking-wider text-ds-navy hover:text-ds-navy-dark px-2 py-1 bg-white rounded border border-ds-navy/10 hover:border-ds-navy transition-all shadow-sm">
+                                                                                        View
+                                                                                    </a>
+                                                                                </div>
+                                                                            @endforeach
                                                                         @else
-                                                                            <span class="text-xs">Uploaded:
-                                                                                {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                            {{-- Legacy single file support --}}
+                                                                            <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50">
+                                                                                <div class="flex items-center gap-2 overflow-hidden">
+                                                                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                                    </svg>
+                                                                                    <span class="truncate text-xs font-medium text-slate-700" title="{{ $submission->file_name }}">{{ $submission->file_name }}</span>
+                                                                                </div>
+                                                                                <a href="{{ route('portal.learner.submission.view', $submission->id) }}" 
+                                                                                    target="_blank" 
+                                                                                    class="text-[10px] font-black uppercase tracking-wider text-ds-navy hover:text-ds-navy-dark px-2 py-1 bg-white rounded border border-ds-navy/10 hover:border-ds-navy transition-all shadow-sm">
+                                                                                    View
+                                                                                </a>
+                                                                            </div>
                                                                         @endif
                                                                     </div>
-                                                                    <x-ui.button
-                                                                        href="{{ route('portal.learner.submission.view', $submission->id) }}"
-                                                                        target="_blank" size="xs" variant="ghost">
-                                                                        Download
-                                                                    </x-ui.button>
                                                                 </div>
                                                             @endif
 
@@ -644,10 +682,19 @@
                                                                         <label class="block text-xs font-bold text-slate-700 mb-1.5">
                                                                             {{ $attemptCount > 0 ? 'Upload Attempt ' . $nextAttemptNo : 'Upload Submission' }}
                                                                         </label>
-                                                                        <input type="file" name="submission_file" required
+                                                                        <input type="file" name="submission_files[]" required multiple
+                                                                            id="submission_files_{{ $assignment->id }}"
+                                                                            onchange="updateFileList({{ $assignment->id }})"
                                                                             class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:text-white border border-slate-200 rounded-lg bg-slate-50 {{ $assignmentTheme['uploadFileButton'] }} {{ $assignmentTheme['uploadFileHoverButton'] }} {{ $assignmentTheme['uploadInputBorderHover'] }}">
-                                                                        <p class="text-[10px] text-slate-400 mt-1">Accepts PDF, DOCX. Max
-                                                                            20MB.</p>
+                                                                        
+                                                                        <div id="file-list-{{ $assignment->id }}" class="mt-3 space-y-2 hidden">
+                                                                            <div class="text-[10px] uppercase tracking-widest font-black text-slate-400">Selected Files</div>
+                                                                            <div class="file-items space-y-1"></div>
+                                                                        </div>
+
+                                                                        <p class="text-[10px] text-slate-400 mt-2">
+                                                                            <span class="font-bold text-ds-navy">Multi-file support enabled.</span> You can select multiple documents at once. Accepts PDF, DOCX. Max 20MB per file.
+                                                                        </p>
                                                                     </div>
                                                                     <x-ui.button type="submit" variant="primary" size="sm">
                                                                         {{ $attemptCount > 0 ? 'Submit Attempt ' . $nextAttemptNo : 'Submit Assignment' }}
@@ -698,6 +745,35 @@
                 firstBtn.classList.add('bg-slate-100', 'ring-2', 'ring-ds-navy');
             }
         });
+
+        function updateFileList(assignmentId) {
+            const input = document.getElementById('submission_files_' + assignmentId);
+            const container = document.getElementById('file-list-' + assignmentId);
+            const itemsDiv = container.querySelector('.file-items');
+            
+            itemsDiv.innerHTML = '';
+            
+            if (input.files.length > 0) {
+                container.classList.remove('hidden');
+                Array.from(input.files).forEach(file => {
+                    const size = (file.size / 1024).toFixed(1);
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between p-2 px-3 bg-white border border-slate-100 rounded-lg shadow-sm animation-fade-in';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <svg class="w-3.5 h-3.5 text-ds-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="truncate text-[11px] font-bold text-slate-600">${file.name}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-medium">${size} KB</span>
+                    `;
+                    itemsDiv.appendChild(item);
+                });
+            } else {
+                container.classList.add('hidden');
+            }
+        }
     </script>
 
 </x-app-layout>

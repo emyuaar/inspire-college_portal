@@ -173,33 +173,33 @@ class LearnerCourseController extends Controller
         }
 
         $request->validate([
-            'submission_file' => 'required|file|max:20480',
+            'submission_files' => 'required|array|min:1',
+            'submission_files.*' => 'file|max:20480',
         ]);
 
-        $file = $request->file('submission_file');
+        $files = $request->file('submission_files');
+        $uploadedFiles = [];
         
-        $logger = LearnerLogger::log('learner.assignment.upload.started', 'upload')
-            ->file($file->getClientOriginalName(), $file->getClientMimeType(), $file->getSize())
-            ->humanMessage('Learner started assignment upload logic')
-            ->save();
-        $originalName = $file->getClientOriginalName();
+        $totalSize = 0;
+        foreach($files as $file) {
+            $totalSize += $file->getSize();
+        }
 
-        // load relations (must exist on Assignment model)
-        $assignment->load(['module', 'course']); // if assignment->course relation exists
+        $logger = LearnerLogger::log('learner.assignment.upload.started', 'upload')
+            ->humanMessage('Learner started multi-file assignment upload logic: ' . count($files) . ' files.')
+            ->save();
+
+        // load relations
+        $assignment->load(['module', 'course']);
 
         $courseTitle = $assignment->course?->title ?? ($enrolment->course?->title ?? 'Course');
         $moduleTitle = $assignment->module?->title ?? 'Module';
 
         // folder names
-        $courseFolder = $sp->safeName($courseTitle);                          // Course_Name
-        $dsFolder = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // DS_ID_00001
-        $modFolder = $sp->safeName($moduleTitle);                          // Module_1
-        $assFolder = $sp->safeName($assignment->title);                    // Assignment_1
-
-        // file name safe
-        $baseName = pathinfo($originalName, PATHINFO_FILENAME);
-        $ext = strtolower($file->getClientOriginalExtension());
-        $fileName = $sp->safeName($baseName) . '.' . $ext;
+        $courseFolder = $sp->safeName($courseTitle);
+        $dsFolder = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);
+        $modFolder = $sp->safeName($moduleTitle);
+        $assFolder = $sp->safeName($assignment->title);
 
         // create folder structure
         $path1 = $sp->ensureFolder('', $courseFolder);
@@ -207,26 +207,10 @@ class LearnerCourseController extends Controller
         $path3 = $sp->ensureFolder($path2, $modFolder);
         $path4 = $sp->ensureFolder($path3, $assFolder);
 
-        // upload to SharePoint
-        $size = $file->getSize(); // bytes
-
-        if ($size <= 3.5 * 1024 * 1024) {
-            $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
-        } else {
-            $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
-        }
-
         // Calculate Attempt No
-        $attemptNo = AssignmentSubmission::where('assignment_id', $assignment->id)
+        $attemptNo = (int) (AssignmentSubmission::where('assignment_id', $assignment->id)
             ->where('learner_id', $user->id)
-            ->max('attempt_no') ?? 0;
-
-        if ($attemptNo == 0) {
-            $count = AssignmentSubmission::where('assignment_id', $assignment->id)
-                ->where('learner_id', $user->id)
-                ->count();
-            $attemptNo = $count;
-        }
+            ->max('attempt_no') ?? 0);
 
         // --- ENFORCE RESUBMISSION RULES ---
         $standardMaxAttempts = 2;
@@ -243,8 +227,6 @@ class LearnerCourseController extends Controller
         }
 
         if ($attemptNo > 0) {
-            // This is a re-submission. Check if authorized.
-            // We need a GradeReset that is newer than the last submission.
             $lastSubmission = AssignmentSubmission::where('assignment_id', $assignment->id)
                 ->where('learner_id', $user->id)
                 ->latest()
@@ -256,34 +238,71 @@ class LearnerCourseController extends Controller
                 ->exists();
 
             if (!$hasReset) {
-                // Determine if the last grade was actually "Pass" (which shouldn't happen here usually)
-                // But if it was "Refer", we strictly need a reset.
                 return back()->with('error', 'Re-submission is not yet approved by the assessor.');
             }
         }
         // ----------------------------------
 
-        // DB save (NO file_path)
-        AssignmentSubmission::create([
+        // Process uploads
+        foreach ($files as $file) {
+            $originalName = $file->getClientOriginalName();
+            $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+            $ext = strtolower($file->getClientOriginalExtension());
+            $fileName = $sp->safeName($baseName) . '_' . time() . '_' . \Illuminate\Support\Str::random(4) . '.' . $ext;
+            
+            $size = $file->getSize();
+
+            if ($size <= 3.5 * 1024 * 1024) {
+                $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
+            } else {
+                $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+            }
+
+            $uploadedFiles[] = [
+                'name' => $originalName,
+                'path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
+                'item_id' => $uploaded['id'] ?? null,
+                'url' => $uploaded['webUrl'] ?? null,
+                'size' => $size,
+                'mime' => $file->getClientMimeType()
+            ];
+        }
+
+        $primaryFile = $uploadedFiles[0];
+
+        // DB save submission header
+        $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
-            'file_name' => $originalName,
+            'file_name' => $primaryFile['name'],
             'status_id' => 1, // Submitted
             'attempt_no' => $attemptNo + 1,
 
-            'sharepoint_item_id' => $uploaded['id'] ?? null,
-            'sharepoint_path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
-            'sharepoint_url' => $uploaded['webUrl'] ?? null,
+            'sharepoint_item_id' => $primaryFile['item_id'],
+            'sharepoint_path' => $primaryFile['path'],
+            'sharepoint_url' => $primaryFile['url'],
         ]);
+
+        // DB save all files
+        foreach ($uploadedFiles as $uFile) {
+            \App\Models\AssignmentSubmissionFile::create([
+                'assignment_submission_id' => $submission->id,
+                'file_name' => $uFile['name'],
+                'sharepoint_item_id' => $uFile['item_id'],
+                'sharepoint_path' => $uFile['path'],
+                'sharepoint_url' => $uFile['url'],
+                'file_size' => $uFile['size'],
+                'mime_type' => $uFile['mime'],
+            ]);
+        }
         
         LearnerLogger::log('learner.assignment.submission.completed', 'upload')
             ->courseId($assignment->course_id)
             ->assignmentId($assignment->id)
-            ->file($originalName, $ext, $size)
-            ->humanMessage('Assignment uploaded and submitted successfully')
+            ->humanMessage('Assignment submitted successfully with ' . count($uploadedFiles) . ' files')
             ->save();
 
-        return back()->with('success', 'Your assignment file has been submitted');
+        return back()->with('success', 'Your assignment files have been submitted');
     }
 
     public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
@@ -304,6 +323,28 @@ class LearnerCourseController extends Controller
         return $sp->streamByItemId(
             $submission->sharepoint_item_id,
             $submission->file_name ?? 'submission',
+            $inline
+        );
+    }
+
+    public function viewSubmissionFile(\App\Models\AssignmentSubmissionFile $file, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        // Check if the user owns the submission through the relationship
+        if (!$file->submission || (int) $file->submission->learner_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        if (!$file->sharepoint_item_id) {
+            return back()->with('error', 'File not found on SharePoint.');
+        }
+
+        $inline = request()->boolean('inline', true);
+
+        return $sp->streamByItemId(
+            $file->sharepoint_item_id,
+            $file->file_name ?? 'submission',
             $inline
         );
     }
