@@ -188,18 +188,12 @@
                                 $state = $enrolment->access_state;
 
                                 $showContinue = $state->can_access;
-                                $requirementsMet = $state->requirements_met;
-                                $isVerified = $state->is_verified;
                                 $blockReason = $state->block_reason;
                                 $graceActive = $state->grace_active;
                                 $graceUntil = $state->grace_until;
-                                $dueInfo = $state->due_info;
+                                $requirementsMet = $state->requirements_met;
+                                $isVerified = $state->is_verified;
                                 $denied = $state->is_denied;
-
-                                $isPaid = $enrolment->payment_status_details['status'] === 'paid';
-                                $isUnderReview = $requirementsMet && !$isVerified;
-                                $isActiveOrPaid = $isPaid || in_array(strtolower($enrolment->status->status ?? ''), ['active', 'paid', 'approved', 'installments_active']);
-                                $isPaymentPending = !$isPaid && !$isUnderReview && !$denied;
                             @endphp
 
                             {{-- ✅ ITEM WRAPPER --}}
@@ -207,28 +201,12 @@
                                 <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center gap-2 mb-2">
-                                            @if(!$requirementsMet)
-                                                <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                            @elseif(!$isVerified)
-                                                <x-ui.badge variant="neutral" size="sm">Under Review</x-ui.badge>
-                                            @elseif($blockReason)
-                                                <x-ui.badge variant="error" size="sm">PAYMENT OVERDUE</x-ui.badge>
-                                            @elseif($graceActive)
-                                                <x-ui.badge variant="warning" size="sm">GRACE PERIOD ACTIVE</x-ui.badge>
-                                            @elseif($isActiveOrPaid)
-                                                <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
-                                            @elseif($isPaymentPending)
-                                                <x-ui.badge variant="warning" size="sm">Payment Pending</x-ui.badge>
-                                            @else
-                                                <x-ui.badge variant="neutral" size="sm">Pending</x-ui.badge>
-                                            @endif
+                                             <x-ui.badge :variant="$state->status_variant" size="sm">
+                                                 {{ $state->status_label }}
+                                             </x-ui.badge>
 
-                                            @if($denied)
-                                                <x-ui.badge variant="error" size="sm">Denied</x-ui.badge>
-                                            @endif
-
-                                            <span class="text-[10px] text-slate-400 font-medium">#{{ $enrolment->id }}</span>
-                                        </div>
+                                             <span class="text-[10px] text-slate-400 font-medium">#{{ $enrolment->id }}</span>
+                                         </div>
 
                                         <h3 class="font-bold text-slate-800 text-sm md:text-base mb-1">
                                             @if ($showContinue && $course)
@@ -246,28 +224,30 @@
 
                                     <div class="shrink-0 self-end sm:self-center">
                                         @if ($showContinue)
-                                            <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
-                                                <x-ui.button fullWidth size="sm">
-                                                    Continue Learning
-                                                </x-ui.button>
-                                            </a>
+                                            <div class="flex flex-col items-end gap-1">
+                                                <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
+                                                    <x-ui.button fullWidth size="sm">
+                                                        Continue Learning
+                                                    </x-ui.button>
+                                                </a>
+                                                @if ($graceActive)
+                                                    <span class="text-[10px] text-amber-600 font-medium">
+                                                        Grace ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         @elseif ($blockReason)
-                                            <div class="flex flex-col items-end">
-                                                <span class="text-xs font-semibold text-red-600">Payment Overdue</span>
-                                                <span class="text-[10px] text-slate-500">Please pay to restore access</span>
-                                            </div>
-                                        @elseif ($graceActive)
-                                            <div class="flex flex-col items-end">
-                                                <x-ui.button size="sm"
-                                                    href="{{ route('portal.learner.course.show', $enrolment->id) }}">
-                                                    Continue Learning
+                                            <div class="flex flex-col items-end gap-1">
+                                                <x-ui.button size="sm" variant="outline" class="text-red-600 border-red-200 cursor-not-allowed opacity-70" disabled>
+                                                    Access Blocked
                                                 </x-ui.button>
-                                                <span class="text-[10px] text-amber-600 mt-1 font-medium">
-                                                    Grace period ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
-                                                </span>
+                                                <span class="text-[10px] text-slate-500">Resolve payment to continue</span>
                                             </div>
-                                        @elseif ($isPaymentPending)
-                                            <span class="text-xs font-semibold text-amber-600">Please contact Partner</span>
+                                        @elseif ($state->status_label === 'Payment Pending')
+                                            <div class="flex flex-col items-end gap-1">
+                                                <span class="text-xs font-semibold text-amber-600">Payment Pending</span>
+                                                <span class="text-[10px] text-slate-500 italic">Contact partner for access</span>
+                                            </div>
                                         @elseif (!$requirementsMet)
                                             <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
                                                 Complete Requirements
@@ -279,6 +259,8 @@
                                                 class="text-red-600 border-red-200 hover:bg-red-50">
                                                 Update Details
                                             </x-ui.button>
+                                        @else
+                                            <span class="text-xs font-semibold text-slate-400 italic">Awaiting Status</span>
                                         @endif
                                     </div>
                                 </div>
