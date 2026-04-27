@@ -566,7 +566,7 @@
                                                                         @if($subFiles && $subFiles->isNotEmpty())
                                                                             @foreach($subFiles as $subFile)
                                                                                 <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50 hover:border-ds-navy/20 transition-colors">
-                                                                                    <div class="flex items-center gap-2 overflow-hidden">
+                                                                                    <div class="flex items-center gap-2 overflow-hidden min-w-0">
                                                                                         <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                                                                                         </svg>
@@ -582,7 +582,7 @@
                                                                         @else
                                                                             {{-- Legacy single file support --}}
                                                                             <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50">
-                                                                                <div class="flex items-center gap-2 overflow-hidden">
+                                                                                <div class="flex items-center gap-2 overflow-hidden min-w-0">
                                                                                     <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                                                                                     </svg>
@@ -681,7 +681,7 @@
                                                                     method="POST" enctype="multipart/form-data"
                                                                     class="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 pt-4 border-t border-slate-100">
                                                                     @csrf
-                                                                    <div class="flex-1 w-full">
+                                                                    <div class="flex-1 min-w-0">
                                                                         <label class="block text-xs font-bold text-slate-700 mb-1.5">
                                                                             {{ $attemptCount > 0 ? 'Upload Attempt ' . $nextAttemptNo : 'Upload Submission' }}
                                                                         </label>
@@ -699,7 +699,7 @@
                                                                             <span class="font-bold text-ds-navy">Multi-file support enabled.</span> You can select multiple documents at once. Accepts PDF, DOCX. Max 20MB per file.
                                                                         </p>
                                                                     </div>
-                                                                    <x-ui.button type="submit" variant="primary" size="sm">
+                                                                    <x-ui.button type="submit" variant="primary" size="sm" class="shrink-0">
                                                                         {{ $attemptCount > 0 ? 'Submit Attempt ' . $nextAttemptNo : 'Submit Assignment' }}
                                                                     </x-ui.button>
                                                                 </form>
@@ -761,15 +761,15 @@
                 Array.from(input.files).forEach(file => {
                     const size = (file.size / 1024).toFixed(1);
                     const item = document.createElement('div');
-                    item.className = 'flex items-center justify-between p-2 px-3 bg-white border border-slate-100 rounded-lg shadow-sm animation-fade-in';
+                    item.className = 'flex items-center justify-between gap-3 p-2 px-3 bg-white border border-slate-100 rounded-lg shadow-sm animation-fade-in';
                     item.innerHTML = `
-                        <div class="flex items-center gap-2 overflow-hidden">
-                            <svg class="w-3.5 h-3.5 text-ds-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                            <svg class="w-3.5 h-3.5 text-ds-navy shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span class="truncate text-[11px] font-bold text-slate-600">${file.name}</span>
+                            <span class="truncate text-[11px] font-bold text-slate-600" title="${file.name}">${file.name}</span>
                         </div>
-                        <span class="text-[10px] text-slate-400 font-medium">${size} KB</span>
+                        <span class="text-[10px] text-slate-400 font-medium shrink-0">${size} KB</span>
                     `;
                     itemsDiv.appendChild(item);
                 });
