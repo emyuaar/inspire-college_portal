@@ -7,8 +7,11 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "dompdf/dompdf": "^3.1",
+        "goodnesskay/laravelpdfviewer": "^1.0",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "phpoffice/phpword": "^1.4",
         "stripe/stripe-php": "^19.2"
     },
     "require-dev": {

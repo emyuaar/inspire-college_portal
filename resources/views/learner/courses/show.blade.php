@@ -132,15 +132,23 @@
                                                 @foreach ($module->lessons as $lesson)
                                                     @php
                                                         $isUrl = !blank($lesson->video_url);
-                                                        $isFileResource = !blank($lesson->file_path) && blank($lesson->content) && blank($lesson->video_url);
+                                                        $isSecureDoc = ($lesson->resource_type === 'secure_document');
+                                                        $isFileResource = !blank($lesson->file_path) && blank($lesson->content) && blank($lesson->video_url) && !$isSecureDoc;
                                                         
-                                                        if ($isFileResource) {
+                                                        if ($isSecureDoc) {
+                                                            $primaryUrl = route('portal.learner.secure_doc.view', $lesson->id);
+                                                            $primaryTarget = null;
+                                                            $typeLabel = 'Secure Document';
+                                                            $actionLabel = 'View Document';
+                                                            $btnIcon = 'eye';
+                                                            $typeIcon = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+                                                        } elseif ($isFileResource) {
                                                             $primaryUrl = route('portal.learner.lesson.file.download', $lesson->id);
                                                             $primaryTarget = null;
                                                             $typeLabel = 'File / Resource';
                                                             $actionLabel = 'Download File';
                                                             $btnIcon = 'download';
-                                                            $typeIcon = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>';
+                                                            $typeIcon = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>';
                                                         } else {
                                                             $primaryUrl = $isUrl ? $lesson->video_url : route('portal.learner.lessons.show', $lesson->id);
                                                             $primaryTarget = $isUrl ? '_blank' : null;
@@ -154,7 +162,7 @@
                                                         class="group flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm hover:bg-slate-50 transition-all bg-white">
                                                         <div class="flex items-start gap-4">
                                                             <div
-                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg {{ $isFileResource ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600' }} flex items-center justify-center">
+                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg {{ $isSecureDoc ? 'bg-amber-50 text-amber-600' : ($isFileResource ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600') }} flex items-center justify-center">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                                     stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
                                                                     stroke-linejoin="round" class="w-5 h-5">
@@ -177,9 +185,11 @@
                                                         </div>
                                                         <div class="flex items-center gap-2 pl-12 md:pl-0">
                                                             <x-ui.button href="{{ $primaryUrl }}" target="{{ $primaryTarget }}"
-                                                                size="sm" variant="{{ $isFileResource ? 'primary' : 'outline' }}">
+                                                                size="sm" variant="{{ $isSecureDoc ? 'secondary' : ($isFileResource ? 'primary' : 'outline') }}">
                                                                 @if($btnIcon === 'download')
                                                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                                                @elseif($btnIcon === 'eye')
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                                                 @endif
                                                                 {{ $actionLabel }}
                                                             </x-ui.button>

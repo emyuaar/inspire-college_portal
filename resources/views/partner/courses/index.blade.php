@@ -127,7 +127,7 @@
                                         <div class="text-right">
                                             <span class="block text-[10px] font-bold text-slate-400 uppercase">Plan</span>
                                             <span class="text-sm font-black text-slate-800">£{{ number_format($course->installment_plan['monthly_amount'], 2) }} <span class="text-[10px] font-bold text-slate-400">/mo</span></span>
-                                            <span class="block text-[10px] font-bold text-emerald-600 uppercase">{{ $course->installment_plan['months'] }} Months</span>
+                                            <span class="block text-[10px] font-bold text-emerald-600 uppercase">{{ $course->installment_plan['months'] + 1 }} Months</span>
                                         </div>
                                     </div>
                                 </div>

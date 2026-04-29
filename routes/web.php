@@ -185,6 +185,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
             ->name('portal.learner.lessons.show');
 
+        Route::get('/learner/lessons/{lesson}/secure-viewer', [LearnerCourseController::class, 'viewSecureDocument'])
+            ->name('portal.learner.secure_doc.view');
+
+        Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])
+            ->name('portal.learner.secure_doc.stream');
+
+        Route::get('/learner/lessons/{lesson}/secure-pdf-data', [LearnerCourseController::class, 'securePdfData'])
+            ->name('learner.lessons.secure-pdf-data');
+
         // Lesson file (SharePoint proxy)
         Route::get('/learner/lessons/{lesson}/file/download', [LearnerCourseController::class, 'downloadLessonFile'])
             ->name('portal.learner.lesson.file.download');
@@ -207,3 +216,31 @@ Route::middleware('auth')->group(function () {
             ->name('portal.learner.assignment.grading.download');
     });
 });
+
+Route::get('/debug-pdf-test', function () {
+    $path = "D:\\Laravel\\test\\crm-directskills\\storage\\app\\public\\lms\\resources\\1777451086_Care Standards Act 2000.pdf";
+
+    if (!file_exists($path)) {
+        abort(404, 'File not found on CRM path.');
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="test.pdf"',
+        'Cache-Control' => 'no-store',
+    ]);
+});
+
+Route::get('/debug-pdf-secure-test', function () {
+    $path = "D:\\Laravel\\test\\crm-directskills\\storage\\app\\public\\lms\\resources\\1777451086_Care Standards Act 2000.pdf";
+
+    if (!file_exists($path)) {
+        abort(404, 'File not found on CRM path.');
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="test.pdf"',
+        'Cache-Control' => 'no-store',
+    ]);
+})->middleware(['web', 'auth']);

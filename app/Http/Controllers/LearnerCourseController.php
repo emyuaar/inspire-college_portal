@@ -389,6 +389,10 @@ class LearnerCourseController extends Controller
             abort(404);
         }
 
+        if ($lesson->resource_type === 'secure_document') {
+            return redirect()->route('portal.learner.secure_doc.view', $lesson->id);
+        }
+
         // optional: previous/next lesson (same module)
         $prev = Lesson::where('module_id', $lesson->module_id)
             ->where('is_published', 1)
@@ -436,6 +440,10 @@ class LearnerCourseController extends Controller
             abort(403);
         }
 
+        if ($lesson->resource_type === 'secure_document') {
+            abort(403, 'Direct download is disabled for secure documents.');
+        }
+
         LearnerLogger::log('learner.lesson.viewed', 'activity')
             ->humanMessage('Learner viewed lesson/downloaded file')
             ->save();
@@ -447,9 +455,8 @@ class LearnerCourseController extends Controller
         }
 
         if (!blank($lesson->file_path)) {
-            // 1. Try local Portal storage (if synced)
             if (\Storage::disk('public')->exists($lesson->file_path)) {
-                return \Storage::disk('public')->download($lesson->file_path, $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
+                return response()->download(\Storage::disk('public')->path($lesson->file_path), $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
             }
 
             // 2. Try CRM storage root
@@ -633,5 +640,205 @@ class LearnerCourseController extends Controller
         }
 
         return response()->download($realFullPath);
+    }
+
+    public function viewSecureDocument(Lesson $lesson)
+    {
+        $user = Auth::user();
+
+        if (!(int) $lesson->is_published) {
+            abort(404);
+        }
+
+        if ($lesson->resource_type !== 'secure_document') {
+            abort(400, 'This resource is not a secure document.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            return redirect()
+                ->route('portal.learner.dashboard')
+                ->with('error', 'Your enrolment is not active or payment is pending.');
+        }
+
+        LearnerLogger::log('learner.secure_doc.view')
+            ->courseId($lesson->course_id)
+            ->lessonId($lesson->id)
+            ->humanMessage('Learner accessed secure document viewer')
+            ->save();
+
+        return view('learner.lessons.secure_viewer', [
+            'lesson' => $lesson,
+            'enrolment' => $enrolment,
+            'user' => $user,
+        ]);
+    }
+
+    public function streamSecureDocument(Lesson $lesson)
+    {
+        $user = Auth::user();
+
+        // Add debug logging
+        \Log::info('Secure stream requested', [
+            'lesson_id' => $lesson->id,
+            'user_id' => auth()->id(),
+            'type' => $lesson->resource_type ?? null,
+            'file_path' => $lesson->file_path ?? null,
+            'file_url' => $lesson->file_url ?? null,
+            'sharepoint_url' => $lesson->sharepoint_item_id ?? null,
+            'mime_type' => 'application/pdf',
+        ]);
+
+        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
+            abort(404, 'Secure document not found.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $filePath = $lesson->file_path;
+        if (blank($filePath)) {
+            \Log::error('Secure stream failed: no file path found', [
+                'lesson_id' => $lesson->id,
+            ]);
+            abort(404, 'Document file path missing.');
+        }
+
+        $fullReal = null;
+        $crmRoot = "D:\\Laravel\\test\\crm-directskills\\storage\\app";
+        $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
+        $fullPath = $crmRoot . DIRECTORY_SEPARATOR . $relative;
+
+        if (file_exists($fullPath) && is_file($fullPath)) {
+            $fullReal = $fullPath;
+        } else {
+            $crmRootConfig = config('services.crm.storage_root');
+            if ($crmRootConfig) {
+                $relativeConfig = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
+                $fullPathConfig = rtrim($crmRootConfig, '/\\') . DIRECTORY_SEPARATOR . $relativeConfig;
+                if (file_exists($fullPathConfig) && is_file($fullPathConfig)) {
+                    $fullReal = $fullPathConfig;
+                }
+            }
+        }
+
+        if (!$fullReal) {
+            if (\Storage::disk('public')->exists($filePath)) {
+                $fullReal = \Storage::disk('public')->path($filePath);
+            } elseif (\Storage::disk('local')->exists($filePath)) {
+                $fullReal = \Storage::disk('local')->path($filePath);
+            }
+        }
+
+        \Log::info('Secure PDF stream debug', [
+            'lesson_id' => $lesson->id,
+            'file_path' => $filePath,
+            'absolute_path' => $fullReal ?? null,
+            'exists' => $fullReal ? file_exists($fullReal) : false,
+            'size' => ($fullReal && file_exists($fullReal)) ? filesize($fullReal) : null,
+        ]);
+
+        if (!$fullReal || !file_exists($fullReal)) {
+            \Log::error('PDF missing', [
+                'lesson_id' => $lesson->id,
+                'path' => $fullReal ?? 'null'
+            ]);
+            abort(404, 'File not found');
+        }
+
+        $absolutePath = $fullReal;
+        $binary = file_get_contents($absolutePath);
+
+        \Log::info('FORCED PDF RESPONSE RETURNING', [
+            'lesson_id' => $lesson->id,
+            'status' => 200,
+            'bytes' => strlen($binary),
+            'first_bytes' => substr($binary, 0, 5),
+        ]);
+
+        return response($binary, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Length', strlen($binary))
+            ->header('Content-Disposition', 'inline; filename="' . basename($absolutePath) . '"')
+            ->header('Accept-Ranges', 'bytes')
+            ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function securePdfData(Lesson $lesson)
+    {
+        $user = Auth::user();
+
+        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
+            abort(404, 'Secure document not found.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $filePath = $lesson->file_path;
+        if (blank($filePath)) {
+            abort(404, 'Document file path missing.');
+        }
+
+        $fullReal = null;
+        $crmRoot = "D:\\Laravel\\test\\crm-directskills\\storage\\app";
+        $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
+        $fullPath = $crmRoot . DIRECTORY_SEPARATOR . $relative;
+
+        if (file_exists($fullPath) && is_file($fullPath)) {
+            $fullReal = $fullPath;
+        } else {
+            $crmRootConfig = config('services.crm.storage_root');
+            if ($crmRootConfig) {
+                $relativeConfig = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
+                $fullPathConfig = rtrim($crmRootConfig, '/\\') . DIRECTORY_SEPARATOR . $relativeConfig;
+                if (file_exists($fullPathConfig) && is_file($fullPathConfig)) {
+                    $fullReal = $fullPathConfig;
+                }
+            }
+        }
+
+        if (!$fullReal) {
+            if (\Storage::disk('public')->exists($filePath)) {
+                $fullReal = \Storage::disk('public')->path($filePath);
+            } elseif (\Storage::disk('local')->exists($filePath)) {
+                $fullReal = \Storage::disk('local')->path($filePath);
+            }
+        }
+
+        if (!$fullReal || !file_exists($fullReal)) {
+            abort(404, 'File not found');
+        }
+
+        if (filesize($fullReal) > 50 * 1024 * 1024) {
+            abort(413, 'PDF too large for inline secure viewer');
+        }
+
+        $binary = file_get_contents($fullReal);
+
+        return response()->json([
+            'success' => true,
+            'filename' => basename($fullReal),
+            'mime' => 'application/pdf',
+            'data' => base64_encode($binary),
+        ], 200, [
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
     }
 }
