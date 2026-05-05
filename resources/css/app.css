@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --ds-navy: #01345B;
+        --ds-pink: #A91A6A;
+        --ds-navy-rgb: 1, 52, 91;
+        --ds-pink-rgb: 169, 26, 106;
+    }
+}
