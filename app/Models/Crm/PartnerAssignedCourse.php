@@ -12,8 +12,20 @@ class PartnerAssignedCourse extends Model
     protected $fillable = [
         'partner_id',
         'course_id',
+        'discount_type',
+        'discount_value',
+        'allow_full_payment',
+        'allow_three_months',
+        'allow_installments',
+        'status',
         'notes',
     ];
+
+    public function installmentPlans()
+    {
+        return $this->hasMany(PartnerInstallmentPlan::class, 'partner_id', 'partner_id')
+                    ->whereColumn('course_id', 'course_id');
+    }
 
     public function plans()
     {

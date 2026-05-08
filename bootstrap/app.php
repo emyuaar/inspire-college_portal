@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->reportable(function (Throwable $e) {
-            if (request()->route() && (request()->segment(1) === 'learner' || app('auth')->guard('learner')->check() || app('auth')->guard('web')->user()?->isLearner())) {
+            if (request()->route() && (request()->segment(1) === 'learner' || (auth()->check() && auth()->user()->isLearner()))) {
                 $logger = \App\Services\LearnerLogger::logException($e, 'learner.backend.exception', 'error');
                 
                 // Enrich with request inputs if safe (excluding sensitive fields)

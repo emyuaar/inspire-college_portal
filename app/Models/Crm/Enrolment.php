@@ -67,6 +67,14 @@ class Enrolment extends Model
         // Fallback: If no enrolment_id link, check via order_id if possible (but trusted link is enrolment_id)
 
         if ($partnerInstallments->isNotEmpty()) {
+            // Check if any installment is awaiting approval
+            if ($partnerInstallments->whereIn('status', ['awaiting_approval', 'proof_submitted'])->isNotEmpty()) {
+                return [
+                    'status' => 'awaiting_approval',
+                    'label' => 'Proof Submitted',
+                    'color' => 'blue',
+                ];
+            }
 
             // USE NEW LOGIC: Status depends on Access Allowed logic
             if ($this->installment_access_allowed) {

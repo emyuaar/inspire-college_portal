@@ -138,8 +138,8 @@
                                                         if ($isSecureDoc) {
                                                             $primaryUrl = route('portal.learner.secure_doc.view', $lesson->id);
                                                             $primaryTarget = null;
-                                                            $typeLabel = 'Secure Document';
-                                                            $actionLabel = 'View Document';
+                                                            $typeLabel = 'Study Material';
+                                                            $actionLabel = 'Open Material';
                                                             $btnIcon = 'eye';
                                                             $typeIcon = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
                                                         } elseif ($isFileResource) {
@@ -176,9 +176,9 @@
                                                                 </a>
                                                                 <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
                                                                     <span>{{ $typeLabel }}</span>
-                                                                    @if(!$isFileResource && !blank($lesson->file_path))
+                                                                    @if((!$isFileResource && !blank($lesson->file_path)) || $isSecureDoc)
                                                                         <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                                        <span>Includes attachment</span>
+                                                                        <span>{{ $isSecureDoc ? 'Online View' : 'Includes attachment' }}</span>
                                                                     @endif
                                                                 </div>
                                                             </div>

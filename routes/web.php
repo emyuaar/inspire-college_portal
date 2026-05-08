@@ -66,12 +66,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/learners/{learner}/courses', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'store'])
             ->name('courses.store');
 
-        // Course Plan Selection
+        Route::get('/learners/{learner}/enrol/{course}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlanForCourse'])
+            ->name('enrolments.choose_plan_new');
+
+        Route::post('/learners/{learner}/enrol/{course}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'storeEnrolmentWithPlan'])
+            ->name('enrolments.store_with_plan');
+
+        // Course Plan Selection (Legacy/Draft Review)
         Route::get('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlan'])
             ->name('enrolments.choose_plan');
 
         Route::post('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'updatePlan'])
             ->name('enrolments.update_plan');
+
+        Route::post('/enrolments/{enrolment}/submit-proof', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'submitProof'])
+            ->name('enrolments.submit_proof');
 
         Route::post('/learners/{learner}/pay', [\App\Http\Controllers\Payment\CheckoutController::class, 'createCheckoutSession'])
             ->name('checkout');
@@ -79,6 +88,9 @@ Route::middleware('auth')->group(function () {
         // Manual Installment Payment
         Route::get('/installments', [\App\Http\Controllers\Partner\InstallmentController::class, 'index'])
             ->name('installments.index');
+
+        Route::get('/installments/{enrolment}/details', [\App\Http\Controllers\Partner\InstallmentController::class, 'show'])
+            ->name('installments.show');
 
         Route::get('/installments/{installment}/checkout', [\App\Http\Controllers\Partner\InstallmentController::class, 'createCheckoutSession'])
             ->name('installments.checkout');

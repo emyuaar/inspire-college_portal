@@ -53,6 +53,11 @@ class Course extends Model
         return $this->hasMany(CoursePromotion::class, 'course_id');
     }
 
+    public function qualification()
+    {
+        return $this->belongsTo(Qualification::class, 'qualification_id');
+    }
+
     // pivot row (deposit/months/monthly)
     public function activeCoursePromotion()
     {

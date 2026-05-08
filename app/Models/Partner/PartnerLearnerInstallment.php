@@ -36,15 +36,21 @@ class PartnerLearnerInstallment extends Model
         'stripe_payment_intent_id',
         'receipt_path',
         'notes',
+        'submitted_amount',
+        'approved_by',
+        'approved_at',
+        'rejection_reason',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'paid_at' => 'datetime',
+        'approved_at' => 'datetime',
         'total_amount' => 'decimal:2',
         'deposit_amount' => 'decimal:2',
         'installment_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
+        'submitted_amount' => 'decimal:2',
     ];
 
     /**

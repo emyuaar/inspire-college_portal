@@ -1,4 +1,4 @@
-<x-app-layout page-title="Secure Document Viewer" active-page="courses">
+<x-app-layout page-title="Study Material Viewer" active-page="courses">
 
     <style>
         .pdf-page-wrapper {
@@ -42,7 +42,7 @@
             <div class="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between">
                 <div>
                     <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
-                        Secure Viewer
+                        Online View
                     </span>
                     <h1 class="text-xl font-bold text-ds-navy mt-1">
                         {{ $lesson->document_title ?? $lesson->title }}

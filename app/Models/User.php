@@ -86,6 +86,11 @@ class User extends Authenticatable
         return $this->org_id > 0 && $this->org_id !== $this->id;
     }
 
+    public function isLearner(): bool
+    {
+        return $this->org_id !== $this->id;
+    }
+
     // Scopes
     public function scopePartner($query)
     {

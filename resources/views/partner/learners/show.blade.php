@@ -146,15 +146,13 @@
         <div class="lg:col-span-7 space-y-6">
             <x-ui.card title="Enrolled Courses" subtitle="Manage payment plans and view progress">
                 <x-slot name="actions">
-                    @if($learner->crm_approved)
-                        <x-ui.button variant="outline" size="sm" data-bs-toggle="modal" data-bs-target="#addCourseModal">
+                    <x-ui.button variant="outline" size="sm" data-bs-toggle="modal" data-bs-target="#addCourseModal">
                             <x-slot name="icon">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                             </x-slot>
                             Add Course
                         </x-ui.button>
                         @include('partner.courses.partials.add_modal')
-                    @endif
                 </x-slot>
 
                 <div class="space-y-4 mt-2">
@@ -225,71 +223,66 @@
                                         </div>
                                     @endif
                                     
-                                    @if($statusName == 'pending-payment' && $learner->crm_approved)
-                                        <div class="mt-2">
-                                           <form action="{{ route('partner.checkout', $learner->id) }}" method="POST" 
-                                              x-data="{ 
-                                                expanded: false, 
-                                                code: '', 
-                                                status: 'idle', 
-                                                msg: '',
-                                                validate() {
-                                                    if(!this.code) return;
-                                                    this.status = 'loading';
-                                                    fetch('{{ route('partner.coupon.validate') }}', {
-                                                        method: 'POST',
-                                                        headers: { 
-                                                            'Content-Type': 'application/json',
-                                                            'X-CSRF-TOKEN': document.head.querySelector('meta[name=csrf-token]').content
-                                                        },
-                                                        body: JSON.stringify({ code: this.code })
-                                                    })
-                                                    .then(r => r.json())
-                                                    .then(d => {
-                                                        this.status = d.valid ? 'valid' : 'invalid';
-                                                        this.msg = d.message;
-                                                    })
-                                                    .catch(() => {
-                                                        this.status = 'invalid';
-                                                        this.msg = 'System error';
-                                                    });
-                                                }
-                                            }">
-                                            @csrf
-                                            <input type="hidden" name="enrolment_id" value="{{ $enrolment->id }}">
-                                            
-                                            <div class="flex flex-col items-end gap-2 mb-2">
-                                                 <!-- Trigger -->
-                                                 <button type="button" 
-                                                    x-show="!expanded" 
-                                                    @click="expanded = true" 
-                                                    class="text-xs text-slate-500 hover:text-brand-600 underline">
-                                                    Add Coupon?
-                                                 </button>
-                                        
-                                                 <!-- Input Area -->
-                                                 <div x-show="expanded" class="flex flex-col items-end gap-1" x-cloak x-transition>
-                                                     <div class="flex items-center gap-1">
-                                                         <input type="text" name="coupon_code" x-model="code" 
-                                                            class="text-xs border-slate-300 rounded focus:ring-brand-500 focus:border-brand-500 w-32 py-1 px-2" 
-                                                            placeholder="Enter code">
-                                                         <button type="button" @click="validate()" 
-                                                            class="bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 text-xs py-1 px-2 rounded transition-colors"
-                                                            :disabled="status === 'loading'">
-                                                            Apply
-                                                         </button>
-                                                     </div>
-                                                     <div x-show="msg" x-text="msg" class="text-[10px] font-medium"
-                                                        :class="status === 'valid' ? 'text-emerald-600' : 'text-rose-600'"></div>
-                                                 </div>
-                                            </div>
+                                    @if($statusName == 'pending-payment')
+                                        <div class="mt-2 space-y-2">
+                                            @php
+                                                $pendingInstallments = $enrolment->partnerInstallments()->where('status', '!=', 'paid')->get();
+                                                $hasAwaitingProof = $pendingInstallments->whereIn('status', ['awaiting_approval', 'proof_submitted'])->isNotEmpty();
+                                                
+                                                // Find the specific installment to pay/record (usually the oldest unpaid)
+                                                $currentInst = $pendingInstallments->sortBy('due_date')->first();
+                                                $hasRejectedProof = $currentInst && $currentInst->status === 'rejected';
+                                            @endphp
 
-                                            <x-ui.button variant="primary" size="sm" type="submit" class="w-full justify-center">
-                                                Pay Now
-                                            </x-ui.button>
-                                        </form>
-                                    </div>
+                                            @if($hasAwaitingProof)
+                                                <div class="p-3 bg-blue-50 border border-blue-100 rounded-lg text-center">
+                                                    <div class="flex items-center justify-center gap-2 mb-1">
+                                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        <span class="text-xs font-bold text-blue-800">Payment Proof Submitted</span>
+                                                    </div>
+                                                    <span class="block text-[10px] text-blue-600 uppercase tracking-tight font-medium">Awaiting Admin Approval</span>
+                                                </div>
+                                            @elseif($currentInst)
+                                                @if($hasRejectedProof)
+                                                    <div class="p-2 bg-red-50 border border-red-100 rounded-lg mb-2">
+                                                        <div class="flex items-center gap-1.5 text-red-700 mb-1">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                            <span class="text-[10px] font-bold uppercase">Proof Rejected</span>
+                                                        </div>
+                                                        @if($currentInst->rejection_reason)
+                                                            <p class="text-[10px] text-red-600 leading-tight italic">"{{ $currentInst->rejection_reason }}"</p>
+                                                        @endif
+                                                    </div>
+                                                @endif
 
+                                                {{-- Option 1: Stripe (if enabled/available) --}}
+                                                <form action="{{ route('partner.checkout', $learner->id) }}" method="POST">
+                                                    @csrf
+                                                    <input type="hidden" name="enrolment_id" value="{{ $enrolment->id }}">
+                                                    <x-ui.button variant="primary" size="sm" type="submit" class="w-full justify-center">
+                                                        <x-slot name="icon">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                                        </x-slot>
+                                                        Pay via Stripe
+                                                    </x-ui.button>
+                                                </form>
+
+                                                <div class="relative flex py-1 items-center">
+                                                    <div class="flex-grow border-t border-slate-200"></div>
+                                                    <span class="flex-shrink mx-2 text-[10px] text-slate-400 font-bold uppercase">OR</span>
+                                                    <div class="flex-grow border-t border-slate-200"></div>
+                                                </div>
+
+                                                {{-- Option 2: Bank Transfer (Upload Proof) --}}
+                                                {{-- Re-using the installment modal from the partial --}}
+                                                <x-ui.button variant="outline" size="sm" class="w-full justify-center" data-bs-toggle="modal" data-bs-target="#payModal-{{ $currentInst->id }}">
+                                                    <x-slot name="icon">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                                    </x-slot>
+                                                    {{ $hasRejectedProof ? 'Re-upload Proof' : 'Upload Proof' }}
+                                                </x-ui.button>
+                                            @endif
+                                        </div>
                                     @elseif($statusName == 'pending')
                                          @php
                                             $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $learner->id)->first();

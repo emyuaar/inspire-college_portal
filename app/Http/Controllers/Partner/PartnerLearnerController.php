@@ -5,9 +5,18 @@ namespace App\Http\Controllers\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Crm\Enrolment;
+use App\Models\Crm\EnrolmentStatus;
+use App\Models\Crm\Order;
+use App\Models\Crm\OrderDetail;
+use App\Models\Crm\OrderInstallment;
+use App\Models\Crm\UserDetail as CrmUserDetail;
+use App\Models\Crm\PartnerAssignedCourse;
+use App\Models\Crm\PartnerInstallmentPlan;
+use App\Models\Partner\PartnerLearnerInstallment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
@@ -70,39 +79,65 @@ class PartnerLearnerController extends Controller
 
         // Fetch Only Assigned Courses for the "Add Course" Modal
         $assignedCourses = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
-            ->with(['course', 'plans'])
+            ->where('status', 'active') // Only active assignments
+            ->with(['course.qualification', 'plans'])
             ->get();
 
         // Get IDs of currently enrolled courses to filter them out
-        $enrolledCourseIds = $enrolments->pluck('course_id')->unique();
+        $enrolledCourseIds = $enrolments->pluck('course_id')->unique()->toArray();
 
         $courses = $assignedCourses->map(function ($assignment) use ($enrolledCourseIds) {
             $course = $assignment->course;
-            if (!$course)
-                return null;
+            if (!$course) return null;
 
             // Exclude if already enrolled
-            if ($enrolledCourseIds->contains($course->id)) {
+            if (in_array($course->id, $enrolledCourseIds)) {
                 return null;
             }
 
-            // Pricing & Plans from Assignment
-            $fullPlan = $assignment->plans->where('plan_type', 'full')->where('status', true)->first();
-            $instPlan = $assignment->plans->where('plan_type', 'installment')->where('status', true)->first();
+            // 1. Map ID for View
+            $course->course_id = $course->id;
 
-            // Construct Data Object for Frontend (matches `add_modal.blade.php` expectations)
-            return (object) [
-                'course_id' => $course->id,
-                'title' => $course->title,
-                'is_promo' => false, // Partner assignments have fixed pricing, ignoring standard promos for now
-                'final_full_price' => $fullPlan ? number_format($fullPlan->amount, 2) : 'N/A', // Display string
-                'full_payment_available' => (bool) $fullPlan,
-                'installment_plan' => (object) [
-                    'available' => (bool) $instPlan,
-                    'deposit' => $instPlan ? $instPlan->deposit : 0,
-                ],
-            ];
-        })->filter()->values(); // Filter nulls and re-index
+            // 2. Data from Website Database
+            $qual = $course->qualification;
+            $course->awarding_body = strip_tags($qual?->short_title ?? $qual?->title ?? 'N/A');
+
+            // Extract Level from title
+            $level = 'N/A';
+            if (preg_match('/Level\s+(\d+)/i', $course->title, $matches)) {
+                $level = 'Level ' . $matches[1];
+            }
+            $course->level_name = trim(strip_tags($level));
+
+            // 3. Base Price from Website Database (Primary Source)
+            $course->base_price = (float) ($course->sale_price ?? 0);
+            $course->price_status = ($course->base_price <= 0) ? 'No website pricing configured' : null;
+
+            // 4. Discount & Partner Price from CRM
+            $dValue = (float) ($assignment->discount_value ?? 0);
+            if ($assignment->discount_type == 'percentage') {
+                $discountAbs = $course->base_price * ($dValue / 100);
+                $course->discount_label = $dValue . '% off';
+            } else {
+                $discountAbs = $dValue;
+                $course->discount_label = $dValue > 0 ? '£' . $dValue . ' off' : '';
+            }
+
+            $course->final_full_price = max(0, $course->base_price - $discountAbs);
+
+            // 5. Payment Modes from CRM
+            $course->allow_full = (bool) $assignment->allow_full_payment;
+            $course->allow_three = (bool) $assignment->allow_three_months;
+            $course->allow_inst = (bool) $assignment->allow_installments;
+
+            // 6. Installment Plan check from CRM
+            $instPlan = $assignment->plans ? $assignment->plans->where('plan_type', 'installment')->where('status', 1)->first() : null;
+            $course->has_plan = (bool) $instPlan;
+
+            return $course;
+        })->filter()->values();
+
+        \Log::error("DEBUG Final available courses count: " . $courses->count());
 
         // Fetch Partner Installments (Manual Plan)
         $installments = \App\Models\Partner\PartnerLearnerInstallment::where('learner_id', $learner->id)
@@ -114,7 +149,7 @@ class PartnerLearnerController extends Controller
     }
 
     /**
-     * Show Create Learner Form
+     * Show Create Learner Form (Step 1)
      */
     public function create()
     {
@@ -122,78 +157,164 @@ class PartnerLearnerController extends Controller
     }
 
     /**
-     * Store New Learner
+     * Store New Learner (Step 1)
      */
-    public function store(Request $request, \App\Services\MicrosoftGraphService $graphService)
+    public function store(Request $request)
     {
         $partner = Auth::user();
 
-        // Validate Personal Email
+        // 1. Validation (Learner Details Only)
         $request->validate([
-            'first_name' => 'required|string|max:255',
-            'sur_name' => 'required|string|max:255',
-            'email_address' => 'required|email', // Check format. Uniqueness? Maybe in CRM details later.
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
-            ],
+            'first_name' => 'required|string|max:60',
+            'middle_name' => 'nullable|string|max:60',
+            'sur_name' => 'required|string|max:60',
+            'email_address' => 'required|email',
+            'contact_number' => 'required|string|max:50',
+            'dob' => 'required|date',
+            'gender' => 'required|string|max:20',
+            'address_line_1' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'country' => 'required|string|max:100',
+            'zip_code' => 'required|string|max:30',
+            'password' => 'required|confirmed|min:8',
         ]);
 
+        DB::beginTransaction();
+        DB::connection('mysql_crm')->beginTransaction();
+
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
-
-            // 1. Create User in Portal DB with TEMP email (to get ID)
-            // We use a safe temp generic email
-            $tempEmail = 'temp_' . uniqid() . '@directskills.co.uk';
-
+            // A) Create Portal User (Initial with temp email)
             $learner = User::create([
                 'org_id' => $partner->id,
-                'status_id' => 1, // Pending
+                'status_id' => 1, // Pending Approval
                 'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name ?? '',
                 'sur_name' => $request->sur_name,
-                'email_address' => $tempEmail,
+                'email_address' => 'ds.pending.' . time() . '@directskills.co.uk',
                 'password' => Hash::make($request->password),
+                'crm_approved' => 0,
             ]);
 
-            // 2. Generate Correct DS Email
-            $dsEmail = "DS{$learner->id}@directskills.co.uk";
+            // Final generated DS Email: DS{id}@directskills.co.uk
+            $dsEmail = "DS" . $learner->id . "@directskills.co.uk";
+            $learner->update(['email_address' => $dsEmail]);
 
-            // 3. Update Portal User with DS Email
-            $learner->update([
-                'email_address' => $dsEmail
-            ]);
-
-            // 4. Save Personal Email to CRM
-            // Using the Crm\UserDetail model we created
-            \App\Models\Crm\UserDetail::create([
+            // B) CRM User Detail
+            CrmUserDetail::create([
                 'learner_id' => $learner->id,
                 'personal_email' => $request->email_address,
-                // Add other fields if necessary or nullable
+                'contact' => $request->contact_number,
+                'dob' => $request->dob,
+                'gender' => $request->gender,
+                'address_line_1' => $request->address_line_1,
+                'address_line_2' => $request->address_line_2 ?? '',
+                'city' => $request->city,
+                'state' => $request->state ?? '',
+                'country' => $request->country,
+                'zip_code' => $request->zip_code,
             ]);
 
-            // 5. Create in Microsoft Graph (Disabled initially) using DS Email
-            // Note: Password is set to user input as per requirement
-            $msUser = $graphService->createPendingLearner($learner, $request->password);
+            DB::connection('mysql_crm')->commit();
+            DB::commit();
 
-            // 6. Update with MS ID
-            $learner->update([
-                'ms_user_id' => $msUser['id'],
-                'ms_provisioned_at' => now(),
-            ]);
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            return redirect()->route('partner.learners.index')
-                ->with('success', "Learner created successfully. Login Email: {$dsEmail} (Pending Approval).");
+            return redirect()->route('partner.learners.show', $learner->id)
+                ->with('success', "Learner created successfully. Login: {$dsEmail}. You can now enrol them on a course.");
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            return back()->with('error', 'Error creating learner: ' . $e->getMessage())->withInput();
+            DB::connection('mysql_crm')->rollBack();
+            DB::rollBack();
+            return back()->with('error', 'Error: ' . $e->getMessage())->withInput();
+        }
+    }
+
+    private function getPlanData($type, $total, $partnerId, $courseId)
+    {
+        if ($type == 'full') {
+            return [
+                'payment_mode' => 'full',
+                'deposit' => $total,
+                'months' => 0,
+                'monthly' => 0,
+                'title' => 'Full Payment'
+            ];
+        } 
+        elseif ($type == 'three_months') {
+            $split = round($total / 3, 2);
+            return [
+                'payment_mode' => 'installment',
+                'deposit' => $split,
+                'months' => 2,
+                'monthly' => $split,
+                'title' => '3 Months Distributed'
+            ];
+        } 
+        else {
+            $plan = PartnerInstallmentPlan::where('partner_id', $partnerId)
+                ->where('course_id', $courseId)
+                ->where('status', 'active')
+                ->firstOrFail();
+            
+            return [
+                'payment_mode' => 'installment',
+                'deposit' => $plan->deposit_amount,
+                'months' => $plan->installment_count,
+                'monthly' => $plan->installment_amount,
+                'title' => $plan->plan_name
+            ];
+        }
+    }
+
+    private function createInstallments($type, $partnerId, $learnerId, $enrolmentId, $order, $total, $planData)
+    {
+        $startDate = now();
+
+        // Portal Tracking (Deposit/Full always no 0)
+        PartnerLearnerInstallment::create([
+            'partner_id' => $partnerId,
+            'learner_id' => $learnerId,
+            'enrolment_id' => $enrolmentId,
+            'order_id' => $order->id,
+            'course_id' => $order->details->first()->course_id ?? 0,
+            'plan_type' => $type,
+            'total_amount' => $total,
+            'deposit_amount' => $planData['deposit'],
+            'installment_amount' => $planData['deposit'],
+            'installments_count' => $planData['months'] + 1,
+            'installment_no' => 0,
+            'due_date' => $startDate,
+            'status' => 'pending',
+        ]);
+
+        // Remaining Installments
+        for ($i = 1; $i <= $planData['months']; $i++) {
+            $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
+            
+            // Portal Tracking
+            PartnerLearnerInstallment::create([
+                'partner_id' => $partnerId,
+                'learner_id' => $learnerId,
+                'enrolment_id' => $enrolmentId,
+                'order_id' => $order->id,
+                'course_id' => $order->details->first()->course_id ?? 0,
+                'plan_type' => $type,
+                'total_amount' => $total,
+                'deposit_amount' => $planData['deposit'],
+                'installment_amount' => $planData['monthly'],
+                'installments_count' => $planData['months'] + 1,
+                'installment_no' => $i,
+                'due_date' => $dueDate,
+                'status' => 'pending',
+            ]);
+
+            // CRM Tracking
+            OrderInstallment::create([
+                'order_id' => $order->id,
+                'installment_no' => $i,
+                'amount' => $planData['monthly'],
+                'due_date' => $dueDate,
+                'payment_status' => 'pending',
+                'amount_paid' => 0,
+            ]);
         }
     }
 }

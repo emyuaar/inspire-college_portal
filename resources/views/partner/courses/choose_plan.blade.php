@@ -3,119 +3,161 @@
 @section('title', 'Select Payment Plan')
 
 @section('content')
-    <div class="max-w-2xl mx-auto px-4 py-8">
-        <div class="mb-6">
-            <a href="{{ route('partner.learners.show', $enrolment->learner_id) }}"
-                class="text-slate-500 hover:text-slate-700 flex items-center gap-2 text-sm">
-                &larr; Back to Learner
+    <div class="max-w-3xl mx-auto px-4 py-12">
+        <div class="mb-8">
+            <a href="{{ route('partner.learners.show', $isNewEnrolment ? $learner->id : $enrolment->learner_id) }}"
+                class="text-slate-500 hover:text-indigo-600 flex items-center gap-2 text-sm font-bold transition-colors">
+                <i class="fas fa-arrow-left"></i> Back to Learner Profile
             </a>
         </div>
 
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-            <div class="px-6 py-5 border-b border-slate-200 bg-slate-50">
-                <h1 class="text-lg font-bold text-slate-900">Select Payment Plan</h1>
-                <p class="text-sm text-slate-500 mt-1">Course: <span
-                        class="font-semibold">{{ $enrolment->course->title }}</span></p>
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            <div class="px-8 py-8 border-b border-slate-50 bg-slate-50/50">
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Finalize Enrollment</h1>
+                <p class="text-slate-500 mt-2 font-medium">Course: <span class="text-indigo-600 font-bold">{{ $isNewEnrolment ? $course->title : $enrolment->course->title }}</span></p>
+                
+                <div class="mt-4 flex items-center gap-2">
+                    <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Base Fee:</span>
+                    <span class="text-sm font-bold text-slate-900">£{{ number_format($finalFee, 2) }}</span>
+                    <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase">Partner Discount Applied</span>
+                </div>
             </div>
 
-            <div class="p-6">
+            <div class="p-8">
                 @if(session('error'))
-                    <div class="mb-4 p-4 rounded bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
-                @endif
-
-                @if(!empty($pricing->assignment_notes))
-                    <div class="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
-                        <p class="font-bold text-sm">Partner Note:</p>
-                        <p class="text-sm mt-1">{{ $pricing->assignment_notes }}</p>
+                    <div class="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-800 text-sm font-bold flex items-center gap-3">
+                        <i class="fas fa-exclamation-circle"></i>
+                        {{ session('error') }}
                     </div>
                 @endif
 
-                <form action="{{ route('partner.enrolments.update_plan', $enrolment->id) }}" method="POST">
+                <form action="{{ $isNewEnrolment ? route('partner.enrolments.store_with_plan', [$learner->id, $course->id]) : route('partner.enrolments.update_plan', $enrolment->id) }}" method="POST" x-data="{ selectedPlan: '' }">
                     @csrf
 
-                    <h3 class="text-sm font-semibold text-slate-700 mb-4">Choose how you want to pay:</h3>
+                    <div class="mb-6">
+                        <h3 class="text-lg font-black text-slate-900 tracking-tight">Select Payment Method</h3>
+                        <p class="text-slate-500 text-sm font-medium mt-1">Choose one payment method to finalize the enrollment</p>
+                    </div>
 
-                    <div class="grid grid-cols-1 gap-4">
-                        {{-- Full Payment --}}
-                        @if($pricing->full_price_available)
-                            <label
-                                class="relative border border-slate-200 rounded-xl p-5 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/10 transition-all group">
-                                <div class="flex items-start gap-4">
-                                    <div class="pt-1">
-                                        <input type="radio" name="plan_type" value="full" checked
-                                            class="h-5 w-5 text-indigo-600 border-slate-300 focus:ring-indigo-500">
-                                    </div>
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="font-bold text-slate-900">Full Payment</span>
-                                            <span
-                                                class="text-lg font-bold text-indigo-600">£{{ $pricing->final_full_price }}</span>
+                    <div class="space-y-4">
+                        @foreach($plans as $type => $plan)
+                            @if($type == 'installment_unavailable')
+                                <div class="p-6 border-2 border-dashed border-slate-100 rounded-3xl opacity-60">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+                                            <i class="fas fa-lock"></i>
                                         </div>
-                                        <p class="text-sm text-slate-500">Pay the entire course fee upfront.</p>
-                                        @if(!empty($pricing->is_promo))
-                                            <div
-                                                class="mt-2 inline-flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
-                                                Includes {{ $pricing->discount_percent }}% Discount
+                                        <div>
+                                            <p class="font-bold text-slate-500">Custom Installments Unavailable</p>
+                                            <p class="text-xs text-slate-400">No active plan has been configured for this course.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                @continue
+                            @endif
+
+                            <label class="relative block cursor-pointer group">
+                                <input type="radio" name="plan_type" value="{{ $type }}" x-model="selectedPlan" class="peer hidden" required>
+                                
+                                <div class="p-6 border-2 rounded-3xl transition-all duration-200"
+                                    :class="selectedPlan === '{{ $type }}' ? 'border-indigo-600 bg-indigo-50/50 shadow-lg shadow-indigo-100' : 'border-slate-100 bg-white group-hover:border-slate-200'">
+                                    
+                                    <div class="flex items-start justify-between gap-6">
+                                        {{-- Left Section: Icon + Text --}}
+                                        <div class="flex items-start gap-5 flex-1">
+                                            <div class="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200"
+                                                :class="selectedPlan === '{{ $type }}' ? '{{ $type == 'full' ? 'bg-emerald-600 text-white' : ($type == 'three_months' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white') }}' : '{{ $type == 'full' ? 'bg-emerald-50 text-emerald-600' : ($type == 'three_months' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600') }}'">
+                                                <i class="fas {{ $type == 'full' ? 'fa-check-double' : ($type == 'three_months' ? 'fa-calendar-alt' : 'fa-layer-group') }} text-xl"></i>
+                                            </div>
+                                            
+                                            <div>
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <h4 class="font-black text-slate-900 transition-colors" :class="selectedPlan === '{{ $type }}' ? 'text-indigo-700' : ''">{{ $plan['title'] }}</h4>
+                                                    <template x-if="selectedPlan === '{{ $type }}'">
+                                                        <span class="bg-indigo-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Selected</span>
+                                                    </template>
+                                                </div>
+                                                <p class="text-sm text-slate-500 font-medium line-clamp-1">{{ $plan['description'] }}</p>
+                                            </div>
+                                        </div>
+
+                                        {{-- Right Section: Amount + Radio Button --}}
+                                        <div class="flex items-center gap-4 shrink-0">
+                                            <div class="text-right">
+                                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Due Now</p>
+                                                <p class="text-xl font-black text-slate-900">£{{ number_format($plan['amount'], 2) }}</p>
+                                            </div>
+                                            
+                                            <div class="w-6 h-6 rounded-full border-2 transition-all flex items-center justify-center shrink-0"
+                                                :class="selectedPlan === '{{ $type }}' ? 'border-indigo-600 bg-indigo-600' : 'border-slate-200 bg-white group-hover:border-slate-300'">
+                                                <template x-if="selectedPlan === '{{ $type }}'">
+                                                    <i class="fas fa-check text-white text-[10px]"></i>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {{-- Plan Specific Details (Breakdowns) --}}
+                                    <div class="mt-4 pl-16"> {{-- Offset by icon width + gap --}}
+                                        @if($type == 'three_months')
+                                            <div class="grid grid-cols-3 gap-3">
+                                                @foreach($plan['installments'] as $inst)
+                                                    <div class="border border-slate-100 rounded-xl p-3 text-center transition-colors"
+                                                        :class="selectedPlan === '{{ $type }}' ? 'bg-white border-indigo-100' : 'bg-slate-50/50'">
+                                                        <p class="text-[9px] font-black text-slate-400 uppercase">{{ $inst['due'] }}</p>
+                                                        <p class="text-sm font-bold text-slate-900 mt-1">£{{ number_format($inst['amount'], 2) }}</p>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+
+                                        @if(str_starts_with($type, 'installment_'))
+                                            <div class="border rounded-2xl p-4 flex justify-between items-center transition-colors"
+                                                :class="selectedPlan === '{{ $type }}' ? 'bg-white border-purple-200' : 'bg-purple-50/30 border-purple-100/50'">
+                                                <div class="text-xs">
+                                                    <span class="text-slate-500 font-medium">Monthly Pay:</span>
+                                                    <span class="font-black text-purple-700 ml-1">£{{ number_format($plan['details']->monthly_amount, 2) }} x {{ $plan['details']->months }} months</span>
+                                                </div>
+                                                <div class="text-xs">
+                                                    <span class="text-slate-500 font-medium">Total Price:</span>
+                                                    <span class="font-black text-slate-900 ml-1">£{{ number_format($plan['details']->amount, 2) }}</span>
+                                                </div>
                                             </div>
                                         @endif
                                     </div>
                                 </div>
                             </label>
-                        @endif
-
-                        {{-- Installment Plan --}}
-                        @if($pricing->installment_plan->available)
-                            <label
-                                class="relative border border-slate-200 rounded-xl p-5 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/10 transition-all group">
-                                <div class="flex items-start gap-4">
-                                    <div class="pt-1">
-                                        <input type="radio" name="plan_type" value="installment"
-                                            class="h-5 w-5 text-indigo-600 border-slate-300 focus:ring-indigo-500">
-                                    </div>
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="font-bold text-slate-900">Installment Plan</span>
-                                            <span
-                                                class="text-lg font-bold text-slate-900">£{{ $pricing->installment_plan->deposit }}
-                                                <span class="text-sm font-normal text-slate-500">deposit</span></span>
-                                        </div>
-                                        <p class="text-sm text-slate-500 mb-2">Pay a deposit now, then monthly installments.</p>
-
-                                        <div class="bg-slate-50 rounded p-3 text-xs text-slate-600 space-y-1">
-                                            <div class="flex justify-between">
-                                                <span>Monthly Payments:</span>
-                                                <span class="font-medium">£{{ $pricing->installment_plan->monthly_amount }} x
-                                                    {{ $pricing->installment_plan->months }} months</span>
-                                            </div>
-                                            <div class="flex justify-between border-t border-slate-200 pt-1 mt-1">
-                                                <span>Total Plan Cost:</span>
-                                                <span
-                                                    class="font-medium">£{{ $pricing->installment_plan->total_payable ?? 'N/A' }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </label>
-                        @else
-                            <div
-                                class="border border-slate-100 rounded-xl p-5 bg-slate-50 text-slate-400 opacity-75 cursor-not-allowed">
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636">
-                                        </path>
-                                    </svg>
-                                    <span class="font-medium">No Installment Plan Available</span>
-                                </div>
-                            </div>
-                        @endif
+                        @endforeach
                     </div>
 
-                    <div class="mt-8 flex justify-end">
-                        <button type="submit"
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-lg shadow-sm transition-colors w-full sm:w-auto">
-                            Confirm Selection
+                    <div class="mt-10">
+                        <button type="submit" 
+                            :disabled="!selectedPlan"
+                            :class="!selectedPlan ? 'opacity-50 cursor-not-allowed bg-slate-300' : 'bg-slate-900 hover:bg-indigo-600 shadow-xl shadow-indigo-100'"
+                            class="w-full text-white font-black py-5 rounded-2xl transition-all hover:-translate-y-1 active:translate-y-0 text-sm uppercase tracking-widest flex items-center justify-center gap-3">
+                            
+                            <template x-if="!selectedPlan">
+                                <span>Select a Payment Method to Continue</span>
+                            </template>
+                            
+                            <template x-if="selectedPlan === 'full'">
+                                <span>Continue with Full Payment</span>
+                            </template>
+                            
+                            <template x-if="selectedPlan === 'three_months'">
+                                <span>Continue with 3 Months Distributed</span>
+                            </template>
+                            
+                            <template x-if="selectedPlan.startsWith('installment_')">
+                                <span>Continue with Installment Plan</span>
+                            </template>
+
+                            <i class="fas fa-arrow-right text-xs" x-show="selectedPlan"></i>
                         </button>
+                        
+                        <p class="text-center text-[10px] text-slate-400 font-bold mt-6 uppercase tracking-widest flex items-center justify-center gap-2">
+                            <i class="fas fa-shield-alt"></i> Secure Administrative Enrollment & Billing
+                        </p>
                     </div>
                 </form>
             </div>

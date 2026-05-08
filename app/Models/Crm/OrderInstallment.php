@@ -16,6 +16,15 @@ class OrderInstallment extends Model
         'amount',
         'payment_status', // pending, paid
         'stripe_payment_id',
+        'installment_no',
+        'due_date',
+        'paid_at',
+        'amount_paid',
+    ];
+
+    protected $casts = [
+        'due_date' => 'date',
+        'paid_at' => 'datetime',
     ];
 
     public function order()
