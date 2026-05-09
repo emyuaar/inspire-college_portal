@@ -100,15 +100,16 @@
                 </div>
             </div>
 
-            <div class="bg-ds-navy/5 p-4 rounded-xl border border-ds-navy/10">
-                <h3 class="text-sm font-bold text-ds-navy mb-2">Set Portal Password</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <input type="password" name="password" required class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm" placeholder="New Password">
-                    </div>
-                    <div>
-                        <input type="password" name="password_confirmation" required class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm" placeholder="Confirm Password">
-                    </div>
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
+                <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                    <h3 class="text-sm font-bold text-blue-900 mb-1">No Password Required</h3>
+                    <p class="text-[13px] text-blue-700 leading-relaxed">
+                        Learner accounts are now more secure. You don't need to set a password for the learner. 
+                        Once the payment is confirmed, the learner will receive an email to set their own secure password.
+                    </p>
                 </div>
             </div>
         </x-ui.card>

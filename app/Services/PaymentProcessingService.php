@@ -127,11 +127,10 @@ class PaymentProcessingService
                         ]);
                         Log::info("PaymentProcessingService: Updated Order {$order->id} status to 1 (Active/Paid).");
                     } else {
-                        // Create missing order logic only if really needed, but typically Stripe payment implies order exists or was just created via Checkout/Plan.
-                        // If it came from Partner Portal "Pay" link, order might be missing if imported? 
-                        // Let's create if missing as good measure.
+                        // Create missing order logic
                         $order = Order::create([
                             'learner_id' => $pInstallment->learner_id,
+                            'partner_learner_id' => $pInstallment->partner_learner_id,
                             'enrolment_id' => $pInstallment->enrolment_id,
                             'amount' => $pInstallment->total_amount ?? 0,
                             'status_id' => 1, // Paid/Active
@@ -139,6 +138,21 @@ class PaymentProcessingService
                             'plan_title' => 'Installment Plan (Auto-Created via Stripe)',
                         ]);
                         Log::info("PaymentProcessingService: Created Missing Order {$order->id} and set to 1.");
+                    }
+
+                    // Update Enrolment Payment Status
+                    if ($pInstallment->enrolment_id) {
+                        $enrolment = Enrolment::find($pInstallment->enrolment_id);
+                        if ($enrolment) {
+                            $enrolment->update(['payment_status' => 'paid']);
+                            
+                            // Trigger Activation
+                            try {
+                                app(LearnerActivationService::class)->activate($enrolment);
+                            } catch (\Exception $e) {
+                                Log::error("Activation failed for enrolment {$enrolment->id}: " . $e->getMessage());
+                            }
+                        }
                     }
                 }
             } elseif ($installmentId) {
@@ -170,6 +184,19 @@ class PaymentProcessingService
                                 'stripe_payment_intent_id' => $session->payment_intent,
                                 'payment_reference' => $session->id,
                             ]);
+                    }
+
+                    // Update Enrolment Payment Status
+                    $enrolment = Enrolment::find($order->enrolment_id);
+                    if ($enrolment) {
+                        $enrolment->update(['payment_status' => 'paid']);
+                        
+                        // Trigger Activation
+                        try {
+                            app(LearnerActivationService::class)->activate($enrolment);
+                        } catch (\Exception $e) {
+                            Log::error("Activation failed for enrolment {$enrolment->id} (Full Pay): " . $e->getMessage());
+                        }
                     }
 
                     // --- INSTALLMENT SUBSCRIPTION LOGIC ---

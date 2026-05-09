@@ -13,6 +13,7 @@ class Order extends Model
 
     protected $fillable = [
         'learner_id',
+        'partner_learner_id',
         'enrolment_id',
         'amount',
         'stripe_payment_id',
@@ -36,6 +37,11 @@ class Order extends Model
     public function learner()
     {
         return $this->belongsTo(\App\Models\User::class, 'learner_id');
+    }
+
+    public function partnerLearner()
+    {
+        return $this->belongsTo(PartnerLearner::class, 'partner_learner_id');
     }
 
     public function enrolment()

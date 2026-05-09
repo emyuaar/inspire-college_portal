@@ -16,6 +16,23 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('portal.logout');
 
+// Learner Activation / Password Setup Routes
+Route::get('/activate/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
+    ->middleware('guest')
+    ->name('learner.activate');
+
+Route::post('/reset-password', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'store'])
+    ->middleware('guest')
+    ->name('password.update');
+
+Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
+    ->middleware('guest')
+    ->name('password.reset');
+
+Route::get('/reset-password', function() {
+    return redirect()->route('portal.login');
+})->middleware('guest');
+
 // DEBUG ROUTE
 Route::get('/debug-webhook', function () {
     $statuses = \App\Models\Crm\EnrolmentStatus::all();
@@ -62,6 +79,11 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/learners/{learner}/courses/create', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'create'])
             ->name('courses.create');
+
+        // Redirect GET requests for /courses back to the learner show page to avoid 404s
+        Route::get('/learners/{learner}/courses', function($learner) {
+            return redirect()->route('partner.learners.show', $learner);
+        });
 
         Route::post('/learners/{learner}/courses', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'store'])
             ->name('courses.store');

@@ -14,19 +14,95 @@
             </svg>
         </a>
         <div>
-            <h1 class="text-xl font-bold text-slate-900">{{ $learner->first_name }} {{ $learner->sur_name }}</h1>
+            <h1 class="text-xl font-bold text-slate-900">{{ $learner->first_name }} {{ $learner->sur_name ?? $learner->last_name }}</h1>
             <p class="text-sm text-slate-500">Learner Profile & Enrolments</p>
         </div>
     </div>
     
+    @if($isPending)
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
+        @php
+            $hasEnrolment = $enrolments->isNotEmpty();
+            $hasAwaitingProof = false;
+            $hasPendingPayment = false;
+            $welcomeSent = false;
+            $passwordSet = ($learner instanceof \App\Models\Crm\PartnerLearner && $learner->activation_status === 'completed');
+            $courseName = $hasEnrolment ? ($enrolments->first()->course->title ?? 'a course') : null;
+            
+            foreach($enrolments as $e) {
+                $p = $e->payment_status_details;
+                if ($p['status'] === 'awaiting_approval') $hasAwaitingProof = true;
+                if ($p['status'] === 'pending_payment') $hasPendingPayment = true;
+                if ($e->welcome_email_sent_at) $welcomeSent = true;
+            }
+
+            // Determine State
+            $state = 'add_course';
+            if ($hasEnrolment) $state = 'payment';
+            if ($hasAwaitingProof) $state = 'review';
+            if ($welcomeSent) $state = 'password_sent';
+            if ($passwordSet) $state = 'completed';
+        @endphp
+
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex-1">
+                {{-- Dynamic Heading --}}
+                <h2 class="text-lg font-bold text-blue-900 mb-1">
+                    @if($state == 'add_course')
+                        Next Step: Add a Course
+                    @elseif($state == 'payment')
+                        Next Step: Complete Payment
+                    @elseif($state == 'review')
+                        Payment Proof Under Review
+                    @elseif($state == 'password_sent')
+                        Password Setup Email Sent
+                    @else
+                        Account Fully Activated
+                    @endif
+                </h2>
+
+                {{-- Dynamic Text --}}
+                <p class="text-sm text-blue-700 max-w-2xl">
+                    @if($state == 'add_course')
+                        The learner profile is created, but access is not active yet. Add a course, complete the first payment, and the learner will receive a secure password setup email.
+                    @elseif($state == 'payment')
+                        This learner is enrolled on <strong>{{ $courseName }}</strong>. Please complete the first payment by Stripe or upload bank transfer proof. Once payment is confirmed, the learner will receive a secure password setup email.
+                    @elseif($state == 'review')
+                        We’ve received the payment proof. The learner account will activate automatically once our team approves it.
+                    @elseif($state == 'password_sent')
+                        The first payment has been confirmed and this learner account has been activated. A secure “Set Your Password” email has been sent to the learner. Once the learner sets their password, they can log in and access the course.
+                    @else
+                        The learner has successfully set their password and now has full access to the portal and their enrolled courses.
+                    @endif
+                </p>
+
+                {{-- Compact Progress Line --}}
+                <div class="mt-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider">
+                    <span class="{{ $state == 'add_course' ? 'text-blue-600' : 'text-emerald-600' }}">1. Add Course ✓</span>
+                    <svg class="w-3 h-3 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <span class="{{ $state == 'payment' ? 'text-blue-600' : 'text-emerald-600' }}">2. Payment Confirmed ✓</span>
+                    <svg class="w-3 h-3 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <span class="{{ $state == 'completed' ? 'text-emerald-600' : ($state == 'password_sent' ? 'text-blue-600' : 'text-slate-400') }}">3. Learner Sets Password {{ $state == 'completed' ? '✓' : '' }}</span>
+                </div>
+            </div>
+
+            </div>
+        </div>
+    </div>
+    @endif
+    
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {{-- LEFT COLUMN: PROFILE & STATUS --}}
-        <div class="lg:col-span-5 space-y-6">
+        <div class="lg:col-span-5 space-y-6" id="profile-details">
             
             <x-ui.card title="Learner Profile" subtitle="Account & Provisioning Status">
                 <x-slot name="actions">
-                     @if(!$learner->crm_approved)
+                     @if($passwordSet)
+                        <x-ui.badge variant="success">Active</x-ui.badge>
+                     @elseif($isPending)
+                        <x-ui.badge variant="warning">Activation Pending</x-ui.badge>
+                     @elseif(!$learner->crm_approved)
                         <x-ui.badge variant="warning">Pending Approval</x-ui.badge>
                     @elseif($learner->status_id == 2)
                          <x-ui.badge variant="success">Active</x-ui.badge>
@@ -42,16 +118,23 @@
                              {{ substr($learner->first_name, 0, 1) }}{{ substr($learner->sur_name, 0, 1) }}
                         </div>
                         <div>
-                            <div class="font-bold text-slate-800">{{ $learner->first_name }} {{ $learner->sur_name }}</div>
-                            <div class="text-slate-500">{{ $learner->email_address }}</div>
+                            <div class="font-bold text-slate-800">{{ $learner->first_name }} {{ $learner->sur_name ?? $learner->last_name }}</div>
+                            <div class="text-slate-500">{{ $learner->email_address ?? $learner->personal_email }}</div>
                         </div>
                     </div>
 
-                    {{-- Admissions Status --}}
+                     {{-- Admissions Status --}}
                     <div class="flex justify-between py-1">
-                        <dt class="text-slate-500">College Approval</dt>
+                        <dt class="text-slate-500">Admissions Approval</dt>
                         <dd class="text-right">
-                             @if($learner->crm_approved)
+                             @if($welcomeSent)
+                                <span class="font-bold text-emerald-600 flex items-center justify-end gap-1">
+                                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    Activated
+                                </span>
+                             @elseif($isPending)
+                                <span class="font-bold text-slate-400">Awaiting Activation</span>
+                             @elseif($learner->crm_approved)
                                 <span class="font-bold text-slate-700 flex items-center justify-end gap-1">
                                     <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                     Approved
@@ -64,28 +147,43 @@
 
                     {{-- MS 365 Status --}}
                     <div class="flex justify-between py-1">
-                        <dt class="text-slate-500">Microsoft 365</dt>
+                        <dt class="text-slate-500">Course Access</dt>
                         <dd class="text-right">
-                             @if($learner->ms_user_id)
-                                 @if($learner->status_id == 2)
-                                     <span class="font-bold text-emerald-600">Active</span>
-                                 @else
-                                     <span class="font-bold text-amber-600">Provisioned (Disabled)</span>
-                                 @endif
-                                 <div class="text-[10px] text-slate-400 font-mono mt-0.5" title="{{ $learner->ms_user_id }}">
-                                     ID: {{ substr($learner->ms_user_id, 0, 8) }}...
-                                 </div>
+                             @if($passwordSet)
+                                <span class="font-bold text-emerald-600">Active</span>
+                             @elseif($welcomeSent)
+                                <span class="font-bold text-blue-600">Available after password setup</span>
+                             @elseif(!$isPending && $learner->ms_user_id)
+                                  @if($learner->status_id == 2)
+                                      <span class="font-bold text-emerald-600">Available</span>
+                                  @else
+                                      <span class="font-bold text-amber-600">Provisioned (Disabled)</span>
+                                  @endif
                              @else
-                                 <span class="font-bold text-slate-400">Not Provisioned</span>
+                                  <span class="font-bold text-slate-400 italic">Not available yet</span>
                              @endif
                         </dd>
                     </div>
+
+                    {{-- Password Email Status --}}
+                    @if($isPending)
+                    <div class="flex justify-between py-1">
+                        <dt class="text-slate-500">Password Setup Email</dt>
+                        <dd class="text-right font-bold {{ $welcomeSent ? 'text-emerald-600' : 'text-slate-400 italic' }}">
+                            {{ $welcomeSent ? 'Sent' : 'Not sent yet' }}
+                        </dd>
+                    </div>
+                    @endif
 
                     {{-- Portal Access --}}
                     <div class="flex justify-between py-1">
                         <dt class="text-slate-500">Portal Access</dt>
                         <dd class="text-right">
-                            @if($learner->status_id == 2)
+                             @if($passwordSet)
+                                <span class="font-bold text-emerald-600">Active</span>
+                             @elseif($welcomeSent)
+                                <span class="font-bold text-blue-600">Waiting for learner password setup</span>
+                             @elseif(!$isPending && $learner->status_id == 2)
                                 <span class="font-bold text-slate-700 flex items-center justify-end gap-1.5">
                                     <span class="relative flex h-2 w-2">
                                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -93,48 +191,47 @@
                                     </span>
                                     Enabled
                                 </span>
-                            @else
-                                <span class="font-bold text-slate-400">Disabled</span>
-                            @endif
+                             @else
+                                <span class="font-bold text-slate-400 italic">Disabled until course payment is confirmed</span>
+                             @endif
                         </dd>
                     </div>
 
                      {{-- Financial Rollup --}}
                     <div class="flex justify-between pt-3 border-t border-slate-50">
-                        <dt class="text-slate-500">Financial Status</dt>
+                        <dt class="text-slate-500">{{ $enrolments->isEmpty() ? 'Course Status' : 'Financial Status' }}</dt>
                         <dd class="text-right">
-                            @php
-                               $overallStatus = 'paid';
-                               $label = 'All Settled';
-                               $color = 'success'; // badge variant
-
-                               foreach($enrolments as $e) {
-                                   $p = $e->payment_status_details; 
-                                   if ($e->status_id == 5) { // Pending Plan
-                                       $overallStatus = 'review';
-                                       $label = 'Plan Review Pending';
-                                       $color = 'brand';
-                                       break;
+                            @if($enrolments->isEmpty())
+                                <x-ui.badge variant="neutral" size="sm">No Course Added</x-ui.badge>
+                            @else
+                                @php
+                                   $overallStatus = 'paid';
+                                   $label = 'All Settled';
+                                   $color = 'success'; // badge variant
+    
+                                   foreach($enrolments as $e) {
+                                       $p = $e->payment_status_details; 
+                                       if ($e->status_id == 5) { // Pending Plan
+                                           $overallStatus = 'review';
+                                           $label = 'Plan Review Pending';
+                                           $color = 'brand';
+                                           break;
+                                       }
+                                       if ($p['status'] === 'pending_payment') {
+                                           $overallStatus = 'pending';
+                                           $label = 'Payment Pending';
+                                           $color = 'warning';
+                                           break; 
+                                       }
+                                       if ($p['status'] === 'installments_active') {
+                                           $overallStatus = 'installments';
+                                           $label = 'Installments Active';
+                                           $color = 'brand';
+                                       }
                                    }
-                                   if ($p['status'] === 'pending_payment') {
-                                       $overallStatus = 'pending';
-                                       $label = 'Action Required';
-                                       $color = 'warning';
-                                       break; 
-                                   }
-                                   if ($p['status'] === 'installments_active') {
-                                       $overallStatus = 'installments';
-                                       $label = 'Installments Active';
-                                       $color = 'brand';
-                                   }
-                               }
-                               if ($enrolments->isEmpty()) {
-                                   $overallStatus = 'none';
-                                   $label = 'No Enrolments';
-                                   $color = 'neutral';
-                               }
-                           @endphp
-                           <x-ui.badge variant="{{ $color }}" size="sm">{{ $label }}</x-ui.badge>
+                               @endphp
+                               <x-ui.badge variant="{{ $color }}" size="sm">{{ $label }}</x-ui.badge>
+                           @endif
                         </dd>
                     </div>
 
@@ -143,7 +240,7 @@
         </div>
 
         {{-- RIGHT COLUMN: COURSES --}}
-        <div class="lg:col-span-7 space-y-6">
+        <div class="lg:col-span-7 space-y-6" id="enrolled-courses">
             <x-ui.card title="Enrolled Courses" subtitle="Manage payment plans and view progress">
                 <x-slot name="actions">
                     <x-ui.button variant="outline" size="sm" data-bs-toggle="modal" data-bs-target="#addCourseModal">
@@ -256,7 +353,7 @@
                                                 @endif
 
                                                 {{-- Option 1: Stripe (if enabled/available) --}}
-                                                <form action="{{ route('partner.checkout', $learner->id) }}" method="POST">
+                                                <form action="{{ route('partner.checkout', $isPending ? 'pending-'.$learner->id : $learner->id) }}" method="POST">
                                                     @csrf
                                                     <input type="hidden" name="enrolment_id" value="{{ $enrolment->id }}">
                                                     <x-ui.button variant="primary" size="sm" type="submit" class="w-full justify-center">
@@ -283,16 +380,19 @@
                                                 </x-ui.button>
                                             @endif
                                         </div>
-                                    @elseif($statusName == 'pending')
+                                     @elseif($statusName == 'pending' || ($isPending && $statusName == 'pending_payment'))
                                          @php
-                                            $onboarding = \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $learner->id)->first();
+                                            $onboarding = !$isPending ? \App\Models\Crm\LearnerOnboardingStatus::where('learner_id', $learner->id)->first() : null;
                                             $reqMet = $onboarding && 
                                                        $onboarding->personal_info_completed && 
                                                        $onboarding->rpl_info_completed && 
                                                        $onboarding->disability_info_completed;
                                          @endphp
-
-                                         @if(!$reqMet)
+ 
+                                         @if($isPending)
+                                             <span class="text-xs font-bold text-amber-600 block text-right">Payment Pending</span>
+                                             <span class="text-[10px] text-slate-400 block text-right">Activation follows payment</span>
+                                         @elseif(!$reqMet)
                                              <span class="text-xs font-bold text-amber-600 block text-right">Requirements Pending</span>
                                              <span class="text-[10px] text-slate-400 block text-right">Learner must fill forms</span>
                                          @elseif(!$learner->crm_approved)

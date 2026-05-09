@@ -98,9 +98,22 @@ class InstallmentController extends Controller
      */
     public function createCheckoutSession(Request $request, $installmentId)
     {
-        $installment = PartnerLearnerInstallment::findOrFail($installmentId);
+        $installment = PartnerLearnerInstallment::with('enrolment')->findOrFail($installmentId);
         $partner = Auth::user();
-        $learner = $installment->learner; // Eager load if needed, or reliance on model relationship
+        
+        // Resolve learner correctly (Handle pending learners where learner_id is 0)
+        $enrolment = $installment->enrolment;
+        if ($enrolment->partner_learner_id) {
+            $learner = \App\Models\Crm\PartnerLearner::find($enrolment->partner_learner_id);
+            $learnerIdForRoute = 'pending-' . $learner->id;
+            $learnerName = "{$learner->first_name} {$learner->last_name}";
+            $learnerEmail = $learner->personal_email;
+        } else {
+            $learner = User::find($enrolment->learner_id);
+            $learnerIdForRoute = $learner->id;
+            $learnerName = "{$learner->first_name} {$learner->sur_name}";
+            $learnerEmail = $learner->email_address;
+        }
 
         // Security: Ensure partner owns this learner? 
         // Assuming PartnerLearnerInstallment -> partner_id check is enough
@@ -118,7 +131,7 @@ class InstallmentController extends Controller
             return back()->with('error', 'No amount due for this installment.');
         }
 
-        $description = "DS{$learner->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for Learner";
+        $description = "DS-P{$enrolment->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for {$learnerName}";
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
 
@@ -156,7 +169,8 @@ class InstallmentController extends Controller
                                     'course_name' => $installment->course->title ?? 'Course',
                                     'course_id' => $installment->course->id ?? null,
                                     'installment_no' => $installment->installment_no,
-                                    'learner_id' => $learner->id
+                                    'learner_id' => $enrolment->learner_id ?: $enrolment->partner_learner_id,
+                                    'learner_name' => $learnerName
                                 ]
                             ],
                         ],
@@ -169,8 +183,9 @@ class InstallmentController extends Controller
                     'payer_type' => 'partner',
                     'partner_id' => $partner->id,
                     'partner_email' => $partner->email_address,
-                    'learner_id' => $learner->id,
-                    'learner_email' => $learner->email_address, // Reference
+                    'learner_id' => $enrolment->learner_id,
+                    'partner_learner_id' => $enrolment->partner_learner_id,
+                    'learner_email' => $learnerEmail, // Reference
                     'enrolment_id' => $installment->enrolment_id,
                     'order_id' => $installment->order_id,
                     'partner_installment_id' => $installment->id,
@@ -180,7 +195,8 @@ class InstallmentController extends Controller
                     'metadata' => [
                         'payer_type' => 'partner',
                         'partner_id' => $partner->id,
-                        'learner_id' => $learner->id,
+                        'learner_id' => $enrolment->learner_id,
+                        'partner_learner_id' => $enrolment->partner_learner_id,
                         'enrolment_id' => $installment->enrolment_id,
                         'partner_installment_id' => $installment->id,
                     ],
@@ -192,8 +208,8 @@ class InstallmentController extends Controller
                         'setup_future_usage' => 'off_session',
                     ],
                 ],
-                'success_url' => route('partner.learners.show', $learner->id) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('partner.learners.show', $learner->id) . '?payment=cancelled',
+                'success_url' => route('partner.learners.show', $learnerIdForRoute) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('partner.learners.show', $learnerIdForRoute) . '?payment=cancelled',
             ]);
 
             return redirect($session->url);
@@ -248,6 +264,14 @@ class InstallmentController extends Controller
                 'receipt_path' => $receiptPath,
                 'notes' => $request->notes,
             ]);
+
+            // Trigger CRM Notification
+            try {
+                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($installment);
+            } catch (\Exception $e) {
+                Log::error("CRM_NOTIFICATION_FAILED: " . $e->getMessage());
+                // Don't fail the whole request if only notification fails
+            }
 
             // We do NOT update paid_amount or sync order/enrolment status here.
             // That must be done by the CRM Admin upon approval.

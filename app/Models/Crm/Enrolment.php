@@ -15,6 +15,7 @@ class Enrolment extends Model
     protected $fillable = [
         'course_id',
         'learner_id',
+        'partner_learner_id',
         'partner_id',
         'status_id',
     ];
@@ -47,6 +48,11 @@ class Enrolment extends Model
     public function orders()
     {
         return $this->hasMany(Order::class, 'enrolment_id');
+    }
+
+    public function partnerLearner()
+    {
+        return $this->belongsTo(PartnerLearner::class, 'partner_learner_id');
     }
 
     public function partnerInstallments()
@@ -377,7 +383,7 @@ class Enrolment extends Model
                 ];
             }
 
-            $unpaid = $order->installments()->where('payment_status', '!=', 'paid')->sortBy('installment_no')->first();
+            $unpaid = $order->installments()->where('payment_status', '!=', 'paid')->orderBy('installment_no')->first();
             if ($unpaid) {
                  return [
                     'date' => $unpaid->due_date,

@@ -64,7 +64,39 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($learners as $learner)
+                        {{-- Pending Learners --}}
+                        @foreach($pendingLearners as $learner)
+                            <tr class="group bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm border border-blue-200 shadow-sm">
+                                            {{ substr($learner->first_name, 0, 1) }}{{ substr($learner->last_name, 0, 1) }}
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-900 text-sm">{{ $learner->first_name }} {{ $learner->last_name }}</div>
+                                            <div class="text-xs text-slate-500 font-medium">{{ $learner->personal_email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <x-ui.badge variant="warning" size="sm">Pending Payment</x-ui.badge>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="text-xs text-slate-400 font-medium">Awaiting Payment</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="text-xs text-slate-400 font-medium">-</span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <x-ui.button variant="ghost" size="sm" href="{{ route('partner.learners.show', $learner->id) }}">
+                                        View Details
+                                    </x-ui.button>
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        {{-- Active Learners --}}
+                        @forelse($activeLearners as $learner)
                             <tr class="group hover:bg-slate-50/80 transition-colors">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
@@ -116,6 +148,7 @@
                                 </td>
                             </tr>
                         @empty
+                            @if($pendingLearners->isEmpty())
                             <tr>
                                 <td colspan="5" class="px-6 py-16 text-center">
                                     <div
@@ -135,6 +168,7 @@
                                     </div>
                                 </td>
                             </tr>
+                            @endif
                         @endforelse
                     </tbody>
                 </table>

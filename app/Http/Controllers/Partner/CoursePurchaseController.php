@@ -128,9 +128,20 @@ class CoursePurchaseController extends Controller
     public function create($learnerId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        
+        // Try active user first
+        $learner = User::myLearners($partner->id)->find($learnerId);
+        
+        // If not found, try pending learner
+        if (!$learner) {
+            $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
+            $learner->is_pending_record = true;
+        } else {
+            $learner->is_pending_record = false;
+        }
 
-        if (!$learner->crm_approved) {
+        // Pending learners are implicitly "approved" enough to add courses
+        if (!$learner->is_pending_record && !$learner->crm_approved) {
             return back()->with('error', 'Learner is not approved yet.');
         }
 
@@ -205,7 +216,14 @@ class CoursePurchaseController extends Controller
     public function store(Request $request, $learnerId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        
+        // Try active user first
+        $learner = User::myLearners($partner->id)->find($learnerId);
+        
+        // If not found, try pending learner
+        if (!$learner) {
+            $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
+        }
 
         $request->validate([
             'course_ids' => 'required|array|min:1',
@@ -224,7 +242,13 @@ class CoursePurchaseController extends Controller
         }
 
         // Check for existing active/pending enrollment
-        $existing = Enrolment::where('learner_id', $learner->id)
+        $existing = Enrolment::where(function($q) use ($learner) {
+                if (isset($learner->personal_email)) { // It's a PartnerLearner record
+                    $q->where('partner_learner_id', $learner->id);
+                } else {
+                    $q->where('learner_id', $learner->id);
+                }
+            })
             ->where('course_id', $courseId)
             ->whereHas('status', function ($q) {
                 $q->whereIn('status', ['active', 'pending-payment', 'pending-plan']);
@@ -246,7 +270,15 @@ class CoursePurchaseController extends Controller
     public function choosePlanForCourse($learnerId, $courseId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        
+        // Try active user first
+        $learner = User::myLearners($partner->id)->find($learnerId);
+        
+        // If not found, try pending learner
+        if (!$learner) {
+            $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
+        }
+        
         $course = \App\Models\Website\Course::findOrFail($courseId);
 
         // Calculate Pricing & Plans (Reusing existing logic or abstracting)
@@ -280,7 +312,15 @@ class CoursePurchaseController extends Controller
     public function storeEnrolmentWithPlan(Request $request, $learnerId, $courseId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        
+        // Try active user first
+        $learner = User::myLearners($partner->id)->find($learnerId);
+        
+        // If not found, try pending learner
+        if (!$learner) {
+            $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
+        }
+        
         $course = \App\Models\Website\Course::findOrFail($courseId);
 
         $request->validate(['plan_type' => 'required|string']);
@@ -299,12 +339,22 @@ class CoursePurchaseController extends Controller
         try {
             // 1. Create Enrolment (Status: Pending Payment)
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
-            $enrolment = Enrolment::create([
+            $enrolmentData = [
                 'course_id' => $courseId,
-                'learner_id' => $learner->id,
                 'partner_id' => $partner->id,
                 'status_id' => $status->id,
-            ]);
+            ];
+
+            if (isset($learner->personal_email)) {
+                // It's a PartnerLearner record (pending)
+                $enrolmentData['partner_learner_id'] = $learner->id;
+                $enrolmentData['learner_id'] = 0; // Or null, depending on DB schema
+            } else {
+                // It's an active User
+                $enrolmentData['learner_id'] = $learner->id;
+            }
+
+            $enrolment = Enrolment::create($enrolmentData);
 
             // 2. Create Order & Installments (Reusing updatePlan logic)
             // I'll extract this to a helper or just duplicate for now to be safe with existing types
@@ -548,8 +598,9 @@ class CoursePurchaseController extends Controller
 
         $order = Order::create([
             'learner_id' => $enrolment->learner_id,
+            'partner_learner_id' => $enrolment->partner_learner_id,
             'enrolment_id' => $enrolment->id,
-            'amount' => $finalFee,
+            'amount' => ($paymentMode === 'full') ? $finalFee : $planDepositAmount,
             'plan_full_amount' => $finalFee,
             'status_id' => 3, // Pending
             'payment_mode' => $paymentMode,
@@ -610,7 +661,7 @@ class CoursePurchaseController extends Controller
     {
         return \App\Models\Partner\PartnerLearnerInstallment::create([
             'partner_id' => $partnerId,
-            'learner_id' => $enrolment->learner_id,
+            'learner_id' => $enrolment->learner_id ?: $enrolment->partner_learner_id,
             'enrolment_id' => $enrolment->id,
             'order_id' => $order->id,
             'course_id' => $enrolment->course_id,
@@ -662,6 +713,13 @@ class CoursePurchaseController extends Controller
                 'payment_reference' => $request->payment_reference,
                 'notes' => $request->payment_notes,
             ]);
+
+            // Trigger CRM Notification
+            try {
+                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($deposit);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("CRM_NOTIFICATION_FAILED: " . $e->getMessage());
+            }
         }
 
         return redirect()->back()->with('success', 'Payment proof submitted successfully. Admissions will review it shortly.');

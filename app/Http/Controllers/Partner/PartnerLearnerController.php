@@ -12,7 +12,8 @@ use App\Models\Crm\OrderInstallment;
 use App\Models\Crm\UserDetail as CrmUserDetail;
 use App\Models\Crm\PartnerAssignedCourse;
 use App\Models\Crm\PartnerInstallmentPlan;
-use App\Models\Partner\PartnerLearnerInstallment;
+use App\Models\Crm\PartnerLearner;
+use App\Models\Crm\PartnerLearnerInstallment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -37,12 +38,17 @@ class PartnerLearnerController extends Controller
             abort(403, 'Unauthorized. Partners only.');
         }
 
-        $learners = User::myLearners($partner->id)
-            ->with(['enrolments', 'enrolments.status']) // Assuming relationships exist or will filter in view
+        $activeLearners = User::myLearners($partner->id)
+            ->with(['enrolments', 'enrolments.status'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('partner.learners.index', compact('partner', 'learners'));
+        $pendingLearners = PartnerLearner::where('partner_id', $partner->id)
+            ->where('activation_status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('partner.learners.index', compact('partner', 'activeLearners', 'pendingLearners'));
     }
 
     /**
@@ -51,7 +57,29 @@ class PartnerLearnerController extends Controller
     public function show(Request $request, $id, PricingService $pricingService, PaymentProcessingService $paymentService)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($id);
+        $isPending = false;
+        $learner = null;
+
+        if (str_starts_with($id, 'pending-')) {
+            $isPending = true;
+            $id = str_replace('pending-', '', $id);
+            $learner = PartnerLearner::findOrFail($id);
+        } else {
+            // Try active user first
+            $learner = User::myLearners(Auth::id())->find($id);
+            
+            // If not found, check if it's a pending learner ID
+            if (!$learner) {
+                $learner = PartnerLearner::where('partner_id', Auth::id())->find($id);
+                if ($learner) {
+                    $isPending = true;
+                }
+            }
+        }
+
+        if (!$learner) {
+            abort(404, 'Learner not found.');
+        }
 
         // Check for synchronous payment confirmation (Fix for localhost/missed webhooks)
         if ($request->has('payment') && $request->payment === 'success' && $request->filled('session_id')) {
@@ -72,10 +100,17 @@ class PartnerLearnerController extends Controller
             }
         }
 
-        $enrolments = Enrolment::where('learner_id', $learner->id)
-            ->with(['course', 'status'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        if ($isPending) {
+            $enrolments = Enrolment::where('partner_learner_id', $learner->id)
+                ->with(['course', 'status'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $enrolments = Enrolment::where('learner_id', $learner->id)
+                ->with(['course', 'status'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
 
         // Fetch Only Assigned Courses for the "Add Course" Modal
         $assignedCourses = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
@@ -139,13 +174,13 @@ class PartnerLearnerController extends Controller
 
         \Log::error("DEBUG Final available courses count: " . $courses->count());
 
-        // Fetch Partner Installments (Manual Plan)
-        $installments = \App\Models\Partner\PartnerLearnerInstallment::where('learner_id', $learner->id)
+        // Fetch Partner Installments (Manual Plan) - Correctly linked via Enrolment IDs
+        $installments = \App\Models\Partner\PartnerLearnerInstallment::whereIn('enrolment_id', $enrolments->pluck('id'))
             ->with('course') // meaningful info
             ->orderBy('due_date', 'asc')
             ->get();
 
-        return view('partner.learners.show', compact('learner', 'enrolments', 'courses', 'installments'));
+        return view('partner.learners.show', compact('learner', 'enrolments', 'courses', 'installments', 'isPending'));
     }
 
     /**
@@ -176,34 +211,20 @@ class PartnerLearnerController extends Controller
             'city' => 'required|string|max:100',
             'country' => 'required|string|max:100',
             'zip_code' => 'required|string|max:30',
-            'password' => 'required|confirmed|min:8',
         ]);
 
         DB::beginTransaction();
         DB::connection('mysql_crm')->beginTransaction();
 
         try {
-            // A) Create Portal User (Initial with temp email)
-            $learner = User::create([
-                'org_id' => $partner->id,
-                'status_id' => 1, // Pending Approval
+            // A) Create Partner Learner Record (CRM)
+            $partnerLearner = PartnerLearner::create([
+                'partner_id' => $partner->id,
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name ?? '',
-                'sur_name' => $request->sur_name,
-                'email_address' => 'ds.pending.' . time() . '@directskills.co.uk',
-                'password' => Hash::make($request->password),
-                'crm_approved' => 0,
-            ]);
-
-            // Final generated DS Email: DS{id}@directskills.co.uk
-            $dsEmail = "DS" . $learner->id . "@directskills.co.uk";
-            $learner->update(['email_address' => $dsEmail]);
-
-            // B) CRM User Detail
-            CrmUserDetail::create([
-                'learner_id' => $learner->id,
+                'last_name' => $request->sur_name,
                 'personal_email' => $request->email_address,
-                'contact' => $request->contact_number,
+                'phone' => $request->contact_number,
                 'dob' => $request->dob,
                 'gender' => $request->gender,
                 'address_line_1' => $request->address_line_1,
@@ -212,13 +233,18 @@ class PartnerLearnerController extends Controller
                 'state' => $request->state ?? '',
                 'country' => $request->country,
                 'zip_code' => $request->zip_code,
+                'payment_status' => 'pending',
+                'activation_status' => 'pending',
+                'enrolment_status' => 'pending_payment',
+                'account_status' => 'pending',
+                'created_by_partner_id' => $partner->id,
             ]);
 
             DB::connection('mysql_crm')->commit();
             DB::commit();
 
-            return redirect()->route('partner.learners.show', $learner->id)
-                ->with('success', "Learner created successfully. Login: {$dsEmail}. You can now enrol them on a course.");
+            return redirect()->route('partner.learners.show', $partnerLearner->id)
+                ->with('success', "Learner request submitted successfully. The learner account will be activated once the payment is confirmed.");
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
