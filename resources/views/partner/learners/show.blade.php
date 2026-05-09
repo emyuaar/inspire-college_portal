@@ -19,30 +19,31 @@
         </div>
     </div>
     
+    @php
+        $hasEnrolment = $enrolments->isNotEmpty();
+        $hasAwaitingProof = false;
+        $hasPendingPayment = false;
+        $welcomeSent = false;
+        $passwordSet = ($learner instanceof \App\Models\Crm\PartnerLearner && $learner->activation_status === 'completed');
+        $courseName = $hasEnrolment ? (optional($enrolments->first()->course)->title ?? 'a course') : null;
+        
+        foreach($enrolments as $e) {
+            $p = $e->payment_status_details;
+            if (isset($p['status']) && $p['status'] === 'awaiting_approval') $hasAwaitingProof = true;
+            if (isset($p['status']) && $p['status'] === 'pending_payment') $hasPendingPayment = true;
+            if ($e->welcome_email_sent_at) $welcomeSent = true;
+        }
+
+        // Determine State
+        $state = 'add_course';
+        if ($hasEnrolment) $state = 'payment';
+        if ($hasAwaitingProof) $state = 'review';
+        if ($welcomeSent) $state = 'password_sent';
+        if ($passwordSet) $state = 'completed';
+    @endphp
+
     @if($isPending)
     <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
-        @php
-            $hasEnrolment = $enrolments->isNotEmpty();
-            $hasAwaitingProof = false;
-            $hasPendingPayment = false;
-            $welcomeSent = false;
-            $passwordSet = ($learner instanceof \App\Models\Crm\PartnerLearner && $learner->activation_status === 'completed');
-            $courseName = $hasEnrolment ? (optional($enrolments->first()->course)->title ?? 'a course') : null;
-            
-            foreach($enrolments as $e) {
-                $p = $e->payment_status_details;
-                if ($p['status'] === 'awaiting_approval') $hasAwaitingProof = true;
-                if ($p['status'] === 'pending_payment') $hasPendingPayment = true;
-                if ($e->welcome_email_sent_at) $welcomeSent = true;
-            }
-
-            // Determine State
-            $state = 'add_course';
-            if ($hasEnrolment) $state = 'payment';
-            if ($hasAwaitingProof) $state = 'review';
-            if ($welcomeSent) $state = 'password_sent';
-            if ($passwordSet) $state = 'completed';
-        @endphp
 
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="flex-1">
