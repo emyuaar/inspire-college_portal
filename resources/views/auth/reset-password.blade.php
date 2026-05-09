@@ -18,7 +18,7 @@
         {{-- Logo --}}
         <div class="text-center mb-8">
             <div class="mb-4">
-                <img src="https://directskills.co.uk/images/DirectSkills_logo.webp" alt="DirectSkills" class="h-10 mx-auto">
+                <img src="https://directskills.co.uk/images/DirectSkills_logo.png" alt="DirectSkills" class="h-10 mx-auto">
             </div>
             <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Set Your Password</h1>
             <p class="text-slate-500 mt-2">Create a secure password to access your course.</p>

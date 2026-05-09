@@ -4,6 +4,7 @@ namespace App\Models\Crm;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use App\Models\Website\Course;
 
 class Enrolment extends Model
@@ -42,7 +43,7 @@ class Enrolment extends Model
 
     public function latestOrder()
     {
-        return $this->hasOne(Order::class, 'enrolment_id')->latestOfMany();
+        return $this->hasOne(Order::class, 'enrolment_id')->orderBy('created_at', 'desc');
     }
 
     public function orders()
@@ -227,7 +228,7 @@ class Enrolment extends Model
             $currentMonth = $partnerInstallments->filter(function ($inst) {
                 return $inst->status !== 'paid' &&
                     $inst->due_date &&
-                    $inst->due_date->isSameMonth(now());
+                    Carbon::parse($inst->due_date)->isSameMonth(now());
             });
             if ($currentMonth->isNotEmpty())
                 return false;
@@ -246,7 +247,7 @@ class Enrolment extends Model
             if ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount) {
                 // If deposit grace period exists and is valid, allow access
                 $now = now();
-                if ($order->deposit_grace_until && \Carbon\Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
+                if ($order->deposit_grace_until && Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
                     // within grace
                 } else {
                     return false; // Deposit unpaid and out of grace
@@ -310,7 +311,7 @@ class Enrolment extends Model
             }
 
             $currentMonth = $partnerInstallments->filter(function ($inst) {
-                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isCurrentMonth();
+                return $inst->status !== 'paid' && $inst->due_date && Carbon::parse($inst->due_date)->isSameMonth(now());
             });
             if ($currentMonth->isNotEmpty()) {
                 $first = $currentMonth->sortBy('due_date')->first();
@@ -428,7 +429,7 @@ class Enrolment extends Model
 
             // Current Due (Due in Current Month) - Strict Rule: "If due in current month, must be paid to continue"
             $currentDue = $partnerInstallments->filter(function ($inst) {
-                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isSameMonth(now());
+                return $inst->status !== 'paid' && $inst->due_date && Carbon::parse($inst->due_date)->isSameMonth(now());
             })->reject(function ($inst) use ($overdue) {
                 return $overdue->contains('id', $inst->id); // Avoid duplicates in priority logic
             });
@@ -480,10 +481,10 @@ class Enrolment extends Model
                 ];
 
                 $now = now();
-                if ($order->deposit_grace_until && \Carbon\Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
+                if ($order->deposit_grace_until && Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
                     $status->allowed = true; // In grace
                     $status->grace_active = true;
-                    $status->grace_until = \Carbon\Carbon::parse($order->deposit_grace_until);
+                    $status->grace_until = Carbon::parse($order->deposit_grace_until);
                 }
                 
                 if (!$status->allowed) return $status;

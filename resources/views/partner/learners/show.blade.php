@@ -27,7 +27,7 @@
             $hasPendingPayment = false;
             $welcomeSent = false;
             $passwordSet = ($learner instanceof \App\Models\Crm\PartnerLearner && $learner->activation_status === 'completed');
-            $courseName = $hasEnrolment ? ($enrolments->first()->course->title ?? 'a course') : null;
+            $courseName = $hasEnrolment ? (optional($enrolments->first()->course)->title ?? 'a course') : null;
             
             foreach($enrolments as $e) {
                 $p = $e->payment_status_details;
@@ -256,7 +256,7 @@
                     @forelse($enrolments as $enrolment)
                         @php
                             $payment = $enrolment->payment_status_details;
-                            $statusName = strtolower($enrolment->status->status ?? 'Unknown');
+                            $statusName = strtolower(optional($enrolment->status)->status ?? 'Unknown');
                             
                             // Badge Variant Logic
                             $statusVariant = match($statusName) {
@@ -293,7 +293,7 @@
                                     </div>
 
                                     <h3 class="font-bold text-slate-800 text-sm md:text-base">
-                                        {{ $enrolment->course->title ?? 'Unknown Course' }}
+                                        {{ optional($enrolment->course)->title ?? 'Unknown Course' }}
                                     </h3>
                                     <p class="text-xs text-slate-500 mt-1">Enrolled on {{ $enrolment->created_at->format('M d, Y') }}</p>
                                 </div>

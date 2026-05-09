@@ -30,8 +30,8 @@ Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\LearnerPasswor
     ->name('password.reset');
 
 Route::get('/reset-password', function() {
-    return redirect()->route('portal.login');
-})->middleware('guest');
+    return redirect()->route('portal.login')->with('info', 'Please use the secure link sent to your email to set your password.');
+})->middleware('guest')->name('password.request');
 
 // DEBUG ROUTE
 Route::get('/debug-webhook', function () {
