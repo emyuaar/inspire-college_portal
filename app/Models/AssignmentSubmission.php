@@ -20,4 +20,9 @@ class AssignmentSubmission extends Model
     {
         return $this->belongsTo(Assignment::class, 'assignment_id');
     }
+
+    public function learner()
+    {
+        return $this->belongsTo(User::class, 'learner_id');
+    }
 }

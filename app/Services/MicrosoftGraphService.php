@@ -27,6 +27,12 @@ class MicrosoftGraphService
 
     protected function getAccessToken()
     {
+        Log::info('Graph token request started', [
+            'tenant_id_exists' => !empty(config('services.ms.tenant_id') ?: env('MS_TENANT_ID')),
+            'client_id_exists' => !empty(config('services.ms.client_id') ?: env('MS_CLIENT_ID')),
+            'client_secret_exists' => !empty(config('services.ms.client_secret') ?: env('MS_CLIENT_SECRET')),
+        ]);
+
         $response = Http::asForm()->post("https://login.microsoftonline.com/{$this->tenantId}/oauth2/v2.0/token", [
             'grant_type' => 'client_credentials',
             'client_id' => $this->clientId,
@@ -34,7 +40,16 @@ class MicrosoftGraphService
             'scope' => 'https://graph.microsoft.com/.default',
         ]);
 
+        Log::info('Graph token response received', [
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+        ]);
+
         if ($response->failed()) {
+            Log::error('Graph token request failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
             throw new Exception('Failed to get MS access token: ' . $response->body());
         }
 
@@ -288,5 +303,90 @@ class MicrosoftGraphService
         }
 
         return true;
+    }
+
+    public function sendMail(string $subject, string $htmlBody, array|string $to, array|string $cc = [], array|string $bcc = [])
+    {
+        $token = $this->getAccessToken();
+
+        $senderEmail = config('mail.from.address') ?: env('MAIL_FROM_ADDRESS');
+        $senderName = config('mail.from.name') ?: env('MAIL_FROM_NAME', 'DirectSkills');
+        $saveToSentItems = filter_var(env('MAIL_SAVE_TO_SENT_ITEMS', true), FILTER_VALIDATE_BOOLEAN);
+
+        $url = "https://graph.microsoft.com/v1.0/users/{$senderEmail}/sendMail";
+
+        $toArr = is_string($to) ? [$to] : $to;
+        $ccArr = is_string($cc) ? [$cc] : $cc;
+        $bccArr = is_string($bcc) ? [$bcc] : $bcc;
+
+        Log::info('Graph sendMail request started', [
+            'sender' => $senderEmail,
+            'subject' => $subject,
+            'to_count' => count($toArr),
+            'cc_count' => count($ccArr),
+            'bcc_count' => count($bccArr),
+            'save_to_sent_items' => $saveToSentItems,
+            'endpoint' => $url,
+        ]);
+
+        $payload = [
+            'message' => [
+                'subject' => $subject,
+                'body' => [
+                    'contentType' => 'HTML',
+                    'content' => $htmlBody,
+                ],
+                'toRecipients' => $this->formatRecipients($toArr),
+                'ccRecipients' => $this->formatRecipients($ccArr),
+                'bccRecipients' => $this->formatRecipients($bccArr),
+                'from' => [
+                    'emailAddress' => [
+                        'address' => $senderEmail,
+                        'name' => $senderName,
+                    ],
+                ],
+            ],
+            'saveToSentItems' => $saveToSentItems,
+        ];
+
+        $response = Http::withToken($token)->post($url, $payload);
+
+        Log::info('Graph sendMail response received', [
+            'sender' => $senderEmail,
+            'subject' => $subject,
+            'status' => $response->status(),
+            'successful' => $response->successful() || $response->status() === 202,
+            'body' => $response->body(),
+        ]);
+
+        if ($response->failed() && $response->status() !== 202) {
+            Log::error('Graph sendMail failed', [
+                'sender' => $senderEmail,
+                'subject' => $subject,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'to' => $toArr,
+                'cc' => $ccArr,
+                'bcc' => $bccArr,
+            ]);
+            throw new Exception('Failed to send email via Microsoft Graph: ' . $response->body());
+        }
+
+        return true;
+    }
+
+    protected function formatRecipients(array|string $recipients): array
+    {
+        if (is_string($recipients)) {
+            $recipients = [$recipients];
+        }
+
+        return array_values(array_map(function ($email) {
+            return [
+                'emailAddress' => [
+                    'address' => trim($email),
+                ]
+            ];
+        }, array_filter($recipients)));
     }
 }

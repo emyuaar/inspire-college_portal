@@ -295,12 +295,26 @@ class LearnerCourseController extends Controller
                 'mime_type' => $uFile['mime'],
             ]);
         }
+
+        \Illuminate\Support\Facades\Log::info('Assignment submission saved successfully', [
+            'submission_id' => $submission->id ?? null,
+            'learner_id' => $submission->learner_id ?? null,
+            'assignment_id' => $submission->assignment_id ?? null,
+            'file_name' => $submission->file_name ?? null,
+        ]);
         
         LearnerLogger::log('learner.assignment.submission.completed', 'upload')
             ->courseId($assignment->course_id)
             ->assignmentId($assignment->id)
             ->humanMessage('Assignment submitted successfully with ' . count($uploadedFiles) . ' files')
             ->save();
+
+        \Illuminate\Support\Facades\Log::info('Starting assignment submission email notification flow', [
+            'submission_id' => $submission->id ?? null,
+        ]);
+
+        // Dispatch email notifications
+        \App\Jobs\SendAssignmentSubmissionNotifications::dispatch($submission->id);
 
         return back()->with('success', 'Your assignment files have been submitted');
     }
