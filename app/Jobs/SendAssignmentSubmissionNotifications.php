@@ -28,10 +28,6 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::info('Assignment submission email job started', [
-            'submission_id' => $this->submissionId ?? null,
-        ]);
-
         try {
             $submission = AssignmentSubmission::with(['learner', 'assignment.course'])->find($this->submissionId);
 
@@ -43,12 +39,6 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
                 ]);
                 return;
             }
-
-            Log::info('Checking assignment email sent flags', [
-                'submission_id' => $submission->id,
-                'learner_email_sent_at' => $submission->learner_email_sent_at ?? null,
-                'internal_email_sent_at' => $submission->internal_email_sent_at ?? null,
-            ]);
 
             $learner = $submission->learner;
             $learnerName = trim($learner->name ?? 'Learner');
@@ -75,17 +65,6 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
                 'submissionUrl' => $submissionUrl,
                 'submission' => $submission,
             ];
-
-            Log::info('Resolved learner assignment email data', [
-                'submission_id' => $submission->id ?? null,
-                'learner_id' => $learner->id ?? null,
-                'learner_name' => $learnerName ?? null,
-                'learner_email' => $learnerEmail ?? null,
-                'course_name' => $courseName ?? null,
-                'assignment_name' => $assignmentName ?? null,
-                'file_name' => $fileName ?? null,
-                'submission_url' => $submissionUrl,
-            ]);
 
             $graphService = new \App\Services\MicrosoftGraphService();
 
@@ -142,15 +121,6 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
             $ccEmails = array_unique(array_filter($assessmentManagers));
             $bccEmails = array_unique(array_filter($assessmentCheckers));
 
-            Log::info('Resolved internal assignment email recipients', [
-                'submission_id' => $submission->id ?? null,
-                'to' => $toEmails,
-                'cc' => $ccEmails,
-                'bcc' => $bccEmails,
-                'assessment_managers_count' => count($ccEmails),
-                'assessment_checkers_count' => count($bccEmails),
-            ]);
-
             if (empty($submission->internal_email_sent_at)) {
                 $internalSubject = 'New Assignment Submission – ' . trim($learnerName) . ' – ' . $courseName;
                 $internalHtml = view('emails.assignments.internal-submitted', $emailData)->render();
@@ -162,10 +132,6 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
                     $submission->save();
                 }
             }
-
-            Log::info('Assignment submission email job finished', [
-                'submission_id' => $this->submissionId ?? null,
-            ]);
 
         } catch (\Throwable $e) {
             Log::error('Assignment submission email job failed', [

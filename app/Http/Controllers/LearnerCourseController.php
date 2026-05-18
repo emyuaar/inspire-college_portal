@@ -309,28 +309,11 @@ class LearnerCourseController extends Controller
             ->humanMessage('Assignment submitted successfully with ' . count($uploadedFiles) . ' files')
             ->save();
 
-        \Illuminate\Support\Facades\Log::info('About to dispatch assignment submission email job', [
-            'submission_id' => $submission->id,
-            'queue_default' => config('queue.default'),
-            'queue_database_connection' => config('queue.connections.database.connection'),
-            'queue_database_table' => config('queue.connections.database.table'),
-            'queue_database_queue' => config('queue.connections.database.queue'),
-            'db_default' => config('database.default'),
-        ]);
-
         try {
-            \App\Jobs\SendAssignmentSubmissionNotifications::dispatch($submission->id)
-                ->onConnection('database')
-                ->onQueue('assignment-emails');
-
-            \Illuminate\Support\Facades\Log::info('Assignment submission email job dispatched successfully', [
-                'submission_id' => $submission->id,
-                'connection' => 'database',
-                'queue' => 'assignment-emails',
-            ]);
+            \App\Jobs\SendAssignmentSubmissionNotifications::dispatch($submission->id);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Assignment submission email job dispatch failed', [
-                'submission_id' => $submission->id,
+                'submission_id' => $submission->id ?? null,
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
