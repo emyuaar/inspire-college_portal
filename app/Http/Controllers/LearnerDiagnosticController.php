@@ -72,4 +72,44 @@ class LearnerDiagnosticController extends Controller
             return response()->json(['status' => 'error'], 500);
         }
     }
+
+    /**
+     * Log suspicious security events (screenshot, copy, right click, devtools).
+     */
+    public function logSecurity(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json(['status' => 'unauthenticated'], 401);
+            }
+
+            $event = $request->input('event', 'unknown_security_event');
+            $courseId = $request->input('course_id');
+            $lessonId = $request->input('lesson_id');
+
+            // Throttle: 1 event type per user per lesson per 60 seconds
+            $cacheKey = sprintf('sec_event:%s:%s:%s:%s', $user->id, $event, $courseId ?? 0, $lessonId ?? 0);
+            if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+                return response()->json(['status' => 'throttled']);
+            }
+            \Illuminate\Support\Facades\Cache::put($cacheKey, true, 60);
+
+            $logger = LearnerLogger::log('security.' . $event, 'security')
+                ->severity('warning')
+                ->status('blocked')
+                ->humanMessage(sprintf('Security violation detected: %s', $event));
+
+            if ($courseId) $logger->courseId($courseId);
+            if ($lessonId) $logger->lessonId($lessonId);
+
+            $logger->context($request->except(['event', 'course_id', 'lesson_id', '_token']));
+            $logger->save();
+
+            return response()->json(['status' => 'logged']);
+        } catch (\Throwable $e) {
+            Log::error('Security event log failed', ['error' => $e->getMessage()]);
+            return response()->json(['status' => 'error'], 500);
+        }
+    }
 }

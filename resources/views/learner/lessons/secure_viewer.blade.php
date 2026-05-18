@@ -36,65 +36,71 @@
         </div>
 
         {{-- Viewer Card --}}
-        <x-ui.card padding="p-0" class="overflow-hidden">
+        <x-protected-content-guard 
+            :learner-name="$user->name" 
+            :learner-email="$user->email" 
+            :course-name="$lesson->course->title ?? ''"
+            :course-id="$lesson->course_id ?? null"
+            :lesson-id="$lesson->id ?? null">
+            <x-ui.card padding="p-0" class="overflow-hidden">
 
-            {{-- Header --}}
-            <div class="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between">
-                <div>
-                    <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
-                        Online View
-                    </span>
-                    <h1 class="text-xl font-bold text-ds-navy mt-1">
-                        {{ $lesson->document_title ?? $lesson->title }}
-                    </h1>
-                </div>
-
-                {{-- Toolbar --}}
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2 bg-slate-200/60 p-1 rounded-lg">
-                        <button id="prev-page" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 disabled:opacity-50 viewer-control" disabled>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                        </button>
-                        <span class="text-xs font-bold text-slate-600 px-2">
-                            Page <span id="page-num">1</span> of <span id="page-count">-</span>
+                {{-- Header --}}
+                <div class="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between">
+                    <div>
+                        <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                            Online View
                         </span>
-                        <button id="next-page" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 disabled:opacity-50 viewer-control" disabled>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                        </button>
+                        <h1 class="text-xl font-bold text-ds-navy mt-1">
+                            {{ $lesson->document_title ?? $lesson->title }}
+                        </h1>
                     </div>
 
-                    <div class="flex items-center gap-1 bg-slate-200/60 p-1 rounded-lg">
-                        <button id="zoom-out" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 viewer-control" disabled>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>
-                        </button>
-                        <span id="zoom-percent" class="text-xs font-bold text-slate-600 px-2">100%</span>
-                        <button id="zoom-in" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 viewer-control" disabled>
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                        </button>
+                    {{-- Toolbar --}}
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2 bg-slate-200/60 p-1 rounded-lg">
+                            <button id="prev-page" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 disabled:opacity-50 viewer-control" disabled>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <span class="text-xs font-bold text-slate-600 px-2">
+                                Page <span id="page-num">1</span> of <span id="page-count">-</span>
+                            </span>
+                            <button id="next-page" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 disabled:opacity-50 viewer-control" disabled>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-1 bg-slate-200/60 p-1 rounded-lg">
+                            <button id="zoom-out" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 viewer-control" disabled>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>
+                            </button>
+                            <span id="zoom-percent" class="text-xs font-bold text-slate-600 px-2">100%</span>
+                            <button id="zoom-in" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 viewer-control" disabled>
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {{-- Document Container --}}
-            <div class="relative bg-slate-800 p-4 min-h-[600px] flex justify-center items-start overflow-auto select-none" 
-                 id="viewer-wrapper" 
-                 oncontextmenu="return false;">
+                {{-- Document Container --}}
+                <div class="relative bg-slate-800 p-4 min-h-[600px] flex justify-center items-start overflow-auto select-none" 
+                     id="viewer-wrapper">
 
-                {{-- PDF Page Wrapper --}}
-                <div class="pdf-page-wrapper">
-                    <canvas id="pdf-canvas"></canvas>
-                </div>
+                    {{-- PDF Page Wrapper --}}
+                    <div class="pdf-page-wrapper">
+                        <canvas id="pdf-canvas"></canvas>
+                    </div>
 
-                {{-- Loading Spinner --}}
-                <div id="loading-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-800/80 z-20">
-                    <div class="flex flex-col items-center gap-3">
-                        <div class="w-10 h-10 border-4 border-slate-300 border-t-indigo-500 rounded-full animate-spin"></div>
-                        <p class="text-slate-300 text-sm font-medium">Loading document securely...</p>
+                    {{-- Loading Spinner --}}
+                    <div id="loading-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-800/80 z-20">
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="w-10 h-10 border-4 border-slate-300 border-t-indigo-500 rounded-full animate-spin"></div>
+                            <p class="text-slate-300 text-sm font-medium">Loading document securely...</p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-        </x-ui.card>
+            </x-ui.card>
+        </x-protected-content-guard>
     </div>
 
     {{-- PDF.js Library via CDN --}}

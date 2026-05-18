@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'mysql_portal'),
 
     /*
     |--------------------------------------------------------------------------
@@ -48,6 +48,20 @@ return [
         | DEFAULT: PORTAL (LMS) DATABASE
         |--------------------------------------------------------------------------
         */
+        'mysql' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', 3306),
+            'database' => env('DB_DATABASE', 'directskillsco_portal'),
+            'username' => env('DB_USERNAME', 'directskillsco_portal'),
+            'password' => env('DB_PASSWORD', '=1Z3cfh4^Y]Xsnb3'),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation'=> 'utf8mb4_unicode_ci',
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'mysql_portal' => [
             'driver' => 'mysql',
             'host' => env('DB_HOST', '127.0.0.1'),

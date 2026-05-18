@@ -166,6 +166,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/learner/diagnostic-logs', [\App\Http\Controllers\LearnerDiagnosticController::class, 'store'])
             ->name('portal.learner.diagnostic.store');
 
+        Route::post('/learner/security-event', [\App\Http\Controllers\LearnerDiagnosticController::class, 'logSecurity'])
+            ->name('portal.learner.security.store');
+
         // Learner all courses
         Route::get('/learner/courses', [DashboardController::class, 'allCourses'])
             ->name('portal.learner.courses.all');
@@ -217,9 +220,11 @@ Route::middleware('auth')->group(function () {
             ->name('portal.learner.submission_file.view');
 
         Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
             ->name('portal.learner.lessons.show');
 
         Route::get('/learner/lessons/{lesson}/secure-viewer', [LearnerCourseController::class, 'viewSecureDocument'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
             ->name('portal.learner.secure_doc.view');
 
         Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])

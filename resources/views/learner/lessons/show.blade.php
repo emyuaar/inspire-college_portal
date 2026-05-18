@@ -83,10 +83,16 @@
             {{-- Content --}}
             <div class="p-6 md:p-8 bg-white min-h-[300px]">
                 @if(!empty($lesson->content))
-                    <div
-                        class="prose prose-slate max-w-none prose-headings:text-ds-navy prose-a:text-ds-pink hover:prose-a:text-pink-700 prose-img:rounded-xl">
-                        {!! $lesson->content !!}
-                    </div>
+                    <x-protected-content-guard 
+                        :learner-name="auth()->user()->name" 
+                        :learner-email="auth()->user()->email" 
+                        :course-name="$module->course->title ?? ''"
+                        :course-id="$module->course_id ?? null"
+                        :lesson-id="$lesson->id ?? null">
+                        <div class="prose prose-slate max-w-none prose-headings:text-ds-navy prose-a:text-ds-pink hover:prose-a:text-pink-700 prose-img:rounded-xl">
+                            {!! \App\Helpers\ContentObfuscator::obfuscate($lesson->content) !!}
+                        </div>
+                    </x-protected-content-guard>
                 @else
                     <div class="flex flex-col items-center justify-center h-40 text-center">
                         <div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
