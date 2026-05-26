@@ -305,6 +305,27 @@ class MicrosoftGraphService
         return true;
     }
 
+    public function updateUserPassword(string $msUserId, string $newPassword)
+    {
+        $token = $this->getAccessToken();
+
+        $payload = [
+            'passwordProfile' => [
+                'forceChangePasswordNextSignIn' => false,
+                'password' => $newPassword,
+            ],
+        ];
+
+        $response = Http::withToken($token)
+            ->patch("https://graph.microsoft.com/v1.0/users/{$msUserId}", $payload);
+
+        if ($response->failed()) {
+            throw new Exception('Failed to update MS user password: ' . $response->body());
+        }
+
+        return true;
+    }
+
     public function sendMail(string $subject, string $htmlBody, array|string $to, array|string $cc = [], array|string $bcc = [])
     {
         $token = $this->getAccessToken();
