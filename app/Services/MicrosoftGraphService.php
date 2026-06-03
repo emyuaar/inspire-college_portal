@@ -49,20 +49,8 @@ class MicrosoftGraphService
     {
         $token = $this->getAccessToken();
         
-        // 1. Determine UPN (DS{id}@domain)
-        // Assumption: We want to use the standard DS email format if possible, 
-        // to match CRM logic.
-        $domain = 'inspirecollegeoflearning.com'; // Ideally from config, but hardcoded in CRM example too? No, CRM used config.
-        // Let's assume we can get it from the user's current email or use a standard one.
-        // CRM logic: $dsEmail = "ICOL{$dsNo}@{$domain}";
-        // I'll stick to what the CRM does to ensure consistency.
-        // I need the domain.
-        // If not in config, I'll fallback to 'inspirecollegeoflearning.com'. 
-        // Or extract from existing email if it matches pattern?
-        // Safest is to generate it:
-        $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com'); // Add domain to config if needed, logic below
-        $upn = "ICOL{$dsNo}@{$domain}";
+        $studentCode = config('app.student_email_prefix', 'ICOL') . $user->id;
+        $upn = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
 
         // If user already has ms_user_id, check if they exist?
         // Idempotency handled by createUserOrGetExisting
@@ -178,9 +166,8 @@ class MicrosoftGraphService
     {
         $token = $this->getAccessToken();
         
-        $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com');
-        $upn = "ICOL{$dsNo}@{$domain}"; // Or use $user->email_address if already set to ICOL email
+        $studentCode = config('app.student_email_prefix', 'ICOL') . $user->id;
+        $upn = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
 
         $displayName = trim($user->first_name . ' ' . $user->sur_name);
 

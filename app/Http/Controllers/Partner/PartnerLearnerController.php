@@ -161,7 +161,8 @@ class PartnerLearnerController extends Controller
             ]);
 
             // 2. Generate Correct DS Email
-            $dsEmail = "ICOL{$learner->id}@inspirecollegeoflearning.com";
+            $studentCode = config('app.student_email_prefix', 'ICOL') . $learner->id;
+            $dsEmail = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
 
             // 3. Update Portal User with DS Email
             $learner->update([
