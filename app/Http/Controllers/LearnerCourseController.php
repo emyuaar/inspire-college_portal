@@ -172,7 +172,7 @@ class LearnerCourseController extends Controller
 
         // folder names
         $courseFolder = $sp->safeName($courseTitle);                          // Course_Name
-        $dsFolder = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // DS_ID_00001
+        $learnerFolder = 'ICOL_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // ICOL_ID_00001
         $modFolder = $sp->safeName($moduleTitle);                          // Module_1
         $assFolder = $sp->safeName($assignment->title);                    // Assignment_1
 
@@ -183,7 +183,7 @@ class LearnerCourseController extends Controller
 
         // create folder structure
         $path1 = $sp->ensureFolder('', $courseFolder);
-        $path2 = $sp->ensureFolder($path1, $dsFolder);
+        $path2 = $sp->ensureFolder($path1, $learnerFolder);
         $path3 = $sp->ensureFolder($path2, $modFolder);
         $path4 = $sp->ensureFolder($path3, $assFolder);
 
@@ -243,7 +243,7 @@ class LearnerCourseController extends Controller
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $uploaded['id'] ?? null,
-            'sharepoint_path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
+            'sharepoint_path' => $courseFolder . '/' . $learnerFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
             'sharepoint_url' => $uploaded['webUrl'] ?? null,
         ]);
 

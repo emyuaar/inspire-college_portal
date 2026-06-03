@@ -41,6 +41,7 @@ return [
         'client_secret' => env('MS_CLIENT_SECRET'),
         'student_sku_id' => env('MS_STUDENT_SKU_ID'),
         'student_group_id' => env('MS_STUDENT_GROUP_ID'),
+        'domain'        => env('MS_DOMAIN', 'inspirecollegeoflearning.com'),
     ],
 
     'sharepoint' => [

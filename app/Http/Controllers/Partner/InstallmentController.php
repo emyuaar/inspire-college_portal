@@ -40,7 +40,7 @@ class InstallmentController extends Controller
             return back()->with('error', 'No amount due for this installment.');
         }
 
-        $description = "DS{$learner->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for Learner";
+        $description = "ICOL{$learner->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for Learner";
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
 

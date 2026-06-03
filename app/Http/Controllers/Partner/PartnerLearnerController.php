@@ -149,7 +149,7 @@ class PartnerLearnerController extends Controller
 
             // 1. Create User in Portal DB with TEMP email (to get ID)
             // We use a safe temp generic email
-            $tempEmail = 'temp_' . uniqid() . '@directskills.co.uk';
+            $tempEmail = 'temp_' . uniqid() . '@inspirecollegeoflearning.com';
 
             $learner = User::create([
                 'org_id' => $partner->id,
@@ -161,7 +161,7 @@ class PartnerLearnerController extends Controller
             ]);
 
             // 2. Generate Correct DS Email
-            $dsEmail = "DS{$learner->id}@directskills.co.uk";
+            $dsEmail = "ICOL{$learner->id}@inspirecollegeoflearning.com";
 
             // 3. Update Portal User with DS Email
             $learner->update([

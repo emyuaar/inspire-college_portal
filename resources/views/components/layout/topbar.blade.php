@@ -37,7 +37,7 @@
         {{-- User Menu --}}
         @php
             $user = Auth::user();
-            $initials = $user ? strtoupper(substr($user->first_name, 0, 1) . substr($user->sur_name, 0, 1)) : 'DS';
+            $initials = $user ? strtoupper(substr($user->first_name, 0, 1) . substr($user->sur_name, 0, 1)) : 'IC';
         @endphp
         
         <div class="relative group" tabindex="0">
