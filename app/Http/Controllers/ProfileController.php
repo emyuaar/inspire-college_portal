@@ -18,7 +18,7 @@ class ProfileController extends Controller
 {
     public function editPersonal()
     {
-        $user = Auth::user(); // from directskills_portal.users
+        $user = Auth::user(); // from inspire-college_portal.users
 
         // Additional details from CRM
         $detail = UserDetail::where('learner_id', $user->id)->first();
@@ -227,7 +227,7 @@ class ProfileController extends Controller
     // ============================================
     public function editAccount()
     {
-        $user = Auth::user(); // directskills_portal.users
+        $user = Auth::user(); // inspire-college_portal.users
 
         // Extra details from CRM (user_detail)
         $detail = UserDetail::firstOrNew(['learner_id' => $user->id]);

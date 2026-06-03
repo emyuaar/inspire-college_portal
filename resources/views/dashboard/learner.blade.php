@@ -28,7 +28,7 @@
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50">
                         <span class="opacity-70 mr-2">Student ID:</span>
-                        <span class="font-bold text-white">DS{{ $user->id }}</span>
+                        <span class="font-bold text-white">ICOL{{ $user->id }}</span>
                     </div>
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50 overflow-x-auto">
@@ -98,7 +98,7 @@
                     </div>
                     <div class="flex justify-between pt-1">
                         <dt class="text-slate-500">Student ID</dt>
-                        <dd class="font-bold text-slate-800 text-right">DS{{ $user->id }}</dd>
+                        <dd class="font-bold text-slate-800 text-right">ICOL{{ $user->id }}</dd>
                     </div>
                 </dl>
             </x-ui.card>
@@ -256,7 +256,7 @@
                                             @endif
                                         </h3>
 
-                                        <p class="text-xs text-slate-500">Student ID: DS{{ $user->id }}</p>
+                                        <p class="text-xs text-slate-500">Student ID: ICOL{{ $user->id }}</p>
                                     </div>
 
                                     <div class="shrink-0 self-end sm:self-center">

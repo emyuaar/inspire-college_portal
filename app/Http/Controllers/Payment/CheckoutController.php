@@ -78,7 +78,7 @@ class CheckoutController extends Controller
         if (empty($learner->stripe_customer_id)) {
             try {
                 $customer = \Stripe\Customer::create([
-                    'email' => $learner->email_address, // Use Portal email (DS...) or Personal? Ideally Personal if we have it, but Portal Email is safer as unique key.
+                    'email' => $learner->email_address, // Use Portal email (ICOL...) or Personal? Ideally Personal if we have it, but Portal Email is safer as unique key.
                     'name' => "{$learner->first_name} {$learner->sur_name}",
                     'metadata' => [
                         'learner_id' => $learner->id,
@@ -135,7 +135,7 @@ class CheckoutController extends Controller
                             // Stripe expects pence/cents
                             'unit_amount' => (int) round($amountToPay * 100),
                             'product_data' => [
-                                'name' => 'DirectSkills Course Payment',
+                                'name' => 'Inspire College Course Payment',
                                 'description' => $description,
                                 'metadata' => [
                                     'course_name' => $enrolment->course->title ?? 'Course',

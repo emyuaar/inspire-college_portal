@@ -16,7 +16,7 @@
                     <h1 class="text-xl md:text-2xl font-bold text-ds-navy leading-tight">{{ $course?->title }}</h1>
                     <div class="flex flex-wrap items-center gap-3 mt-1 text-xs">
                         <span class="text-slate-500">SID: <strong
-                                class="text-slate-700">DS{{ $user->id }}</strong></span>
+                                class="text-slate-700">ICOL{{ $user->id }}</strong></span>
                         @if ((int) $enrolment->status_id === 2)
                             <x-ui.badge variant="success" size="sm">Approved</x-ui.badge>
                         @elseif((int) $enrolment->status_id === 3)
