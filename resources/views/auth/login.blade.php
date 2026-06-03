@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Login - DirectSkills Portal</title>
+    <title>Login - Inspire College Portal</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {
-            --ds-navy: #01345B;
+            --ds-navy: #0f172a;
             --ds-pink: #A91A6A;
         }
 
@@ -41,7 +41,7 @@
 
     {{-- LEFT COLUMN: BRANDING (Desktop Only) --}}
     <div
-        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#01345B] relative overflow-hidden flex-col justify-between p-12 text-white">
+        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#0f172a] relative overflow-hidden flex-col justify-between p-12 text-white">
 
         {{-- Background Pattern/Effect --}}
         <div class="absolute inset-0 opacity-10"
@@ -54,7 +54,7 @@
 
         {{-- Content --}}
         <div class="relative z-10">
-            <img src="https://directskills.co.uk/images/DirectSKills%20inverted-02.png" alt="DirectSkills"
+            <img src="{{ asset('images/1000ppi/logo-white.png') }}" alt="Inspire College"
                 class="h-10 mb-8">
 
             <h1 class="text-4xl font-bold leading-tight mb-4">
@@ -67,7 +67,7 @@
         </div>
 
         <div class="relative z-10 text-sm text-slate-400">
-            &copy; {{ date('Y') }} DirectSkills. All rights reserved.
+            &copy; {{ date('Y') }} Inspire College. All rights reserved.
         </div>
     </div>
 
@@ -78,7 +78,7 @@
 
             {{-- Mobile Logo (Visible only on mobile) --}}
             <div class="md:hidden text-center mb-8">
-                <img src="https://directskills.co.uk/images/DirectSkills_logo.webp" alt="DirectSkills"
+                <img src="{{ asset('images/1000ppi/logo.png') }}" alt="Inspire College"
                     class="h-10 mx-auto">
             </div>
 
@@ -123,7 +123,7 @@
                             Password
                         </label>
                         {{-- Forgot Password Link --}}
-                        <a href="#" class="text-sm font-semibold text-[#01345B] hover:text-[#A91A6A] transition-colors">
+                        <a href="#" class="text-sm font-semibold text-[#0f172a] hover:text-[#A91A6A] transition-colors">
                             Forgot password?
                         </a>
                     </div>
@@ -148,8 +148,8 @@
 
             {{-- Footer Text --}}
             <p class="text-center text-xs text-slate-400 mt-8">
-                By signing in, you agree to our <a href="https://directskills.co.uk/terms-and-conditions" class="underline hover:text-slate-600">Terms of Service</a>
-                and <a href="https://directskills.co.uk/gdpr-and-retention-of-records-policy" class="underline hover:text-slate-600">Privacy Policy</a>.
+                By signing in, you agree to our <a href="https://inspirecollege.co.uk/terms-and-conditions" class="underline hover:text-slate-600">Terms of Service</a>
+                and <a href="https://inspirecollege.co.uk/gdpr-and-retention-of-records-policy" class="underline hover:text-slate-600">Privacy Policy</a>.
             </p>
         </div>
     </div>

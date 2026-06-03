@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Organization Dashboard - DirectSkills Portal</title>
+    <title>Organization Dashboard - Inspire College Portal</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-100">
@@ -10,8 +10,8 @@
     <header class="bg-white border-b border-slate-200">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <img src="https://directskills.co.uk/images/DirectSkills_logo.webp"
-                     class="h-7" alt="DirectSkills">
+                <img src="{{ asset('images/1000ppi/logo.png') }}"
+                     class="h-7" alt="Inspire College">
                 <span class="text-sm text-slate-500 hidden sm:inline">
                     Organization Portal
                 </span>
