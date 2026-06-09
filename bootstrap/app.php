@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'stripe/webhook',
         ]);
+        $middleware->redirectGuestsTo(fn () => route('portal.login'));
         $middleware->alias([
             'installment.access' => \App\Http\Middleware\CheckInstallmentAccess::class,
         ]);

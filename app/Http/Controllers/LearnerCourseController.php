@@ -10,6 +10,7 @@ use App\Models\Lesson;
 use App\Models\Assignment;
 use App\Models\AssignmentFile;
 use App\Models\AssignmentSubmission;
+use App\Models\AssignmentSubmissionFile;
 use App\Models\Crm\GradeSheetCell; // Added CRM Grade Model
 use App\Services\SharePointService;
 
@@ -90,6 +91,7 @@ class LearnerCourseController extends Controller
             'assignments.files',
             'assignments.submissions' => function ($q) use ($user) {
                 $q->where('learner_id', $user->id)
+                    ->with('files')
                     ->latest();
             },
             'assignments.gradeResets' => function ($q) use ($user) {
@@ -157,12 +159,12 @@ class LearnerCourseController extends Controller
         }
 
         $request->validate([
-            'submission_file' => 'required|file|max:20480',
+            'submission_files' => 'required_without:submission_file|array|min:1',
+            'submission_files.*' => 'file|max:20480',
+            'submission_file' => 'required_without:submission_files|file|max:20480',
         ]);
 
-        // file + original name
-        $file = $request->file('submission_file');
-        $originalName = $file->getClientOriginalName();
+        $files = $request->file('submission_files') ?: [$request->file('submission_file')];
 
         // load relations (must exist on Assignment model)
         $assignment->load(['module', 'course']); // if assignment->course relation exists
@@ -176,25 +178,11 @@ class LearnerCourseController extends Controller
         $modFolder = $sp->safeName($moduleTitle);                          // Module_1
         $assFolder = $sp->safeName($assignment->title);                    // Assignment_1
 
-        // file name safe
-        $baseName = pathinfo($originalName, PATHINFO_FILENAME);
-        $ext = strtolower($file->getClientOriginalExtension());
-        $fileName = $sp->safeName($baseName) . '.' . $ext;
-
         // create folder structure
         $path1 = $sp->ensureFolder('', $courseFolder);
         $path2 = $sp->ensureFolder($path1, $learnerFolder);
         $path3 = $sp->ensureFolder($path2, $modFolder);
         $path4 = $sp->ensureFolder($path3, $assFolder);
-
-        // upload to SharePoint
-        $size = $file->getSize(); // bytes
-
-        if ($size <= 3.5 * 1024 * 1024) {
-            $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
-        } else {
-            $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
-        }
 
         // Calculate Attempt No
         $attemptNo = AssignmentSubmission::where('assignment_id', $assignment->id)
@@ -234,20 +222,60 @@ class LearnerCourseController extends Controller
         }
         // ----------------------------------
 
-        // DB save (NO file_path)
-        AssignmentSubmission::create([
+        $uploadedFiles = [];
+
+        foreach ($files as $file) {
+            $originalName = $file->getClientOriginalName();
+            $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+            $ext = strtolower($file->getClientOriginalExtension());
+            $fileName = $sp->safeName($baseName) . '_' . time() . '_' . \Illuminate\Support\Str::random(4) . '.' . $ext;
+            $uploaded = $sp->uploadFile($path4, $fileName, $file->getRealPath());
+
+            $uploadedFiles[] = [
+                'original_name' => $originalName,
+                'stored_name' => $fileName,
+                'path' => $courseFolder . '/' . $learnerFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
+                'item_id' => $uploaded['id'] ?? null,
+                'url' => $uploaded['webUrl'] ?? null,
+                'drive_id' => $uploaded['parentReference']['driveId'] ?? $sp->driveId(),
+                'size' => $file->getSize(),
+                'mime' => $file->getClientMimeType(),
+            ];
+        }
+
+        $primaryFile = $uploadedFiles[0];
+
+        $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
-            'file_name' => $originalName,
-            'status' => 'submitted',
+            'file_name' => $primaryFile['original_name'],
+            'stored_file_name' => $primaryFile['stored_name'],
+            'status_id' => 1,  // Status ID for 'submitted'
             'attempt_no' => $attemptNo + 1,
 
-            'sharepoint_item_id' => $uploaded['id'] ?? null,
-            'sharepoint_path' => $courseFolder . '/' . $learnerFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
-            'sharepoint_url' => $uploaded['webUrl'] ?? null,
+            'sharepoint_item_id' => $primaryFile['item_id'],
+            'sharepoint_path' => $primaryFile['path'],
+            'sharepoint_url' => $primaryFile['url'],
+            'drive_id' => $primaryFile['drive_id'],
+            'file_size' => $primaryFile['size'],
+            'mime_type' => $primaryFile['mime'],
         ]);
 
-        return back()->with('success', 'Your assignment file has been submitted');
+        foreach ($uploadedFiles as $uploadedFile) {
+            AssignmentSubmissionFile::create([
+                'assignment_submission_id' => $submission->id,
+                'file_name' => $uploadedFile['original_name'],
+                'stored_file_name' => $uploadedFile['stored_name'],
+                'sharepoint_item_id' => $uploadedFile['item_id'],
+                'sharepoint_path' => $uploadedFile['path'],
+                'sharepoint_url' => $uploadedFile['url'],
+                'drive_id' => $uploadedFile['drive_id'],
+                'file_size' => $uploadedFile['size'],
+                'mime_type' => $uploadedFile['mime'],
+            ]);
+        }
+
+        return back()->with('success', count($uploadedFiles) . ' assignment file(s) submitted successfully.');
     }
 
     public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
@@ -268,7 +296,40 @@ class LearnerCourseController extends Controller
         return $sp->streamByItemId(
             $submission->sharepoint_item_id,
             $submission->file_name ?? 'submission',
-            $inline
+            $inline,
+            $submission->drive_id
+        );
+    }
+
+    public function viewSubmissionFile(AssignmentSubmissionFile $file, SharePointService $sp)
+    {
+        $user = Auth::user();
+        $submission = $file->submission;
+
+        if (!$submission || (int) $submission->learner_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        if (!$file->sharepoint_item_id) {
+            return back()->with('error', 'File not found on SharePoint.');
+        }
+
+        $assignment = $submission->assignment;
+        if ($assignment) {
+            $enrolment = Enrolment::where('learner_id', $user->id)
+                ->where('course_id', $assignment->course_id)
+                ->firstOrFail();
+
+            if (!$this->checkAccess($enrolment)) {
+                abort(403);
+            }
+        }
+
+        return $sp->streamByItemId(
+            $file->sharepoint_item_id,
+            $file->file_name ?? 'submission_file',
+            true,
+            $file->drive_id
         );
     }
 
@@ -284,9 +345,12 @@ class LearnerCourseController extends Controller
             return back()->with('error', 'File not found on SharePoint.');
         }
 
-        $url = $sp->temporaryDownloadUrlByItemId($submission->sharepoint_item_id);
-
-        return redirect()->away($url);
+        return $sp->streamByItemId(
+            $submission->sharepoint_item_id,
+            $submission->file_name ?? 'submission',
+            false,
+            $submission->drive_id
+        );
     }
 
     public function viewLesson(Lesson $lesson)
@@ -310,6 +374,10 @@ class LearnerCourseController extends Controller
         // published only
         if (!(int) $lesson->is_published) {
             abort(404);
+        }
+
+        if ($lesson->resource_type === 'secure_document') {
+            return redirect()->route('portal.learner.secure_doc.view', $lesson->id);
         }
 
         // optional: previous/next lesson (same module)
@@ -347,14 +415,41 @@ class LearnerCourseController extends Controller
             abort(403);
         }
 
-        if (blank($lesson->sharepoint_item_id)) {
-            return back()->with('error', 'Lesson file not available on SharePoint.');
+        if ($lesson->resource_type === 'secure_document') {
+            abort(403, 'Direct download is disabled for secure documents.');
         }
 
-        $inline = request()->routeIs('portal.learner.lesson.file.inline');
+        if (!blank($lesson->sharepoint_item_id)) {
+            $inline = request()->routeIs('portal.learner.lesson.file.inline');
+            $name = $lesson->file_name ?? $lesson->title . '.pdf';
 
-        $name = $lesson->file_name ?? $lesson->title . '.pdf'; // adjust if you store
-        return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline);
+            return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline, $lesson->drive_id);
+        }
+
+        if (!blank($lesson->file_path) && filter_var($lesson->file_path, FILTER_VALIDATE_URL)) {
+            try {
+                $inline = request()->routeIs('portal.learner.lesson.file.inline');
+                return $sp->streamByShareUrl($lesson->file_path, $lesson->file_name ?: ($lesson->title . '.pdf'), $inline);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Lesson file SharePoint URL fallback failed', [
+                    'lesson_id' => $lesson->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (!blank($lesson->file_path)) {
+            $fullPath = $this->resolveLessonFilePath($lesson->file_path);
+
+            if ($fullPath) {
+                $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+                $downloadName = $lesson->title . ($extension ? '.' . $extension : '');
+
+                return response()->download($fullPath, $downloadName);
+            }
+        }
+
+        return back()->with('error', 'Lesson file not available.');
     }
 
     public function downloadAssignmentBrief(AssignmentFile $brief, SharePointService $sp)
@@ -373,12 +468,27 @@ class LearnerCourseController extends Controller
             abort(403);
         }
 
-        if (blank($brief->sharepoint_item_id)) {
-            return back()->with('error', 'Brief not available on SharePoint.');
+        $inline = request()->routeIs('portal.learner.assignment.brief.inline');
+        if (!blank($brief->sharepoint_item_id)) {
+            return $sp->streamByItemId($brief->sharepoint_item_id, $brief->file_name ?? 'brief', $inline, $brief->drive_id);
         }
 
-        $inline = request()->routeIs('portal.learner.assignment.brief.inline');
-        return $sp->streamByItemId($brief->sharepoint_item_id, $brief->file_name ?? 'brief', $inline);
+        if (!blank($brief->file_path) && !filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
+            return $this->downloadAssignmentBriefLocal($brief);
+        }
+
+        if (!blank($brief->file_path) && filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
+            try {
+                return $sp->streamByShareUrl($brief->file_path, $brief->file_name ?? 'brief', $inline);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Assignment brief SharePoint URL fallback failed', [
+                    'brief_id' => $brief->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return back()->with('error', 'Brief not available on SharePoint.');
     }
 
     public function downloadAssignmentBriefLocal(AssignmentFile $brief)
@@ -430,7 +540,7 @@ class LearnerCourseController extends Controller
         return response()->download($fullReal, $downloadName);
     }
 
-    public function downloadGradingFile(Request $request, Assignment $assignment)
+    public function downloadGradingFile(Request $request, Assignment $assignment, SharePointService $sp)
     {
         $user = Auth::user();
         $type = $request->query('type'); // 'marking_sheet' or 'feedback_file'
@@ -461,21 +571,32 @@ class LearnerCourseController extends Controller
             abort(404, 'No attempt found.');
         }
 
-        // 3. Determine Path
-        $path = null;
-        if ($type === 'marking_sheet') {
-            $path = $attempt->marking_sheet_path;
-        } elseif ($type === 'feedback_file') {
-            $path = $attempt->feedback_file_path;
-        }
+        $attachment = $attempt->attachments->where('type', $type)->first();
+        $path = $attachment?->file_path;
 
         if (blank($path)) {
             return back()->with('error', 'File not available.');
         }
 
-        // 4. Download Logic
+        if (!blank($attachment->sharepoint_item_id)) {
+            return $sp->streamByItemId(
+                $attachment->sharepoint_item_id,
+                $attachment->original_name ?: ($type . '_file'),
+                false,
+                $attachment->drive_id
+            );
+        }
+
         if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return redirect()->away($path);
+            try {
+                return $sp->streamByShareUrl($path, $attachment->original_name ?: ($type . '_file'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Grading attachment SharePoint URL fallback failed', [
+                    'attachment_id' => $attachment?->id,
+                    'error' => $e->getMessage(),
+                ]);
+                return back()->with('error', 'Secure SharePoint metadata is missing for this grading file.');
+            }
         }
 
         // Local Storage via CRM Root
@@ -509,5 +630,180 @@ class LearnerCourseController extends Controller
         }
 
         return response()->download($realFullPath);
+    }
+
+    public function viewSecureDocument(Lesson $lesson)
+    {
+        $user = Auth::user();
+
+        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
+            abort(404, 'Secure document not found.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            return redirect()
+                ->route('portal.learner.dashboard')
+                ->with('error', 'Your enrolment is not active or payment is pending.');
+        }
+
+        return view('learner.lessons.secure_viewer', [
+            'lesson' => $lesson,
+            'enrolment' => $enrolment,
+            'user' => $user,
+        ]);
+    }
+
+    public function streamSecureDocument(Lesson $lesson, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
+            abort(404, 'Secure document not found.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        if (!blank($lesson->sharepoint_item_id)) {
+            return $sp->streamByItemId(
+                $lesson->sharepoint_item_id,
+                $lesson->file_name ?: ($lesson->title . '.pdf'),
+                true,
+                $lesson->drive_id
+            );
+        }
+
+        $fullPath = $this->resolveLessonFilePath($lesson->file_path);
+        if (!$fullPath) {
+            abort(404, 'File not found.');
+        }
+
+        $binary = file_get_contents($fullPath);
+        $mime = mime_content_type($fullPath) ?: 'application/pdf';
+
+        return response($binary, 200)
+            ->header('Content-Type', $mime)
+            ->header('Content-Length', strlen($binary))
+            ->header('Content-Disposition', 'inline; filename="' . basename($fullPath) . '"')
+            ->header('Accept-Ranges', 'bytes')
+            ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function securePdfData(Lesson $lesson, SharePointService $sp)
+    {
+        $user = Auth::user();
+
+        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
+            abort(404, 'Secure document not found.');
+        }
+
+        $enrolment = Enrolment::where('learner_id', $user->id)
+            ->where('course_id', $lesson->course_id)
+            ->firstOrFail();
+
+        if (!$this->checkAccess($enrolment)) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $driveId = $lesson->drive_id ?: config('services.sharepoint.drive_id');
+        $itemId = blank($lesson->sharepoint_item_id) ? null : $lesson->sharepoint_item_id;
+        $path = blank($lesson->sharepoint_path) ? ($lesson->file_path ?: null) : $lesson->sharepoint_path;
+
+        if (app()->environment('local')) {
+            \Log::info('Secure PDF viewer request', [
+                'lesson_id' => $lesson->id,
+                'secure_pdf_id' => $lesson->id,
+                'drive_id' => $driveId,
+                'sharepoint_item_id' => $itemId,
+                'sharepoint_path' => $path,
+            ]);
+        }
+
+        try {
+            $binary = $sp->downloadFileContent($driveId, $itemId, $path);
+        } catch (\RuntimeException $e) {
+            $message = $e->getMessage();
+
+            if (str_contains($message, 'Secure PDF SharePoint metadata is missing') || str_contains($message, 'SharePoint drive ID is missing')) {
+                abort(404, 'Secure PDF SharePoint metadata is missing.');
+            }
+
+            abort(404, 'File not found.');
+        }
+
+        if (strlen($binary) > 50 * 1024 * 1024) {
+            abort(413, 'PDF too large for inline secure viewer.');
+        }
+
+        return response()->json([
+            'success' => true,
+            'filename' => $lesson->file_name ?: basename((string) ($lesson->sharepoint_path ?: $lesson->file_path)),
+            'mime' => $lesson->mime_type ?: 'application/pdf',
+            'data' => base64_encode($binary),
+        ], 200, [
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    private function resolveLessonFilePath(?string $filePath): ?string
+    {
+        if (blank($filePath) || filter_var($filePath, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)) {
+            $path = \Illuminate\Support\Facades\Storage::disk('public')->path($filePath);
+            $realPath = realpath($path);
+
+            if ($realPath && is_file($realPath)) {
+                return $realPath;
+            }
+        }
+
+        $crmRoot = config('services.crm.storage_root');
+        if ($crmRoot) {
+            $crmRootReal = realpath($crmRoot);
+
+            if ($crmRootReal) {
+                $relative = ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
+                $candidates = [
+                    'public' . DIRECTORY_SEPARATOR . $relative,
+                    $relative,
+                ];
+
+                foreach ($candidates as $candidate) {
+                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $candidate;
+                    $fullReal = realpath($fullPath);
+
+                    $rootPrefix = rtrim($crmRootReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+                    if ($fullReal && is_file($fullReal) && str_starts_with($fullReal, $rootPrefix)) {
+                        return $fullReal;
+                    }
+                }
+            }
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)) {
+            $path = \Illuminate\Support\Facades\Storage::disk('local')->path($filePath);
+            $realPath = realpath($path);
+
+            if ($realPath && is_file($realPath)) {
+                return $realPath;
+            }
+        }
+
+        return null;
     }
 }

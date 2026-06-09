@@ -47,7 +47,12 @@ return [
     'sharepoint' => [
         'site_hostname' => env('SP_SITE_HOSTNAME'),
         'site_path'     => env('SP_SITE_PATH'),
+        'site_id'       => env('SP_SITE_ID'),
+        'drive_id'      => env('SP_DRIVE_ID'),
         'library_name'  => env('SP_LIBRARY_NAME', 'Submissions'),
+        'client_id'     => env('SHAREPOINT_CLIENT_ID', env('MS_CLIENT_ID')),
+        'client_secret' => env('SHAREPOINT_CLIENT_SECRET', env('MS_CLIENT_SECRET')),
+        'tenant_id'     => env('SHAREPOINT_TENANT_ID', env('MS_TENANT_ID')),
     ],
 
     'crm' => [

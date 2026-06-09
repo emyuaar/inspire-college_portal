@@ -40,6 +40,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/learner/dashboard', [DashboardController::class, 'learner'])
         ->name('portal.learner.dashboard');
 
+    Route::post('/learner/security-event', [\App\Http\Controllers\LearnerDiagnosticController::class, 'logSecurity'])
+        ->name('portal.learner.security.store');
+
     // Organization specific
     // Route::get('/organization/dashboard', [DashboardController::class, 'organization'])
     //     ->name('portal.organization.dashboard');
@@ -140,8 +143,22 @@ Route::middleware('auth')->group(function () {
     Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
         ->name('portal.learner.submission.direct');
 
+    Route::get('/learner/submission-file/{file}/view', [LearnerCourseController::class, 'viewSubmissionFile'])
+        ->name('portal.learner.submission_file.view');
+
     Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
+        ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
         ->name('portal.learner.lessons.show');
+
+    Route::get('/learner/lessons/{lesson}/secure-viewer', [LearnerCourseController::class, 'viewSecureDocument'])
+        ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
+        ->name('portal.learner.secure_doc.view');
+
+    Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])
+        ->name('portal.learner.secure_doc.stream');
+
+    Route::get('/learner/lessons/{lesson}/secure-pdf-data', [LearnerCourseController::class, 'securePdfData'])
+        ->name('learner.lessons.secure-pdf-data');
 
     // Lesson file (SharePoint proxy)
     Route::get('/learner/lessons/{lesson}/file/download', [LearnerCourseController::class, 'downloadLessonFile'])

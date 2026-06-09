@@ -131,27 +131,42 @@
                                             <div class="space-y-3">
                                                 @foreach ($module->lessons as $lesson)
                                                     @php
-                                                        $primaryUrl = !blank($lesson->video_url) ? $lesson->video_url : route('portal.learner.lessons.show', $lesson->id);
-                                                        $primaryTarget = !blank($lesson->video_url) ? '_blank' : null;
-                                                        $isFile = !blank($lesson->file_path);
+                                                        $isUrl = !blank($lesson->video_url);
+                                                        $isSecureDoc = ($lesson->resource_type === 'secure_document');
+                                                        $isFileResource = !blank($lesson->file_path) && blank($lesson->content) && blank($lesson->video_url) && !$isSecureDoc;
+
+                                                        if ($isSecureDoc) {
+                                                            $primaryUrl = route('portal.learner.secure_doc.view', $lesson->id);
+                                                            $primaryTarget = null;
+                                                            $typeLabel = 'Study Material';
+                                                            $actionLabel = 'Open Material';
+                                                            $btnIcon = 'eye';
+                                                            $typeIcon = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+                                                        } elseif ($isFileResource) {
+                                                            $primaryUrl = route('portal.learner.lesson.file.download', $lesson->id);
+                                                            $primaryTarget = null;
+                                                            $typeLabel = 'File / Resource';
+                                                            $actionLabel = 'Download File';
+                                                            $btnIcon = 'download';
+                                                            $typeIcon = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>';
+                                                        } else {
+                                                            $primaryUrl = $isUrl ? ($lesson->safe_video_url ?? $lesson->video_url) : route('portal.learner.lessons.show', $lesson->id);
+                                                            $primaryTarget = $isUrl ? '_blank' : null;
+                                                            $typeLabel = $isUrl ? 'External Link' : 'Reading Material';
+                                                            $actionLabel = 'Open Lesson';
+                                                            $btnIcon = null;
+                                                            $typeIcon = '<path d="M3.5 5.5A2.5 2.5 0 0 1 6 3h12.5v18H6a2.5 2.5 0 0 0-2.5 2.5V5.5z"/><path d="M7 3v18"/><path d="M10 7h6"/>';
+                                                        }
                                                     @endphp
                                                     <div
                                                         class="group flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm hover:bg-slate-50 transition-all bg-white">
                                                         <div class="flex items-start gap-4">
                                                             <div
-                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                                                class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg {{ $isSecureDoc ? 'bg-amber-50 text-amber-600' : ($isFileResource ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600') }} flex items-center justify-center">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                                     stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
                                                                     stroke-linejoin="round" class="w-5 h-5">
-                                                                    <!-- Book cover -->
-                                                                    <path
-                                                                        d="M3.5 5.5A2.5 2.5 0 0 1 6 3h12.5v18H6a2.5 2.5 0 0 0-2.5 2.5V5.5z" />
-
-                                                                    <!-- Spine -->
-                                                                    <path d="M7 3v18" />
-
-                                                                    <!-- Page line -->
-                                                                    <path d="M10 7h6" />
+                                                                    {!! $typeIcon !!}
                                                                 </svg>
                                                             </div>
                                                             <div>
@@ -161,25 +176,24 @@
                                                                     {{ $lesson->title }}
                                                                 </a>
                                                                 <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                                                    <span>{{ !blank($lesson->video_url) ? 'Lesson' : 'Reading Material' }}</span>
-                                                                    @if($isFile)
+                                                                    <span>{{ $typeLabel }}</span>
+                                                                    @if((!$isFileResource && !blank($lesson->file_path)) || $isSecureDoc)
                                                                         <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                                        <span>Includes files</span>
+                                                                        <span>{{ $isSecureDoc ? 'Online View' : 'Includes attachment' }}</span>
                                                                     @endif
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div class="flex items-center gap-2 pl-12 md:pl-0">
                                                             <x-ui.button href="{{ $primaryUrl }}" target="{{ $primaryTarget }}"
-                                                                size="sm" variant="outline">
-                                                                Open Lesson
+                                                                size="sm" variant="{{ $isSecureDoc ? 'secondary' : ($isFileResource ? 'primary' : 'outline') }}">
+                                                                @if($btnIcon === 'download')
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                                                @elseif($btnIcon === 'eye')
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                                @endif
+                                                                {{ $actionLabel }}
                                                             </x-ui.button>
-                                                            @if ($isFile)
-                                                                <x-ui.button href="{{ $lesson->file_path }}" target="_blank" size="sm"
-                                                                    variant="ghost" icon="download">
-                                                                    File
-                                                                </x-ui.button>
-                                                            @endif
                                                         </div>
                                                     </div>
                                                 @endforeach
@@ -303,7 +317,7 @@
                                                         <div class="p-4 bg-white space-y-4">
                                                             {{-- Assignment Brief (Always Visible) --}}
                                                             @if ($brief)
-                                                                <a href="{{ $brief->file_path }}" target="_blank"
+                                                                <a href="{{ route('portal.learner.assignment.brief.download', $brief->id) }}" target="_blank"
                                                                     class="flex items-center justify-between p-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 hover:bg-white hover:border-ds-pink/30 hover:shadow-md transition-all group">
                                                                     <div class="flex items-center gap-3">
                                                                         <div
@@ -379,16 +393,8 @@
                                                                         @if($latestGrade->marking_sheet_path || $latestGrade->feedback_file_path)
                                                                             <div class="flex flex-wrap gap-2 pt-2">
                                                                                 @php
-                                                                                    // Use direct URL if valid (SharePoint), else route
-                                                                                    // Marking Sheet
-                                                                                    $msRaw = $latestGrade->marking_sheet_path;
-                                                                                    $msIsUrl = filter_var($msRaw, FILTER_VALIDATE_URL);
-                                                                                    $msHref = $msIsUrl ? $msRaw : route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'marking_sheet']);
-
-                                                                                    // Feedback File
-                                                                                    $fbRaw = $latestGrade->feedback_file_path;
-                                                                                    $fbIsUrl = filter_var($fbRaw, FILTER_VALIDATE_URL);
-                                                                                    $fbHref = $fbIsUrl ? $fbRaw : route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'feedback_file']);
+                                                                                    $msHref = route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'marking_sheet']);
+                                                                                    $fbHref = route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'feedback_file']);
                                                                                 @endphp
 
                                                                                 @if($latestGrade->marking_sheet_path)
@@ -425,18 +431,31 @@
                                                             {{-- PREVIOUS SUBMISSION LINK --}}
                                                             @if ($submission)
                                                                 <div
-                                                                    class="flex items-center justify-between p-3 bg-amber-50 rounded border border-amber-100 text-sm">
+                                                                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-amber-50 rounded border border-amber-100 text-sm">
                                                                     <div class="text-amber-800">
                                                                         <span class="block font-bold text-xs uppercase">Your
                                                                             Submission</span>
                                                                         <span class="text-xs">Uploaded:
                                                                             {{ $submission->created_at->format('d M Y, H:i') }}</span>
                                                                     </div>
-                                                                    <x-ui.button
-                                                                        href="{{ route('portal.learner.submission.view', $submission->id) }}"
-                                                                        target="_blank" size="xs" variant="ghost">
-                                                                        Download
-                                                                    </x-ui.button>
+                                                                    @php $submissionFiles = $submission->files ?? collect(); @endphp
+                                                                    <div class="flex flex-wrap gap-2">
+                                                                        @if($submissionFiles->isNotEmpty())
+                                                                            @foreach($submissionFiles as $submissionFile)
+                                                                                <x-ui.button
+                                                                                    href="{{ route('portal.learner.submission_file.view', $submissionFile->id) }}"
+                                                                                    target="_blank" size="xs" variant="ghost">
+                                                                                    {{ Str::limit($submissionFile->file_name ?? 'Download', 28) }}
+                                                                                </x-ui.button>
+                                                                            @endforeach
+                                                                        @else
+                                                                            <x-ui.button
+                                                                                href="{{ route('portal.learner.submission.view', $submission->id) }}"
+                                                                                target="_blank" size="xs" variant="ghost">
+                                                                                Download
+                                                                            </x-ui.button>
+                                                                        @endif
+                                                                    </div>
                                                                 </div>
                                                             @endif
 
@@ -506,10 +525,10 @@
                                                                         <label class="block text-xs font-bold text-slate-700 mb-1.5">
                                                                             {{ $isActiveReset ? 'Upload Attempt 2' : 'Upload Submission' }}
                                                                         </label>
-                                                                        <input type="file" name="submission_file" required
+                                                                        <input type="file" name="submission_files[]" multiple required
                                                                             class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-ds-pink file:text-white hover:file:bg-pink-700 border border-slate-200 rounded-lg bg-slate-50">
                                                                         <p class="text-[10px] text-slate-400 mt-1">Accepts PDF, DOCX. Max
-                                                                            20MB.</p>
+                                                                            20MB per file.</p>
                                                                     </div>
                                                                     <x-ui.button type="submit" variant="primary" size="sm">
                                                                         {{ $isActiveReset ? 'Submit Attempt 2' : 'Submit Assignment' }}
