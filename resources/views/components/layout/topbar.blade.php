@@ -53,16 +53,12 @@
                         <p class="font-black text-slate-800">Notifications</p>
                         <p class="text-[11px] text-slate-400 font-medium" x-text="unread + ' unread'"></p>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div>
                         <button @click="markAllRead()" x-show="unread > 0" x-cloak
                             class="text-[11px] font-bold text-ds-pink hover:text-pink-700 transition-colors"
                             title="Mark all as read">
                             Mark all read
                         </button>
-                        <a href="{{ route('partner.notifications.index') }}"
-                            class="text-[11px] font-bold text-slate-500 hover:text-ds-navy transition-colors">
-                            View all
-                        </a>
                     </div>
                 </div>
 
@@ -112,11 +108,11 @@
                 </div>
 
                 {{-- Panel Footer --}}
-                <div x-show="!loading && notifications.length > 0" x-cloak
-                    class="px-5 py-3 border-t border-slate-50 bg-slate-50/80 text-center">
+                <div x-show="!loading" x-cloak
+                    class="px-5 py-3 border-t border-slate-100 bg-slate-50/80 text-center">
                     <a href="{{ route('partner.notifications.index') }}"
-                        class="text-xs font-bold text-slate-500 hover:text-ds-navy transition-colors">
-                        View all notifications
+                        class="inline-block w-full py-2.5 text-xs font-bold text-ds-navy hover:text-white bg-slate-50 hover:bg-ds-navy border border-slate-200 rounded-xl transition-all duration-150 shadow-sm text-center">
+                        View All
                     </a>
                 </div>
             </div>

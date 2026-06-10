@@ -155,7 +155,7 @@
                                 <i class="fa-solid fa-plus-circle"></i>
                                 Enroll Now
                             </a>
-                            <a href="https://directskills.co.uk/course/{{ $course->slug }}" target="_blank"
+                            <a href="https://directskills.co.uk/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
                                class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors">
                                Details
                             </a>
