@@ -115,4 +115,6 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'save_to_sent_items' => env('MAIL_SAVE_TO_SENT_ITEMS', true),
+
 ];

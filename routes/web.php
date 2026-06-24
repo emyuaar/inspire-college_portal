@@ -202,6 +202,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
             ->middleware('installment.access')
             ->name('portal.learner.course.show');
+        Route::post('/learner/course/{enrolment}/units/{module}/select', [LearnerCourseController::class, 'selectUnit'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.select');
+        Route::delete('/learner/course/{enrolment}/units/{module}/select', [LearnerCourseController::class, 'removeUnit'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.remove');
+        Route::post('/learner/course/{enrolment}/units/finalise', [LearnerCourseController::class, 'finaliseUnitSelection'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.finalise');
 
         // assignment submission
         Route::post('/learner/assignment/{assignment}/submit', [LearnerCourseController::class, 'submitAssignment'])

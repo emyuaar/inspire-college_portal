@@ -330,9 +330,9 @@ class MicrosoftGraphService
     {
         $token = $this->getAccessToken();
 
-        $senderEmail = config('mail.from.address') ?: env('MAIL_FROM_ADDRESS');
-        $senderName = config('mail.from.name') ?: env('MAIL_FROM_NAME', 'DirectSkills');
-        $saveToSentItems = filter_var(env('MAIL_SAVE_TO_SENT_ITEMS', true), FILTER_VALIDATE_BOOLEAN);
+        $senderEmail = config('mail.from.address', 'hello@example.com');
+        $senderName = config('mail.from.name', 'DirectSkills');
+        $saveToSentItems = (bool) config('mail.save_to_sent_items', true);
 
         $url = "https://graph.microsoft.com/v1.0/users/{$senderEmail}/sendMail";
 

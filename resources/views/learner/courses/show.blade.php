@@ -35,6 +35,81 @@
             </div>
         </div>
 
+        @if($creditBased)
+            <x-ui.card class="mb-6 overflow-hidden" padding="p-0">
+                <div class="p-5 border-b border-slate-200 bg-slate-50">
+                    <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-ds-navy">Credit-Based Course Plan</h2>
+                            <p class="text-sm text-slate-600 mt-1">Mandatory units are selected automatically. Choose optional units until all course and group rules are met.</p>
+                        </div>
+                        <span class="inline-flex self-start px-3 py-1 rounded-full text-xs font-bold {{ ($creditSummary['remaining_credits'] ?? 1) <= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                            {{ ($creditSummary['remaining_credits'] ?? 1) <= 0 ? 'Credit target reached' : 'Selection required' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <dl class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                        @foreach([
+                            'Required Credits' => $creditSummary['required_credits'],
+                            'Mandatory Credits' => $creditSummary['mandatory_credits'],
+                            'Selected Optional' => $creditSummary['optional_credits'],
+                            'Total Selected' => $creditSummary['total_selected_credits'],
+                            'Remaining Credits' => $creditSummary['remaining_credits'],
+                        ] as $label => $value)
+                            <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                <dt class="text-[11px] font-bold uppercase tracking-wide text-slate-500">{{ $label }}</dt>
+                                <dd class="text-xl font-bold text-ds-navy mt-1">{{ $value === null ? '—' : rtrim(rtrim(number_format((float)$value, 2), '0'), '.') }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        @foreach($modules->where('section_type', 'unit')->where('unit_type', 'optional')->where('included_in_completion', true) as $optionalUnit)
+                            @php $selection = $unitSelections->get($optionalUnit->id); @endphp
+                            <div class="rounded-xl border {{ $selection ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white' }} p-4">
+                                <div class="flex justify-between gap-3">
+                                    <div>
+                                        <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $optionalUnit->unit_code ?: 'Optional Unit' }}</div>
+                                        <h3 class="font-bold text-slate-800 mt-1">{{ $optionalUnit->unit_title ?: $optionalUnit->title }}</h3>
+                                        <div class="text-xs text-slate-600 mt-2">
+                                            @if($optionalUnit->credits !== null)<span>{{ rtrim(rtrim(number_format((float)$optionalUnit->credits, 2), '0'), '.') }} credits</span>@endif
+                                            @if($optionalUnit->optionalGroup)<span> · {{ $optionalUnit->optionalGroup->name }}</span>@endif
+                                        </div>
+                                    </div>
+                                    @if($selection)<span class="text-emerald-700 text-xs font-bold">Selected</span>@endif
+                                </div>
+                                <div class="mt-4">
+                                    @if(!$selection)
+                                        <form method="POST" action="{{ route('portal.learner.course.units.select', [$enrolment, $optionalUnit]) }}">@csrf
+                                            <button class="h-10 px-4 rounded-lg bg-ds-navy text-white text-sm font-bold hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-pink transition-colors">Select Unit</button>
+                                        </form>
+                                    @elseif(!$selection->is_locked)
+                                        <form method="POST" action="{{ route('portal.learner.course.units.remove', [$enrolment, $optionalUnit]) }}">@csrf @method('DELETE')
+                                            <button class="h-10 px-4 rounded-lg border border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors">Remove Unit</button>
+                                        </form>
+                                    @else
+                                        <span class="inline-flex items-center h-10 px-3 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Locked after work submission</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if($completionReport && $completionReport['missing_requirements'])
+                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <strong>Requirements still to complete</strong>
+                            <ul class="list-disc ml-5 mt-2 space-y-1">@foreach($completionReport['missing_requirements'] as $requirement)<li>{{ $requirement }}</li>@endforeach</ul>
+                        </div>
+                    @endif
+
+                    <form class="mt-5" method="POST" action="{{ route('portal.learner.course.units.finalise', $enrolment) }}">@csrf
+                        <button class="h-10 px-4 rounded-lg bg-ds-pink text-white text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-navy transition-opacity">Validate My Unit Selection</button>
+                    </form>
+                </div>
+            </x-ui.card>
+        @endif
+
         @if ($modules->count())
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
@@ -46,7 +121,10 @@
                             <p class="text-xs text-slate-500">Select a unit to view content</p>
                         </div>
                         <div class="max-h-[calc(100vh-200px)] overflow-y-auto p-2 space-y-1">
+                            @php $navigationUnitNumber = 0; @endphp
                             @foreach ($modules as $i => $m)
+                                @continue($creditBased && $m->isUnit() && $m->unit_type === 'optional' && !$unitSelections->has($m->id))
+                                @php if (!$creditBased || $m->isUnit()) $navigationUnitNumber++; @endphp
                                 <button type="button" onclick="scrollToUnit({{ $m->id }})"
                                     class="w-full text-left p-3 rounded-lg hover:bg-slate-50 transition-colors group focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ds-navy"
                                     data-nav-unit="{{ $m->id }}">
@@ -54,7 +132,7 @@
                                         <div>
                                             <div
                                                 class="text-sm font-semibold text-slate-700 group-hover:text-ds-navy transition-colors">
-                                                Unit {{ $i + 1 }}: {{ $m->title }}
+                                                {{ $creditBased && !$m->isUnit() ? $m->section_type_label : 'Unit ' . $navigationUnitNumber }}: {{ $m->title }}
                                             </div>
                                             <div class="text-[10px] text-slate-400 mt-0.5">
                                                 {{ $m->lessons->count() }} Notes • {{ $m->assignments->count() }} Tasks
@@ -74,7 +152,10 @@
 
                 {{-- RIGHT CONTENT (Units) --}}
                 <div class="lg:col-span-9 space-y-6">
+                    @php $contentUnitNumber = 0; @endphp
                     @foreach ($modules as $index => $module)
+                        @continue($creditBased && $module->isUnit() && $module->unit_type === 'optional' && !$unitSelections->has($module->id))
+                        @php if (!$creditBased || $module->isUnit()) $contentUnitNumber++; @endphp
                         @php
                             $isEmpty = $module->lessons->count() + $module->assignments->count() === 0;
                         @endphp
@@ -88,10 +169,21 @@
                                     <div class="flex items-center gap-3">
                                         <span
                                             class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
-                                            {{ $index + 1 }}
+                                            {{ !$creditBased || $module->isUnit() ? $contentUnitNumber : 'R' }}
                                         </span>
                                         <div>
                                             <h2 class="text-lg font-bold text-ds-navy">{{ $module->title }}</h2>
+                                            @if($creditBased && $module->isUnit())
+                                                <div class="flex flex-wrap gap-2 mt-1">
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide {{ $module->unit_type === 'optional' ? 'bg-cyan-100 text-cyan-800' : 'bg-indigo-100 text-indigo-800' }}">{{ ucfirst($module->unit_type) }}</span>
+                                                    @if($module->credits !== null)<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">{{ rtrim(rtrim(number_format((float)$module->credits, 2), '0'), '.') }} credits</span>@endif
+                                                </div>
+                                            @elseif($creditBased)
+                                                <div class="flex flex-wrap gap-2 mt-1">
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-200 text-slate-700">{{ $module->section_type_label }}</span>
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-white text-slate-600 border border-slate-200">Not part of credit completion</span>
+                                                </div>
+                                            @endif
                                             @if($isEmpty)
                                                 <span
                                                     class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wide">Empty

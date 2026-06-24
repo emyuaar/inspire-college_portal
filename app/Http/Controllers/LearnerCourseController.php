@@ -15,6 +15,9 @@ use App\Services\SharePointService;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use App\Services\LearnerLogger;
+use App\Models\LearnerCourseUnitSelection;
+use App\Services\Lms\UnitSelectionService;
+use App\Services\Lms\CreditCompletionService;
 
 class LearnerCourseController extends Controller
 {
@@ -33,7 +36,7 @@ class LearnerCourseController extends Controller
         return $this->accessService->canAccessLearning($enrolment, Auth::user());
     }
 
-    public function show(Enrolment $enrolment)
+    public function show(Enrolment $enrolment, UnitSelectionService $selectionService, CreditCompletionService $completionService)
     {
         $user = Auth::user();
 
@@ -71,6 +74,11 @@ class LearnerCourseController extends Controller
 
         $enrolment->load('course');
         $course = $enrolment->course;
+        $creditBased = $course->usesCreditBasedCompletion();
+        if ($creditBased) {
+            $selectionService->ensureMandatorySelections($user->id, $course);
+            $selectionService->refreshLocks($user->id, $course->id);
+        }
 
         $hasExtraAttemptTable = Schema::connection('mysql_crm')->hasTable('grade_extra_attempts');
 
@@ -97,10 +105,19 @@ class LearnerCourseController extends Controller
             };
         }
 
+        $with[] = 'optionalGroup';
         $modules = CourseModule::with($with)
             ->where('course_id', $course->id)
+            ->when($creditBased, fn ($query) => $query->where('status', 'active'))
             ->orderBy('sort_order')
             ->get();
+        if ($creditBased) {
+            $modules = $modules->sortBy(fn (CourseModule $module) => [
+                $module->isUnit() ? 1 : 0,
+                $module->sort_order,
+                $module->id,
+            ])->values();
+        }
 
         // ------------------------------------------------------------------
         // NEW: Fetch CRM Grading Data (Cross-DB)
@@ -143,6 +160,16 @@ class LearnerCourseController extends Controller
                 ->toArray();
         }
         
+        $unitSelections = collect();
+        $creditSummary = null;
+        $completionReport = null;
+        if ($creditBased) {
+            $unitSelections = LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $course->id)->get()->keyBy('module_id');
+            $creditSummary = $selectionService->summary($course, $unitSelections);
+            $completionReport = $completionService->evaluate($user->id, $course);
+        }
+
         return view('learner.courses.show', [
             'user' => $user,
             'enrolment' => $enrolment,
@@ -150,6 +177,10 @@ class LearnerCourseController extends Controller
             'modules' => $modules,
             'hasExtraAttemptTable' => $hasExtraAttemptTable,
             'submissionStatusNameById' => $submissionStatusNameById,
+            'creditBased' => $creditBased,
+            'unitSelections' => $unitSelections,
+            'creditSummary' => $creditSummary,
+            'completionReport' => $completionReport,
         ]);
     }
 
@@ -191,6 +222,16 @@ class LearnerCourseController extends Controller
 
         // load relations
         $assignment->load(['module', 'course']);
+
+        if ($enrolment->course?->usesCreditBasedCompletion()
+            && $assignment->module?->isUnit()
+            && $assignment->module?->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $assignment->course_id)
+                ->where('module_id', $assignment->module_id)
+                ->exists()) {
+            return back()->with('error', 'Select this optional unit before submitting work.');
+        }
 
         $courseTitle = $assignment->course?->title ?? ($enrolment->course?->title ?? 'Course');
         $moduleTitle = $assignment->module?->title ?? 'Module';
@@ -283,6 +324,27 @@ class LearnerCourseController extends Controller
             'sharepoint_url' => $primaryFile['url'],
         ]);
 
+        if ($assignment->module?->isUnit() && $assignment->module?->unit_type === 'optional') {
+            $selection = LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $assignment->course_id)
+                ->where('module_id', $assignment->module_id)
+                ->first();
+            if ($selection && !$selection->is_locked) {
+                $old = $selection->toArray();
+                $selection->update(['is_locked' => true, 'locked_at' => now()]);
+                \App\Models\LearnerCourseUnitSelectionHistory::create([
+                    'learner_id' => $user->id,
+                    'course_id' => $assignment->course_id,
+                    'module_id' => $assignment->module_id,
+                    'action' => 'locked',
+                    'old_value' => $old,
+                    'new_value' => $selection->fresh()->toArray(),
+                    'reason' => 'Assignment submission created for the optional unit.',
+                    'created_at' => now(),
+                ]);
+            }
+        }
+
         // DB save all files
         foreach ($uploadedFiles as $uFile) {
             \App\Models\AssignmentSubmissionFile::create([
@@ -333,6 +395,10 @@ class LearnerCourseController extends Controller
         if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
         }
+        $submission->loadMissing('assignment');
+        if ($submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
+        }
 
         if (!$submission->sharepoint_item_id) {
             return back()->with('error', 'File not found on SharePoint.');
@@ -356,6 +422,10 @@ class LearnerCourseController extends Controller
         if (!$file->submission || (int) $file->submission->learner_id !== (int) $user->id) {
             abort(403);
         }
+        $file->submission->loadMissing('assignment');
+        if ($file->submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $file->submission->assignment->course_id, $file->submission->assignment->module_id);
+        }
 
         if (!$file->sharepoint_item_id) {
             return back()->with('error', 'File not found on SharePoint.');
@@ -376,6 +446,10 @@ class LearnerCourseController extends Controller
 
         if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
+        }
+        $submission->loadMissing('assignment');
+        if ($submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
         }
 
         if (!$submission->sharepoint_item_id) {
@@ -403,6 +477,17 @@ class LearnerCourseController extends Controller
             return redirect()
                 ->route('portal.learner.dashboard')
                 ->with('error', 'Your enrolment is not active or payment is pending.');
+        }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
+
+        $enrolment->loadMissing('course');
+        if ($enrolment->course?->usesCreditBasedCompletion()
+            && $module->isUnit()
+            && $module->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $lesson->course_id)
+                ->where('module_id', $module->id)->exists()) {
+            abort(403, 'Select this optional unit before opening its learning content.');
         }
 
         // published only
@@ -460,6 +545,7 @@ class LearnerCourseController extends Controller
                 ->save();
             abort(403);
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         if ($lesson->resource_type === 'secure_document') {
             abort(403, 'Direct download is disabled for secure documents.');
@@ -520,6 +606,7 @@ class LearnerCourseController extends Controller
                 ->save();
             abort(403);
         }
+        $this->assertModuleContentAccessible($user->id, $assignment->course_id, $assignment->module_id);
 
         LearnerLogger::log('learner.assignment.brief.viewed', 'activity')
             ->humanMessage('Learner viewed assignment brief')
@@ -550,6 +637,7 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403);
         }
+        $this->assertModuleContentAccessible($user->id, $assignment->course_id, $assignment->module_id);
 
         $crmRoot = config('services.crm.storage_root');
         if (!$crmRoot) {
@@ -684,6 +772,7 @@ class LearnerCourseController extends Controller
                 ->route('portal.learner.dashboard')
                 ->with('error', 'Your enrolment is not active or payment is pending.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         LearnerLogger::log('learner.secure_doc.view')
             ->courseId($lesson->course_id)
@@ -724,6 +813,7 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403, 'Unauthorized access.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         $filePath = $lesson->file_path;
         if (blank($filePath)) {
@@ -810,6 +900,7 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403, 'Unauthorized access.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         $filePath = $lesson->file_path;
         if (blank($filePath)) {
@@ -861,5 +952,45 @@ class LearnerCourseController extends Controller
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
             'Pragma' => 'no-cache',
         ]);
+    }
+
+    public function selectUnit(Request $request, Enrolment $enrolment, CourseModule $module, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->selectOptional(Auth::id(), $enrolment->course, $module);
+        return back()->with('success', 'Optional unit selected.');
+    }
+
+    public function removeUnit(Request $request, Enrolment $enrolment, CourseModule $module, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->removeOptional(Auth::id(), $enrolment->course, $module);
+        return back()->with('success', 'Optional unit removed.');
+    }
+
+    public function finaliseUnitSelection(Enrolment $enrolment, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->finalise(Auth::id(), $enrolment->course);
+        return back()->with('success', 'Your optional unit selection meets the course rules.');
+    }
+
+    private function assertOwnedActiveEnrolment(Enrolment $enrolment): void
+    {
+        if ((int) $enrolment->learner_id !== (int) Auth::id()) abort(403);
+        $enrolment->loadMissing(['course', 'status']);
+        if (!$this->checkAccess($enrolment) || !$enrolment->course?->usesCreditBasedCompletion()) abort(403);
+    }
+
+    private function assertModuleContentAccessible(int $learnerId, int $courseId, int $moduleId): void
+    {
+        $course = \App\Models\Website\Course::find($courseId);
+        if (!$course?->usesCreditBasedCompletion()) return;
+        $module = CourseModule::find($moduleId);
+        if ($module?->isUnit() && $module?->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $learnerId)
+                ->where('course_id', $courseId)->where('module_id', $moduleId)->exists()) {
+            abort(403, 'Select this optional unit before accessing its content.');
+        }
     }
 }
