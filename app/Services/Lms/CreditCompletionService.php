@@ -15,6 +15,23 @@ class CreditCompletionService
         if (!$course->usesCreditBasedCompletion()) {
             return ['mode' => 'standard', 'eligible' => null, 'missing_requirements' => []];
         }
+        if (!$course->hasConfiguredCreditSetup()) {
+            return [
+                'mode' => 'credit_based',
+                'setup_status' => $course->credit_setup_status ?: 'pending_setup',
+                'eligible' => false,
+                'required_credits' => $course->total_required_credits === null ? null : (float) $course->total_required_credits,
+                'achieved_credits' => 0.0,
+                'achieved_mandatory_credits' => 0.0,
+                'achieved_optional_credits' => 0.0,
+                'pending_credits' => $course->total_required_credits === null ? null : (float) $course->total_required_credits,
+                'units' => collect(),
+                'passed_units' => collect(),
+                'referred_or_failed_units' => collect(),
+                'selection_locked' => false,
+                'missing_requirements' => ['Credit setup is not fully configured yet.'],
+            ];
+        }
 
         $selections = LearnerCourseUnitSelection::with('module.optionalGroup')
             ->where('learner_id', $learnerId)

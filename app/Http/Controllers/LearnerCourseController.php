@@ -74,7 +74,7 @@ class LearnerCourseController extends Controller
 
         $enrolment->load('course');
         $course = $enrolment->course;
-        $creditBased = $course->usesCreditBasedCompletion();
+        $creditBased = $course->hasConfiguredCreditSetup();
         if ($creditBased) {
             $selectionService->ensureMandatorySelections($user->id, $course);
             $selectionService->refreshLocks($user->id, $course->id);
@@ -223,7 +223,7 @@ class LearnerCourseController extends Controller
         // load relations
         $assignment->load(['module', 'course']);
 
-        if ($enrolment->course?->usesCreditBasedCompletion()
+        if ($enrolment->course?->hasConfiguredCreditSetup()
             && $assignment->module?->isUnit()
             && $assignment->module?->unit_type === 'optional'
             && !LearnerCourseUnitSelection::where('learner_id', $user->id)
@@ -481,7 +481,7 @@ class LearnerCourseController extends Controller
         $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         $enrolment->loadMissing('course');
-        if ($enrolment->course?->usesCreditBasedCompletion()
+        if ($enrolment->course?->hasConfiguredCreditSetup()
             && $module->isUnit()
             && $module->unit_type === 'optional'
             && !LearnerCourseUnitSelection::where('learner_id', $user->id)
@@ -979,13 +979,13 @@ class LearnerCourseController extends Controller
     {
         if ((int) $enrolment->learner_id !== (int) Auth::id()) abort(403);
         $enrolment->loadMissing(['course', 'status']);
-        if (!$this->checkAccess($enrolment) || !$enrolment->course?->usesCreditBasedCompletion()) abort(403);
+        if (!$this->checkAccess($enrolment) || !$enrolment->course?->hasConfiguredCreditSetup()) abort(403);
     }
 
     private function assertModuleContentAccessible(int $learnerId, int $courseId, int $moduleId): void
     {
         $course = \App\Models\Website\Course::find($courseId);
-        if (!$course?->usesCreditBasedCompletion()) return;
+        if (!$course?->hasConfiguredCreditSetup()) return;
         $module = CourseModule::find($moduleId);
         if ($module?->isUnit() && $module?->unit_type === 'optional'
             && !LearnerCourseUnitSelection::where('learner_id', $learnerId)

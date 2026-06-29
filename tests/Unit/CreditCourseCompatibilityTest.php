@@ -50,4 +50,22 @@ class CreditCourseCompatibilityTest extends TestCase
         $this->assertSame('Guidelines', $guidelines->section_type_label);
         $this->assertTrue($unit->isUnit());
     }
+
+    public function test_credit_completion_is_only_enforced_when_setup_is_configured(): void
+    {
+        $pending = new Course([
+            'completion_mode' => 'credit_based',
+            'uses_credit_based_completion' => true,
+            'credit_setup_status' => 'pending_setup',
+        ]);
+        $configured = new Course([
+            'completion_mode' => 'credit_based',
+            'uses_credit_based_completion' => true,
+            'credit_setup_status' => 'configured',
+        ]);
+
+        $this->assertTrue($pending->usesCreditBasedCompletion());
+        $this->assertFalse($pending->hasConfiguredCreditSetup());
+        $this->assertTrue($configured->hasConfiguredCreditSetup());
+    }
 }

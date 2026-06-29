@@ -13,7 +13,7 @@ class UnitSelectionService
 {
     public function ensureMandatorySelections(int $learnerId, Course $course): void
     {
-        if (!$course->usesCreditBasedCompletion()) {
+        if (!$course->hasConfiguredCreditSetup()) {
             return;
         }
 
@@ -211,7 +211,7 @@ class UnitSelectionService
 
     private function assertSelectableCourseAndUnit(Course $course, CourseModule $module): void
     {
-        if (!$course->usesCreditBasedCompletion()
+        if (!$course->hasConfiguredCreditSetup()
             || (int) $module->course_id !== (int) $course->id
             || !$module->isUnit()
             || $module->unit_type !== 'optional'

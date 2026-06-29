@@ -38,6 +38,7 @@ class Course extends Model
         'minimum_optional_units',
         'maximum_optional_units',
         'completion_rule_type',
+        'credit_setup_status',
     ];
 
     protected $casts = [
@@ -79,6 +80,12 @@ class Course extends Model
     {
         return $this->completion_mode === 'credit_based'
             && (bool) $this->uses_credit_based_completion;
+    }
+
+    public function hasConfiguredCreditSetup(): bool
+    {
+        return $this->usesCreditBasedCompletion()
+            && $this->credit_setup_status === 'configured';
     }
 
     // pivot row (deposit/months/monthly)
