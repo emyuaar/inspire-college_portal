@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Partner;
 
 use App\Http\Controllers\Controller;
-use App\Models\Partner\PartnerLearnerInstallment;
 use App\Models\Crm\Order;
+use App\Models\Partner\PartnerLearnerInstallment;
+use App\Services\PartnerCoursePricingService;
 use App\Services\PaymentProcessingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Stripe\Stripe;
 use Stripe\Checkout\Session;
-use App\Services\PartnerCoursePricingService;
+use Stripe\Stripe;
 
 class InstallmentController extends Controller
 {
@@ -27,25 +27,25 @@ class InstallmentController extends Controller
 
         $query = \App\Models\Crm\Enrolment::where('partner_id', $partner->id)
             ->whereHas('partnerInstallments')
-            ->with(['learner', 'course', 'partnerInstallments' => function($q) {
+            ->with(['learner', 'course', 'partnerInstallments' => function ($q) {
                 $q->orderBy('due_date', 'asc');
             }]);
 
         // Apply Status Filters based on Enrolment installment access status
         if ($status === 'overdue') {
-            $query->whereHas('partnerInstallments', function($q) {
+            $query->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid')->where('due_date', '<', now()->startOfDay());
             });
         } elseif ($status === 'due_soon') {
-            $query->whereHas('partnerInstallments', function($q) {
+            $query->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid')->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()]);
             });
         } elseif ($status === 'pending') {
-            $query->whereHas('partnerInstallments', function($q) {
+            $query->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid');
             });
         } elseif ($status === 'paid') {
-            $query->whereDoesntHave('partnerInstallments', function($q) {
+            $query->whereDoesntHave('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid');
             });
         }
@@ -64,13 +64,13 @@ class InstallmentController extends Controller
         // Counts for tabs
         $counts = [
             'all' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments')->count(),
-            'overdue' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function($q) {
+            'overdue' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid')->where('due_date', '<', now()->startOfDay());
             })->count(),
-            'due_soon' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function($q) {
+            'due_soon' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid')->whereBetween('due_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()]);
             })->count(),
-            'pending' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function($q) {
+            'pending' => \App\Models\Crm\Enrolment::where('partner_id', $partner->id)->whereHas('partnerInstallments', function ($q) {
                 $q->where('status', '!=', 'paid');
             })->count(),
         ];
@@ -86,7 +86,7 @@ class InstallmentController extends Controller
         $partner = Auth::user();
         $enrolment = \App\Models\Crm\Enrolment::where('id', $enrolmentId)
             ->where('partner_id', $partner->id)
-            ->with(['learner', 'course', 'partnerInstallments' => function($q) {
+            ->with(['learner', 'course', 'partnerInstallments' => function ($q) {
                 $q->orderBy('installment_no', 'asc');
             }])
             ->firstOrFail();
@@ -101,12 +101,12 @@ class InstallmentController extends Controller
     {
         $installment = PartnerLearnerInstallment::with('enrolment')->findOrFail($installmentId);
         $partner = Auth::user();
-        
+
         // Resolve learner correctly (Handle pending learners where learner_id is 0)
         $enrolment = $installment->enrolment;
         if ($enrolment->partner_learner_id) {
             $learner = \App\Models\Crm\PartnerLearner::find($enrolment->partner_learner_id);
-            $learnerIdForRoute = 'pending-' . $learner->id;
+            $learnerIdForRoute = 'pending-'.$learner->id;
             $learnerName = "{$learner->first_name} {$learner->last_name}";
             $learnerEmail = $learner->personal_email;
         } else {
@@ -116,7 +116,7 @@ class InstallmentController extends Controller
             $learnerEmail = $learner->email_address;
         }
 
-        // Security: Ensure partner owns this learner? 
+        // Security: Ensure partner owns this learner?
         // Assuming PartnerLearnerInstallment -> partner_id check is enough
         if ($installment->partner_id != $partner->id) {
             abort(403, 'Unauthorized');
@@ -134,7 +134,7 @@ class InstallmentController extends Controller
         }
         $amountToPay = $partnerPricing->fromMinorUnits($amountToPayMinor);
 
-        $description = "DS-P{$enrolment->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for {$learnerName}";
+        $description = "DS-P{$enrolment->id} ".($installment->installment_no == 0 ? 'Deposit' : "{$installment->installment_no}th Installment")." Partner Payment for {$learnerName}";
 
         Stripe::setApiKey(env('STRIPE_SECRET'));
 
@@ -146,13 +146,13 @@ class InstallmentController extends Controller
                     'name' => "{$partner->first_name} {$partner->sur_name} (Partner)",
                     'metadata' => [
                         'partner_id' => $partner->id,
-                        'type' => 'partner'
-                    ]
+                        'type' => 'partner',
+                    ],
                 ]);
                 $partner->stripe_customer_id = $customer->id;
                 $partner->save();
             } catch (\Exception $e) {
-                return back()->with('error', 'Failed to create Stripe Customer for Partner: ' . $e->getMessage());
+                return back()->with('error', 'Failed to create Stripe Customer for Partner: '.$e->getMessage());
             }
         }
 
@@ -173,12 +173,12 @@ class InstallmentController extends Controller
                                     'course_id' => $installment->course->id ?? null,
                                     'installment_no' => $installment->installment_no,
                                     'learner_id' => $enrolment->learner_id ?: $enrolment->partner_learner_id,
-                                    'learner_name' => $learnerName
-                                ]
+                                    'learner_name' => $learnerName,
+                                ],
                             ],
                         ],
                         'quantity' => 1,
-                    ]
+                    ],
                 ],
                 'mode' => 'payment',
                 // Updated Metadata to ensure Partner-Paid flow tracking
@@ -211,14 +211,14 @@ class InstallmentController extends Controller
                         'setup_future_usage' => 'off_session',
                     ],
                 ],
-                'success_url' => route('partner.learners.show', $learnerIdForRoute) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('partner.learners.show', $learnerIdForRoute) . '?payment=cancelled',
+                'success_url' => route('partner.learners.show', $learnerIdForRoute).'?payment=success&session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('partner.learners.show', $learnerIdForRoute).'?payment=cancelled',
             ]);
 
             return redirect($session->url);
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Stripe Error: ' . $e->getMessage());
+            return back()->with('error', 'Stripe Error: '.$e->getMessage());
         }
     }
 
@@ -268,21 +268,36 @@ class InstallmentController extends Controller
                 'notes' => $request->notes,
             ]);
 
+            $proof = \App\Models\Partner\PartnerPaymentProof::create([
+                'partner_learner_installment_id' => $installment->id,
+                'partner_id' => $installment->partner_id,
+                'learner_id' => $installment->learner_id,
+                'enrolment_id' => $installment->enrolment_id,
+                'order_id' => $installment->order_id,
+                'course_id' => $installment->course_id,
+                'submitted_amount' => $request->amount,
+                'payment_date' => $request->payment_date,
+                'payment_reference' => $request->payment_reference,
+                'proof_path' => $receiptPath,
+                'notes' => $request->notes,
+                'status' => 'awaiting_approval',
+            ]);
+
             // Trigger CRM Notification
             try {
-                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($installment);
+                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($proof);
             } catch (\Exception $e) {
-                Log::error("CRM_NOTIFICATION_FAILED: " . $e->getMessage());
+                Log::error('CRM_NOTIFICATION_FAILED: '.$e->getMessage());
                 // Don't fail the whole request if only notification fails
             }
 
             // We do NOT update paid_amount or sync order/enrolment status here.
             // That must be done by the CRM Admin upon approval.
 
-            Log::info("PARTNER_PROOF_SUBMITTED", [
+            Log::info('PARTNER_PROOF_SUBMITTED', [
                 'installment_id' => $installment->id,
                 'enrolment_id' => $installment->enrolment_id,
-                'submitted_amount' => $request->amount
+                'submitted_amount' => $request->amount,
             ]);
 
             DB::connection('mysql_crm')->commit();
@@ -291,7 +306,8 @@ class InstallmentController extends Controller
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
-            return back()->with('error', 'Failed to record payment: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to record payment: '.$e->getMessage());
         }
     }
 }

@@ -3,19 +3,21 @@
 namespace App\Http\Controllers\Partner;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Website\Course;
 use App\Models\Crm\Enrolment;
+use App\Models\Crm\EnrolmentPricingSnapshot;
 use App\Models\Crm\EnrolmentStatus;
 use App\Models\Crm\Order;
 use App\Models\Crm\OrderDetail;
 use App\Models\Crm\OrderInstallment;
-use App\Models\Crm\EnrolmentPricingSnapshot;
+use App\Models\User;
+use App\Models\Website\Course;
 use App\Services\PartnerCoursePricingService;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class CoursePurchaseController extends Controller
 {
@@ -33,7 +35,7 @@ class CoursePurchaseController extends Controller
     {
         $partner = Auth::user();
         $learnerIds = User::myLearners($partner->id)->pluck('id');
-        
+
         $enrolments = Enrolment::with(['course', 'learner', 'status'])
             ->whereIn('learner_id', $learnerIds)
             ->whereIn('status_id', [1, 5]) // Removed status 6 (Pending Payment)
@@ -65,7 +67,9 @@ class CoursePurchaseController extends Controller
 
         $courses = $assigned->map(function ($assignment) use ($partner) {
             $course = $assignment->course;
-            if (!$course) return null;
+            if (! $course) {
+                return null;
+            }
 
             $course->assignment_notes = $assignment->notes;
             $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
@@ -74,7 +78,7 @@ class CoursePurchaseController extends Controller
             // Populate View-Expected Arrays
             $course->full_plan = [
                 'available' => (bool) $assignment->allow_full_payment,
-                'amount' => $finalFee
+                'amount' => $finalFee,
             ];
 
             // For display purposes, we show either the custom installment or the 3-month automatic one
@@ -88,7 +92,7 @@ class CoursePurchaseController extends Controller
                     ->where('plan_type', 'installment')
                     ->where('status', 1)
                     ->first();
-                
+
                 if ($customPlan) {
                     $instAvailable = true;
                     $instDeposit = $customPlan->deposit;
@@ -108,13 +112,14 @@ class CoursePurchaseController extends Controller
                 'available' => $instAvailable,
                 'deposit' => $instDeposit,
                 'months' => $instMonths,
-                'monthly_amount' => $instMonthly
+                'monthly_amount' => $instMonthly,
             ];
 
             $course->final_fee = $finalFee;
             $course->partner_quote = $quote;
             $course->allow_two = (bool) $assignment->allow_two_months;
             $course->allow_three = (bool) $assignment->allow_three_months;
+
             return $course;
         })->filter();
 
@@ -127,12 +132,12 @@ class CoursePurchaseController extends Controller
     public function create($learnerId)
     {
         $partner = Auth::user();
-        
+
         // Try active user first
         $learner = User::myLearners($partner->id)->find($learnerId);
-        
+
         // If not found, try pending learner
-        if (!$learner) {
+        if (! $learner) {
             $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
             $learner->is_pending_record = true;
         } else {
@@ -140,7 +145,7 @@ class CoursePurchaseController extends Controller
         }
 
         // Pending learners are implicitly "approved" enough to add courses
-        if (!$learner->is_pending_record && !$learner->crm_approved) {
+        if (! $learner->is_pending_record && ! $learner->crm_approved) {
             return back()->with('error', 'Learner is not approved yet.');
         }
 
@@ -151,27 +156,29 @@ class CoursePurchaseController extends Controller
 
         $courses = $assigned->map(function ($assignment) use ($partner) {
             $course = $assignment->course;
-            if (!$course) return null;
+            if (! $course) {
+                return null;
+            }
 
             // Map ID for View
             $course->course_id = $course->id;
-            
+
             // 1. Data from Website Database
             $qualModel = $course->getRelation('qualification');
             $course->awarding_body = strip_tags($qualModel->short_title ?? $qualModel->title ?? 'N/A');
-            
+
             // Extract Level from title
             $level = 'N/A';
             if (preg_match('/Level\s+(\d+)/i', $course->title, $matches)) {
-                $level = 'Level ' . $matches[1];
+                $level = 'Level '.$matches[1];
             }
             $course->level_name = trim(strip_tags($level));
-            
+
             $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
 
             // 2. Base Price from Website Database (Primary Source)
             $course->base_price = $quote['original_course_fee'];
-            
+
             if ($course->base_price <= 0) {
                 $course->price_status = 'No website pricing configured';
             } else {
@@ -181,15 +188,15 @@ class CoursePurchaseController extends Controller
             // 3. Discount & Partner Price from CRM
             $dValue = (string) ($assignment->discount_value ?? '0');
             if ($assignment->discount_type == 'percentage') {
-                $course->discount_label = rtrim(rtrim($dValue, '0'), '.') . '% off';
+                $course->discount_label = rtrim(rtrim($dValue, '0'), '.').'% off';
             } else {
-                $course->discount_label = $quote['partner_discount_amount_minor'] > 0 ? '£' . $dValue . ' off' : '';
+                $course->discount_label = $quote['partner_discount_amount_minor'] > 0 ? '£'.$dValue.' off' : '';
             }
 
             $course->discount_amount = $quote['partner_discount_amount'];
             $course->final_full_price = $quote['final_course_fee'];
             $course->has_partner_discount = $quote['partner_discount_amount_minor'] > 0;
-            
+
             // 4. Payment Modes from CRM
             $course->allow_full = (bool) $assignment->allow_full_payment;
             $course->allow_two = (bool) $assignment->allow_two_months;
@@ -202,7 +209,7 @@ class CoursePurchaseController extends Controller
             $course->installment_plan = [
                 'available' => (bool) ($assignment->allow_two_months || $assignment->allow_three_months || ($assignment->allow_installments && $instPlan)),
             ];
-            
+
             if ($instPlan) {
                 $course->installment_deposit = (float) $instPlan->deposit;
                 $course->installment_months = (int) $instPlan->months;
@@ -221,12 +228,12 @@ class CoursePurchaseController extends Controller
     public function store(Request $request, $learnerId)
     {
         $partner = Auth::user();
-        
+
         // Try active user first
         $learner = User::myLearners($partner->id)->find($learnerId);
-        
+
         // If not found, try pending learner
-        if (!$learner) {
+        if (! $learner) {
             $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
         }
 
@@ -243,18 +250,18 @@ class CoursePurchaseController extends Controller
             ->where('status', 'active')
             ->exists();
 
-        if (!$exists) {
+        if (! $exists) {
             return back()->with('error', 'Selected course is not assigned to your account.');
         }
 
         // Check for existing active/pending enrollment
-        $existing = Enrolment::where(function($q) use ($learner) {
-                if (isset($learner->personal_email)) { // It's a PartnerLearner record
-                    $q->where('partner_learner_id', $learner->id);
-                } else {
-                    $q->where('learner_id', $learner->id);
-                }
-            })
+        $existing = Enrolment::where(function ($q) use ($learner) {
+            if (isset($learner->personal_email)) { // It's a PartnerLearner record
+                $q->where('partner_learner_id', $learner->id);
+            } else {
+                $q->where('learner_id', $learner->id);
+            }
+        })
             ->where('course_id', $courseId)
             ->whereHas('status', function ($q) {
                 $q->whereIn('status', ['active', 'pending-payment', 'pending-plan']);
@@ -276,15 +283,15 @@ class CoursePurchaseController extends Controller
     public function choosePlanForCourse($learnerId, $courseId)
     {
         $partner = Auth::user();
-        
+
         // Try active user first
         $learner = User::myLearners($partner->id)->find($learnerId);
-        
+
         // If not found, try pending learner
-        if (!$learner) {
+        if (! $learner) {
             $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
         }
-        
+
         $course = \App\Models\Website\Course::findOrFail($courseId);
 
         // Calculate Pricing & Plans (Reusing existing logic or abstracting)
@@ -296,12 +303,12 @@ class CoursePurchaseController extends Controller
         $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
 
         $alreadyEnrolled = Enrolment::where(function ($query) use ($learner) {
-                if (isset($learner->personal_email)) {
-                    $query->where('partner_learner_id', $learner->id);
-                } else {
-                    $query->where('learner_id', $learner->id);
-                }
-            })
+            if (isset($learner->personal_email)) {
+                $query->where('partner_learner_id', $learner->id);
+            } else {
+                $query->where('learner_id', $learner->id);
+            }
+        })
             ->where('course_id', $courseId)
             ->where('partner_id', $partner->id)
             ->whereHas('status', fn ($query) => $query->whereIn('status', ['active', 'pending-payment', 'pending-plan']))
@@ -319,7 +326,7 @@ class CoursePurchaseController extends Controller
             'plans' => $plans,
             'quote' => $quote,
             'finalFee' => $quote['final_course_fee'],
-            'isNewEnrolment' => true
+            'isNewEnrolment' => true,
         ]);
     }
 
@@ -329,15 +336,15 @@ class CoursePurchaseController extends Controller
     public function storeEnrolmentWithPlan(Request $request, $learnerId, $courseId)
     {
         $partner = Auth::user();
-        
+
         // Try active user first
         $learner = User::myLearners($partner->id)->find($learnerId);
-        
+
         // If not found, try pending learner
-        if (!$learner) {
+        if (! $learner) {
             $learner = \App\Models\Crm\PartnerLearner::where('partner_id', $partner->id)->findOrFail($learnerId);
         }
-        
+
         $course = \App\Models\Website\Course::findOrFail($courseId);
 
         $request->validate(['plan_type' => 'required|string|max:100']);
@@ -382,7 +389,8 @@ class CoursePurchaseController extends Controller
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
-            return back()->with('error', 'Error: ' . $e->getMessage());
+
+            return back()->with('error', 'Error: '.$e->getMessage());
         }
     }
 
@@ -406,10 +414,10 @@ class CoursePurchaseController extends Controller
 
             if ($customPlans->count() > 0) {
                 foreach ($customPlans as $index => $customPlan) {
-                    $builtPlan = $this->partnerPricing->buildPlan($assignment, 'installment_' . $customPlan->id, $quote, $customPlan);
-                    $plans['installment_' . $customPlan->id] = $this->viewPlan(
+                    $builtPlan = $this->partnerPricing->buildPlan($assignment, 'installment_'.$customPlan->id, $quote, $customPlan);
+                    $plans['installment_'.$customPlan->id] = $this->viewPlan(
                         $builtPlan,
-                        'Configured deposit followed by ' . $customPlan->months . ' monthly payments.',
+                        'Configured deposit followed by '.$customPlan->months.' monthly payments.',
                         $customPlan
                     );
                 }
@@ -417,6 +425,7 @@ class CoursePurchaseController extends Controller
                 $plans['installment_unavailable'] = true;
             }
         }
+
         return $plans;
     }
 
@@ -451,7 +460,7 @@ class CoursePurchaseController extends Controller
             'plans' => $plans,
             'quote' => $quote,
             'finalFee' => $quote['final_course_fee'],
-            'isNewEnrolment' => false
+            'isNewEnrolment' => false,
         ]);
     }
 
@@ -478,7 +487,7 @@ class CoursePurchaseController extends Controller
 
         try {
             $this->processOrderAndSchedule($enrolment, $request->plan_type, $assignment, $quote);
-            
+
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
             $enrolment->update(['status_id' => $status->id]);
 
@@ -489,7 +498,8 @@ class CoursePurchaseController extends Controller
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
-            return back()->with('error', 'Error: ' . $e->getMessage());
+
+            return back()->with('error', 'Error: '.$e->getMessage());
         }
     }
 
@@ -521,7 +531,7 @@ class CoursePurchaseController extends Controller
 
         if (str_starts_with($planType, 'installment_')) {
             $planId = substr($planType, strlen('installment_'));
-            if (!ctype_digit($planId)) {
+            if (! ctype_digit($planId)) {
                 throw new DomainException('The selected payment plan is invalid.');
             }
 
@@ -660,29 +670,73 @@ class CoursePurchaseController extends Controller
         // Upload Proof
         $path = $request->file('payment_proof')->store('proofs', 'public');
 
-        // Update the Deposit Installment (no 0)
-        $deposit = \App\Models\Partner\PartnerLearnerInstallment::where('order_id', $order->id)
-            ->where('installment_no', 0)
-            ->first();
+        DB::connection('mysql_crm')->beginTransaction();
 
-        if ($deposit) {
+        try {
+            // Lock the deposit so concurrent submissions cannot create two awaiting proofs.
+            $deposit = \App\Models\Partner\PartnerLearnerInstallment::where('order_id', $order->id)
+                ->where('installment_no', 0)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $deposit) {
+                throw new DomainException('The deposit installment could not be found.');
+            }
+
             if (in_array($deposit->status, ['awaiting_approval', 'proof_submitted'])) {
-                return redirect()->back()->with('error', 'A payment proof for the deposit is already awaiting approval.');
+                throw new DomainException('A payment proof for the deposit is already awaiting approval.');
+            }
+
+            $submittedAmount = max(0, round((float) $deposit->installment_amount - (float) $deposit->paid_amount, 2));
+            if ($submittedAmount <= 0) {
+                throw new DomainException('This deposit has already been paid.');
             }
 
             $deposit->update([
                 'status' => 'awaiting_approval',
+                'submitted_amount' => $submittedAmount,
                 'receipt_path' => $path,
                 'payment_reference' => $request->payment_reference,
                 'notes' => $request->payment_notes,
             ]);
 
+            $proof = \App\Models\Partner\PartnerPaymentProof::create([
+                'partner_learner_installment_id' => $deposit->id,
+                'partner_id' => $deposit->partner_id,
+                'learner_id' => $deposit->learner_id,
+                'enrolment_id' => $deposit->enrolment_id,
+                'order_id' => $deposit->order_id,
+                'course_id' => $deposit->course_id,
+                'submitted_amount' => number_format($submittedAmount, 2, '.', ''),
+                'payment_date' => now()->toDateString(),
+                'payment_reference' => $request->payment_reference,
+                'proof_path' => $path,
+                'notes' => $request->payment_notes,
+                'status' => 'awaiting_approval',
+            ]);
+
+            DB::connection('mysql_crm')->commit();
+
             // Trigger CRM Notification
             try {
-                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($deposit);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("CRM_NOTIFICATION_FAILED: " . $e->getMessage());
+                app(\App\Services\CrmNotificationService::class)->notifyAdminsForProofSubmission($proof);
+            } catch (\Throwable $e) {
+                Log::error('CRM_NOTIFICATION_FAILED: '.$e->getMessage());
             }
+        } catch (DomainException $e) {
+            DB::connection('mysql_crm')->rollBack();
+            Storage::disk('public')->delete($path);
+
+            return redirect()->back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            DB::connection('mysql_crm')->rollBack();
+            Storage::disk('public')->delete($path);
+            Log::error('PARTNER_DEPOSIT_PROOF_SUBMISSION_FAILED', [
+                'enrolment_id' => $enrolment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'The payment proof could not be submitted. Please try again.');
         }
 
         return redirect()->back()->with('success', 'Payment proof submitted successfully. Admissions will review it shortly.');
