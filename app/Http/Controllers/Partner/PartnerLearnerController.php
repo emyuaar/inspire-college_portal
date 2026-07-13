@@ -23,6 +23,7 @@ use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
 use App\Services\PaymentProcessingService;
 use App\Services\PricingService;
+use App\Services\PartnerCoursePricingService;
 
 class PartnerLearnerController extends Controller
 {
@@ -54,7 +55,7 @@ class PartnerLearnerController extends Controller
     /**
      * Show Learner Details and Courses
      */
-    public function show(Request $request, $id, PricingService $pricingService, PaymentProcessingService $paymentService)
+    public function show(Request $request, $id, PricingService $pricingService, PaymentProcessingService $paymentService, PartnerCoursePricingService $partnerPricing)
     {
         $partner = Auth::user();
         $isPending = false;
@@ -121,7 +122,7 @@ class PartnerLearnerController extends Controller
         // Get IDs of currently enrolled courses to filter them out
         $enrolledCourseIds = $enrolments->pluck('course_id')->unique()->toArray();
 
-        $courses = $assignedCourses->map(function ($assignment) use ($enrolledCourseIds) {
+        $courses = $assignedCourses->map(function ($assignment) use ($enrolledCourseIds, $partner, $partnerPricing) {
             $course = $assignment->course;
             if (!$course) return null;
 
@@ -144,24 +145,26 @@ class PartnerLearnerController extends Controller
             }
             $course->level_name = trim(strip_tags($level));
 
+            $quote = $partnerPricing->quote($course, $assignment, (int) $partner->id);
+
             // 3. Base Price from Website Database (Primary Source)
-            $course->base_price = (float) ($course->sale_price ?? 0);
-            $course->price_status = ($course->base_price <= 0) ? 'No website pricing configured' : null;
+            $course->base_price = $quote['original_course_fee'];
+            $course->price_status = $quote['original_fee_minor'] <= 0 ? 'No website pricing configured' : null;
 
             // 4. Discount & Partner Price from CRM
-            $dValue = (float) ($assignment->discount_value ?? 0);
+            $dValue = (string) ($assignment->discount_value ?? '0');
             if ($assignment->discount_type == 'percentage') {
-                $discountAbs = $course->base_price * ($dValue / 100);
-                $course->discount_label = $dValue . '% off';
+                $course->discount_label = rtrim(rtrim($dValue, '0'), '.') . '% off';
             } else {
-                $discountAbs = $dValue;
-                $course->discount_label = $dValue > 0 ? '£' . $dValue . ' off' : '';
+                $course->discount_label = $quote['partner_discount_amount_minor'] > 0 ? '£' . $dValue . ' off' : '';
             }
 
-            $course->final_full_price = max(0, $course->base_price - $discountAbs);
+            $course->discount_amount = $quote['partner_discount_amount'];
+            $course->final_full_price = $quote['final_course_fee'];
 
             // 5. Payment Modes from CRM
             $course->allow_full = (bool) $assignment->allow_full_payment;
+            $course->allow_two = (bool) $assignment->allow_two_months;
             $course->allow_three = (bool) $assignment->allow_three_months;
             $course->allow_inst = (bool) $assignment->allow_installments;
 
@@ -171,8 +174,6 @@ class PartnerLearnerController extends Controller
 
             return $course;
         })->filter()->values();
-
-        \Log::error("DEBUG Final available courses count: " . $courses->count());
 
         // Fetch Partner Installments (Manual Plan) - Correctly linked via Enrolment IDs
         $installments = \App\Models\Partner\PartnerLearnerInstallment::whereIn('enrolment_id', $enrolments->pluck('id'))
@@ -253,94 +254,4 @@ class PartnerLearnerController extends Controller
         }
     }
 
-    private function getPlanData($type, $total, $partnerId, $courseId)
-    {
-        if ($type == 'full') {
-            return [
-                'payment_mode' => 'full',
-                'deposit' => $total,
-                'months' => 0,
-                'monthly' => 0,
-                'title' => 'Full Payment'
-            ];
-        } 
-        elseif ($type == 'three_months') {
-            $split = round($total / 3, 2);
-            return [
-                'payment_mode' => 'installment',
-                'deposit' => $split,
-                'months' => 2,
-                'monthly' => $split,
-                'title' => '3 Months Distributed'
-            ];
-        } 
-        else {
-            $plan = PartnerInstallmentPlan::where('partner_id', $partnerId)
-                ->where('course_id', $courseId)
-                ->where('status', 'active')
-                ->firstOrFail();
-            
-            return [
-                'payment_mode' => 'installment',
-                'deposit' => $plan->deposit_amount,
-                'months' => $plan->installment_count,
-                'monthly' => $plan->installment_amount,
-                'title' => $plan->plan_name
-            ];
-        }
-    }
-
-    private function createInstallments($type, $partnerId, $learnerId, $enrolmentId, $order, $total, $planData)
-    {
-        $startDate = now();
-
-        // Portal Tracking (Deposit/Full always no 0)
-        PartnerLearnerInstallment::create([
-            'partner_id' => $partnerId,
-            'learner_id' => $learnerId,
-            'enrolment_id' => $enrolmentId,
-            'order_id' => $order->id,
-            'course_id' => $order->details->first()->course_id ?? 0,
-            'plan_type' => $type,
-            'total_amount' => $total,
-            'deposit_amount' => $planData['deposit'],
-            'installment_amount' => $planData['deposit'],
-            'installments_count' => $planData['months'] + 1,
-            'installment_no' => 0,
-            'due_date' => $startDate,
-            'status' => 'pending',
-        ]);
-
-        // Remaining Installments
-        for ($i = 1; $i <= $planData['months']; $i++) {
-            $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
-            
-            // Portal Tracking
-            PartnerLearnerInstallment::create([
-                'partner_id' => $partnerId,
-                'learner_id' => $learnerId,
-                'enrolment_id' => $enrolmentId,
-                'order_id' => $order->id,
-                'course_id' => $order->details->first()->course_id ?? 0,
-                'plan_type' => $type,
-                'total_amount' => $total,
-                'deposit_amount' => $planData['deposit'],
-                'installment_amount' => $planData['monthly'],
-                'installments_count' => $planData['months'] + 1,
-                'installment_no' => $i,
-                'due_date' => $dueDate,
-                'status' => 'pending',
-            ]);
-
-            // CRM Tracking
-            OrderInstallment::create([
-                'order_id' => $order->id,
-                'installment_no' => $i,
-                'amount' => $planData['monthly'],
-                'due_date' => $dueDate,
-                'payment_status' => 'pending',
-                'amount_paid' => 0,
-            ]);
-        }
-    }
 }

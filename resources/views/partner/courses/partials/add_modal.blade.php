@@ -150,6 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             let modesHtml = '';
             if (course.allow_full) modesHtml += '<span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase rounded-md mr-1">Full Pay</span>';
+            if (course.allow_two) modesHtml += '<span class="px-2 py-0.5 bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase rounded-md mr-1">2 Months</span>';
             if (course.allow_three) modesHtml += '<span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-md mr-1">3 Months</span>';
             if (course.allow_inst) {
                 if (course.has_plan) {

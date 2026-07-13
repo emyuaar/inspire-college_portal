@@ -16,10 +16,26 @@
                 <h1 class="text-2xl font-black text-slate-900 tracking-tight">Finalize Enrollment</h1>
                 <p class="text-slate-500 mt-2 font-medium">Course: <span class="text-indigo-600 font-bold">{{ $isNewEnrolment ? $course->title : $enrolment->course->title }}</span></p>
                 
-                <div class="mt-4 flex items-center gap-2">
-                    <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Base Fee:</span>
-                    <span class="text-sm font-bold text-slate-900">£{{ number_format($finalFee, 2) }}</span>
-                    <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase">Partner Discount Applied</span>
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Original Course Fee</span>
+                        <span class="mt-1 block text-lg font-black text-slate-900">£{{ number_format((float) $quote['original_course_fee'], 2) }}</span>
+                    </div>
+                    <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                        <span class="block text-[10px] font-black text-emerald-600 uppercase tracking-widest">Partner Discount</span>
+                        <span class="mt-1 block text-sm font-black text-emerald-800">
+                            @if($quote['partner_discount_type'] === 'percentage')
+                                {{ rtrim(rtrim($quote['partner_discount_value'], '0'), '.') }}%
+                            @else
+                                Fixed amount
+                            @endif
+                            (-£{{ number_format((float) $quote['partner_discount_amount'], 2) }})
+                        </span>
+                    </div>
+                    <div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+                        <span class="block text-[10px] font-black text-indigo-500 uppercase tracking-widest">Discounted Course Fee</span>
+                        <span class="mt-1 block text-lg font-black text-indigo-700">£{{ number_format((float) $quote['final_course_fee'], 2) }}</span>
+                    </div>
                 </div>
             </div>
 
@@ -66,8 +82,8 @@
                                         {{-- Left Section: Icon + Text --}}
                                         <div class="flex items-start gap-5 flex-1">
                                             <div class="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200"
-                                                :class="selectedPlan === '{{ $type }}' ? '{{ $type == 'full' ? 'bg-emerald-600 text-white' : ($type == 'three_months' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white') }}' : '{{ $type == 'full' ? 'bg-emerald-50 text-emerald-600' : ($type == 'three_months' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600') }}'">
-                                                <i class="fas {{ $type == 'full' ? 'fa-check-double' : ($type == 'three_months' ? 'fa-calendar-alt' : 'fa-layer-group') }} text-xl"></i>
+                                                :class="selectedPlan === '{{ $type }}' ? '{{ $type == 'full' ? 'bg-emerald-600 text-white' : (in_array($type, ['two_months', 'three_months']) ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white') }}' : '{{ $type == 'full' ? 'bg-emerald-50 text-emerald-600' : (in_array($type, ['two_months', 'three_months']) ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600') }}'">
+                                                <i class="fas {{ $type == 'full' ? 'fa-check-double' : (in_array($type, ['two_months', 'three_months']) ? 'fa-calendar-alt' : 'fa-layer-group') }} text-xl"></i>
                                             </div>
                                             
                                             <div>
@@ -99,8 +115,8 @@
 
                                     {{-- Plan Specific Details (Breakdowns) --}}
                                     <div class="mt-4 pl-16"> {{-- Offset by icon width + gap --}}
-                                        @if($type == 'three_months')
-                                            <div class="grid grid-cols-3 gap-3">
+                                        @if(($plan['number_of_installments'] ?? 1) > 1)
+                                            <div class="grid gap-3 {{ ($plan['number_of_installments'] ?? 1) === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3' }}">
                                                 @foreach($plan['installments'] as $inst)
                                                     <div class="border border-slate-100 rounded-xl p-3 text-center transition-colors"
                                                         :class="selectedPlan === '{{ $type }}' ? 'bg-white border-indigo-100' : 'bg-slate-50/50'">
@@ -111,19 +127,9 @@
                                             </div>
                                         @endif
 
-                                        @if(str_starts_with($type, 'installment_'))
-                                            <div class="border rounded-2xl p-4 flex justify-between items-center transition-colors"
-                                                :class="selectedPlan === '{{ $type }}' ? 'bg-white border-purple-200' : 'bg-purple-50/30 border-purple-100/50'">
-                                                <div class="text-xs">
-                                                    <span class="text-slate-500 font-medium">Monthly Pay:</span>
-                                                    <span class="font-black text-purple-700 ml-1">£{{ number_format($plan['details']->monthly_amount, 2) }} x {{ $plan['details']->months }} months</span>
-                                                </div>
-                                                <div class="text-xs">
-                                                    <span class="text-slate-500 font-medium">Total Price:</span>
-                                                    <span class="font-black text-slate-900 ml-1">£{{ number_format($plan['details']->amount, 2) }}</span>
-                                                </div>
-                                            </div>
-                                        @endif
+                                        <div class="mt-3 text-right text-xs font-bold text-slate-500">
+                                            Plan total: <span class="font-black text-slate-900">£{{ number_format((float) $plan['total_amount'], 2) }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </label>
@@ -145,7 +151,11 @@
                             </template>
                             
                             <template x-if="selectedPlan === 'three_months'">
-                                <span>Continue with 3 Months Distributed</span>
+                                <span>Continue with 3 Months</span>
+                            </template>
+
+                            <template x-if="selectedPlan === 'two_months'">
+                                <span>Continue with 2 Months</span>
                             </template>
                             
                             <template x-if="selectedPlan.startsWith('installment_')">

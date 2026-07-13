@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
+use App\Services\PartnerCoursePricingService;
 
 class InstallmentController extends Controller
 {
@@ -96,7 +97,7 @@ class InstallmentController extends Controller
     /**
      * Create Stripe Checkout Session for a specific installment
      */
-    public function createCheckoutSession(Request $request, $installmentId)
+    public function createCheckoutSession(Request $request, $installmentId, PartnerCoursePricingService $partnerPricing)
     {
         $installment = PartnerLearnerInstallment::with('enrolment')->findOrFail($installmentId);
         $partner = Auth::user();
@@ -126,10 +127,12 @@ class InstallmentController extends Controller
         }
 
         // Amount to pay: remaining amount
-        $amountToPay = $installment->installment_amount - $installment->paid_amount;
-        if ($amountToPay <= 0) {
+        $amountToPayMinor = $partnerPricing->toMinorUnits((string) $installment->installment_amount)
+            - $partnerPricing->toMinorUnits((string) $installment->paid_amount);
+        if ($amountToPayMinor <= 0) {
             return back()->with('error', 'No amount due for this installment.');
         }
+        $amountToPay = $partnerPricing->fromMinorUnits($amountToPayMinor);
 
         $description = "DS-P{$enrolment->id} " . ($installment->installment_no == 0 ? "Deposit" : "{$installment->installment_no}th Installment") . " Partner Payment for {$learnerName}";
 
@@ -161,7 +164,7 @@ class InstallmentController extends Controller
                     [
                         'price_data' => [
                             'currency' => 'gbp',
-                            'unit_amount' => (int) round($amountToPay * 100),
+                            'unit_amount' => $amountToPayMinor,
                             'product_data' => [
                                 'name' => 'Installment Payment',
                                 'description' => $description,

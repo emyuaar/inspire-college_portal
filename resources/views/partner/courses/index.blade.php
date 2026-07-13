@@ -63,6 +63,12 @@
 
                             {{-- Pricing Badges Overlay --}}
                             <div class="absolute bottom-4 left-4 flex gap-2">
+                                @if($course->allow_two)
+                                    <span class="px-2.5 py-1 bg-cyan-500 text-white text-[9px] font-black uppercase rounded shadow-sm">2 Months</span>
+                                @endif
+                                @if($course->allow_three)
+                                    <span class="px-2.5 py-1 bg-indigo-500 text-white text-[9px] font-black uppercase rounded shadow-sm">3 Months</span>
+                                @endif
                                 @if($course->installment_plan['available'])
                                     <span class="px-2.5 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase rounded shadow-sm">
                                         Installments Available

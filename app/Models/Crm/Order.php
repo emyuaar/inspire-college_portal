@@ -25,9 +25,11 @@ class Order extends Model
         'plan_full_amount',
         'plan_title',
         'plan_meta',
+        'deposit_grace_until',
     ];
 
     protected $casts = [
+        'amount' => 'decimal:2',
         'plan_deposit_amount' => 'decimal:2',
         'plan_monthly_amount' => 'decimal:2',
         'plan_full_amount' => 'decimal:2',

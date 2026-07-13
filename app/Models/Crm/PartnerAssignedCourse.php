@@ -15,10 +15,19 @@ class PartnerAssignedCourse extends Model
         'discount_type',
         'discount_value',
         'allow_full_payment',
+        'allow_two_months',
         'allow_three_months',
         'allow_installments',
         'status',
         'notes',
+    ];
+
+    protected $casts = [
+        'discount_value' => 'decimal:2',
+        'allow_full_payment' => 'boolean',
+        'allow_two_months' => 'boolean',
+        'allow_three_months' => 'boolean',
+        'allow_installments' => 'boolean',
     ];
 
     public function installmentPlans()

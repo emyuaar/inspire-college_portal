@@ -10,18 +10,20 @@ use App\Models\Crm\EnrolmentStatus;
 use App\Models\Crm\Order;
 use App\Models\Crm\OrderDetail;
 use App\Models\Crm\OrderInstallment;
-use App\Services\PricingService;
+use App\Models\Crm\EnrolmentPricingSnapshot;
+use App\Services\PartnerCoursePricingService;
+use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CoursePurchaseController extends Controller
 {
-    protected $pricingService;
+    protected $partnerPricing;
 
-    public function __construct(PricingService $pricingService)
+    public function __construct(PartnerCoursePricingService $partnerPricing)
     {
-        $this->pricingService = $pricingService;
+        $this->partnerPricing = $partnerPricing;
     }
 
     /**
@@ -61,20 +63,13 @@ class CoursePurchaseController extends Controller
 
         $assigned = $query->get();
 
-        $courses = $assigned->map(function ($assignment) {
+        $courses = $assigned->map(function ($assignment) use ($partner) {
             $course = $assignment->course;
             if (!$course) return null;
 
             $course->assignment_notes = $assignment->notes;
-            
-            // Calculate Discounted Price
-            $basePrice = (float) $course->regular_price;
-            if ($assignment->discount_type == 'percentage') {
-                $discount = $basePrice * ($assignment->discount_value / 100);
-            } else {
-                $discount = $assignment->discount_value;
-            }
-            $finalFee = max(0, $basePrice - $discount);
+            $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
+            $finalFee = $quote['final_course_fee'];
 
             // Populate View-Expected Arrays
             $course->full_plan = [
@@ -100,12 +95,13 @@ class CoursePurchaseController extends Controller
                     $instMonths = $customPlan->months;
                     $instMonthly = $customPlan->monthly_amount;
                 }
-            } elseif ($assignment->allow_three_months) {
-                // Fallback to showing the 3-month split as "Installments" in the card
+            } elseif ($assignment->allow_two_months || $assignment->allow_three_months) {
+                $planType = $assignment->allow_two_months ? 'two_months' : 'three_months';
+                $automaticPlan = $this->partnerPricing->buildPlan($assignment, $planType, $quote);
                 $instAvailable = true;
-                $instMonthly = round($finalFee / 3, 2);
-                $instDeposit = $instMonthly;
-                $instMonths = 2; // +1 = 3
+                $instMonthly = $automaticPlan['installments'][1]['amount'] ?? $automaticPlan['amount_due_now'];
+                $instDeposit = $automaticPlan['amount_due_now'];
+                $instMonths = $automaticPlan['number_of_installments'] - 1;
             }
 
             $course->installment_plan = [
@@ -116,6 +112,9 @@ class CoursePurchaseController extends Controller
             ];
 
             $course->final_fee = $finalFee;
+            $course->partner_quote = $quote;
+            $course->allow_two = (bool) $assignment->allow_two_months;
+            $course->allow_three = (bool) $assignment->allow_three_months;
             return $course;
         })->filter();
 
@@ -150,7 +149,7 @@ class CoursePurchaseController extends Controller
             ->with(['course.qualification', 'plans'])
             ->get();
 
-        $courses = $assigned->map(function ($assignment) {
+        $courses = $assigned->map(function ($assignment) use ($partner) {
             $course = $assignment->course;
             if (!$course) return null;
 
@@ -168,8 +167,10 @@ class CoursePurchaseController extends Controller
             }
             $course->level_name = trim(strip_tags($level));
             
+            $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
+
             // 2. Base Price from Website Database (Primary Source)
-            $course->base_price = (float) ($course->regular_price ?? 0);
+            $course->base_price = $quote['original_course_fee'];
             
             if ($course->base_price <= 0) {
                 $course->price_status = 'No website pricing configured';
@@ -178,25 +179,29 @@ class CoursePurchaseController extends Controller
             }
 
             // 3. Discount & Partner Price from CRM
-            $dValue = (float) ($assignment->discount_value ?? 0);
+            $dValue = (string) ($assignment->discount_value ?? '0');
             if ($assignment->discount_type == 'percentage') {
-                $discountAbs = $course->base_price * ($dValue / 100);
-                $course->discount_label = $dValue . '% off';
+                $course->discount_label = rtrim(rtrim($dValue, '0'), '.') . '% off';
             } else {
-                $discountAbs = $dValue;
-                $course->discount_label = $dValue > 0 ? '£' . $dValue . ' off' : '';
+                $course->discount_label = $quote['partner_discount_amount_minor'] > 0 ? '£' . $dValue . ' off' : '';
             }
-            
-            $course->final_full_price = max(0, $course->base_price - $discountAbs);
+
+            $course->discount_amount = $quote['partner_discount_amount'];
+            $course->final_full_price = $quote['final_course_fee'];
+            $course->has_partner_discount = $quote['partner_discount_amount_minor'] > 0;
             
             // 4. Payment Modes from CRM
             $course->allow_full = (bool) $assignment->allow_full_payment;
+            $course->allow_two = (bool) $assignment->allow_two_months;
             $course->allow_three = (bool) $assignment->allow_three_months;
             $course->allow_inst = (bool) $assignment->allow_installments;
 
             // 5. Installment Plan check from CRM (Source of truth for schedule)
             $instPlan = $assignment->plans->where('plan_type', 'installment')->where('status', 1)->first();
             $course->has_plan = (bool) $instPlan;
+            $course->installment_plan = [
+                'available' => (bool) ($assignment->allow_two_months || $assignment->allow_three_months || ($assignment->allow_installments && $instPlan)),
+            ];
             
             if ($instPlan) {
                 $course->installment_deposit = (float) $instPlan->deposit;
@@ -235,6 +240,7 @@ class CoursePurchaseController extends Controller
         // Ensure course is assigned
         $exists = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
             ->where('course_id', $courseId)
+            ->where('status', 'active')
             ->exists();
 
         if (!$exists) {
@@ -287,21 +293,32 @@ class CoursePurchaseController extends Controller
             ->where('status', 'active')
             ->firstOrFail();
 
-        $basePrice = (float) $course->regular_price;
-        if ($assignment->discount_type == 'percentage') {
-            $discount = $basePrice * ($assignment->discount_value / 100);
-        } else {
-            $discount = $assignment->discount_value;
-        }
-        $finalFee = max(0, $basePrice - $discount);
+        $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
 
-        $plans = $this->getAvailablePlans($assignment, $finalFee);
+        $alreadyEnrolled = Enrolment::where(function ($query) use ($learner) {
+                if (isset($learner->personal_email)) {
+                    $query->where('partner_learner_id', $learner->id);
+                } else {
+                    $query->where('learner_id', $learner->id);
+                }
+            })
+            ->where('course_id', $courseId)
+            ->where('partner_id', $partner->id)
+            ->whereHas('status', fn ($query) => $query->whereIn('status', ['active', 'pending-payment', 'pending-plan']))
+            ->exists();
+
+        if ($alreadyEnrolled) {
+            return back()->with('error', 'This learner is already enrolled in the selected course.');
+        }
+
+        $plans = $this->getAvailablePlans($assignment, $quote);
 
         return view('partner.courses.choose_plan', [
             'learner' => $learner,
             'course' => $course,
             'plans' => $plans,
-            'finalFee' => $finalFee,
+            'quote' => $quote,
+            'finalFee' => $quote['final_course_fee'],
             'isNewEnrolment' => true
         ]);
     }
@@ -323,16 +340,14 @@ class CoursePurchaseController extends Controller
         
         $course = \App\Models\Website\Course::findOrFail($courseId);
 
-        $request->validate(['plan_type' => 'required|string']);
+        $request->validate(['plan_type' => 'required|string|max:100']);
 
         $assignment = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
             ->where('course_id', $courseId)
             ->where('status', 'active')
             ->firstOrFail();
 
-        $basePrice = (float) $course->regular_price;
-        $discount = ($assignment->discount_type == 'percentage') ? ($basePrice * ($assignment->discount_value / 100)) : $assignment->discount_value;
-        $finalFee = max(0, $basePrice - $discount);
+        $quote = $this->partnerPricing->quote($course, $assignment, (int) $partner->id);
 
         DB::connection('mysql_crm')->beginTransaction();
 
@@ -358,7 +373,7 @@ class CoursePurchaseController extends Controller
 
             // 2. Create Order & Installments (Reusing updatePlan logic)
             // I'll extract this to a helper or just duplicate for now to be safe with existing types
-            $this->processOrderAndSchedule($enrolment, $request->plan_type, $assignment, $finalFee);
+            $this->processOrderAndSchedule($enrolment, $request->plan_type, $assignment, $quote);
 
             DB::connection('mysql_crm')->commit();
 
@@ -371,24 +386,17 @@ class CoursePurchaseController extends Controller
         }
     }
 
-    private function getAvailablePlans($assignment, $finalFee)
+    private function getAvailablePlans($assignment, array $quote)
     {
         $plans = [];
         if ($assignment->allow_full_payment) {
-            $plans['full'] = ['title' => 'Full Payment', 'description' => 'Pay the entire fee upfront.', 'amount' => $finalFee];
+            $plans['full'] = $this->viewPlan($this->partnerPricing->buildPlan($assignment, 'full', $quote), 'Pay the entire discounted fee upfront.');
+        }
+        if ($assignment->allow_two_months) {
+            $plans['two_months'] = $this->viewPlan($this->partnerPricing->buildPlan($assignment, 'two_months', $quote), 'Split the discounted fee across 2 monthly payments.');
         }
         if ($assignment->allow_three_months) {
-            $monthly = round($finalFee / 3, 2);
-            $plans['three_months'] = [
-                'title' => '3 Months Distributed',
-                'description' => 'Split into 3 equal monthly payments.',
-                'amount' => $monthly,
-                'installments' => [
-                    ['no' => 0, 'amount' => $monthly, 'due' => 'Today'],
-                    ['no' => 1, 'amount' => $monthly, 'due' => 'In 1 Month'],
-                    ['no' => 2, 'amount' => $monthly, 'due' => 'In 2 Months'],
-                ]
-            ];
+            $plans['three_months'] = $this->viewPlan($this->partnerPricing->buildPlan($assignment, 'three_months', $quote), 'Split the discounted fee across 3 monthly payments.');
         }
         if ($assignment->allow_installments) {
             $customPlans = $assignment->plans()
@@ -398,13 +406,12 @@ class CoursePurchaseController extends Controller
 
             if ($customPlans->count() > 0) {
                 foreach ($customPlans as $index => $customPlan) {
-                    $plans['installment_' . $customPlan->id] = [
-                        'title' => 'Installment Plan ' . ($customPlans->count() > 1 ? ($index + 1) : ''),
-                        'description' => "Deposit of £{$customPlan->deposit} + {$customPlan->months} monthly installments.",
-                        'amount' => $customPlan->deposit,
-                        'plan_id' => $customPlan->id,
-                        'details' => $customPlan
-                    ];
+                    $builtPlan = $this->partnerPricing->buildPlan($assignment, 'installment_' . $customPlan->id, $quote, $customPlan);
+                    $plans['installment_' . $customPlan->id] = $this->viewPlan(
+                        $builtPlan,
+                        'Configured deposit followed by ' . $customPlan->months . ' monthly payments.',
+                        $customPlan
+                    );
                 }
             } else {
                 $plans['installment_unavailable'] = true;
@@ -419,12 +426,9 @@ class CoursePurchaseController extends Controller
     public function choosePlan($enrolmentId)
     {
         $partner = Auth::user();
-        $enrolment = Enrolment::with(['course', 'learner', 'status'])
+        $enrolment = Enrolment::where('partner_id', $partner->id)
+            ->with(['course', 'learner', 'status'])
             ->findOrFail($enrolmentId);
-
-        if ($enrolment->learner->org_id !== $partner->id) {
-            abort(403, 'Unauthorized access to enrolment.');
-        }
 
         // Guard: Prevent re-selection if a plan is already locked in
         $hasExistingPlan = $enrolment->orders()->exists() || \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->exists();
@@ -439,67 +443,14 @@ class CoursePurchaseController extends Controller
             ->where('status', 'active')
             ->firstOrFail();
 
-        // Calculate Final Base Price after Discount
-        $basePrice = (float) $enrolment->course->regular_price;
-        if ($assignment->discount_type == 'percentage') {
-            $discount = $basePrice * ($assignment->discount_value / 100);
-        } else {
-            $discount = $assignment->discount_value;
-        }
-        $finalFee = max(0, $basePrice - $discount);
-
-        $plans = [];
-
-        // 1. Full Payment
-        if ($assignment->allow_full_payment) {
-            $plans['full'] = [
-                'title' => 'Full Payment',
-                'description' => 'Pay the entire fee upfront.',
-                'amount' => $finalFee,
-            ];
-        }
-
-        // 2. 3 Months Distributed
-        if ($assignment->allow_three_months) {
-            $monthly = round($finalFee / 3, 2);
-            $plans['three_months'] = [
-                'title' => '3 Months Distributed',
-                'description' => 'Split into 3 equal monthly payments.',
-                'amount' => $monthly, // Amount for first payment (Deposit)
-                'installments' => [
-                    ['no' => 0, 'amount' => $monthly, 'due' => 'Today'],
-                    ['no' => 1, 'amount' => $monthly, 'due' => 'In 1 Month'],
-                    ['no' => 2, 'amount' => $monthly, 'due' => 'In 2 Months'],
-                ]
-            ];
-        }
-
-        // 3. Installments (From Plan Management)
-        if ($assignment->allow_installments) {
-            $customPlans = $assignment->plans()
-                ->where('plan_type', 'installment')
-                ->where('status', 1)
-                ->get();
-
-            if ($customPlans->count() > 0) {
-                foreach ($customPlans as $index => $customPlan) {
-                    $plans['installment_' . $customPlan->id] = [
-                        'title' => 'Installment Plan ' . ($customPlans->count() > 1 ? ($index + 1) : ''),
-                        'description' => "Deposit of £{$customPlan->deposit} + {$customPlan->months} monthly installments.",
-                        'amount' => $customPlan->deposit,
-                        'plan_id' => $customPlan->id,
-                        'details' => $customPlan
-                    ];
-                }
-            } else {
-                $plans['installment_unavailable'] = true;
-            }
-        }
+        $quote = $this->partnerPricing->quote($enrolment->course, $assignment, (int) $partner->id);
+        $plans = $this->getAvailablePlans($assignment, $quote);
 
         return view('partner.courses.choose_plan', [
             'enrolment' => $enrolment,
             'plans' => $plans,
-            'finalFee' => $finalFee,
+            'quote' => $quote,
+            'finalFee' => $quote['final_course_fee'],
             'isNewEnrolment' => false
         ]);
     }
@@ -510,12 +461,10 @@ class CoursePurchaseController extends Controller
     public function updatePlan(Request $request, $enrolmentId)
     {
         $partner = Auth::user();
-        $enrolment = Enrolment::findOrFail($enrolmentId);
-
-        if ($enrolment->learner->org_id !== $partner->id) abort(403);
+        $enrolment = Enrolment::where('partner_id', $partner->id)->findOrFail($enrolmentId);
 
         $request->validate([
-            'plan_type' => 'required|string',
+            'plan_type' => 'required|string|max:100',
         ]);
 
         $assignment = \App\Models\Crm\PartnerAssignedCourse::where('partner_id', $partner->id)
@@ -523,15 +472,12 @@ class CoursePurchaseController extends Controller
             ->where('status', 'active')
             ->firstOrFail();
 
-        // Calculate Final Base Price
-        $basePrice = (float) $enrolment->course->regular_price;
-        $discount = ($assignment->discount_type == 'percentage') ? ($basePrice * ($assignment->discount_value / 100)) : $assignment->discount_value;
-        $finalFee = max(0, $basePrice - $discount);
+        $quote = $this->partnerPricing->quote($enrolment->course, $assignment, (int) $partner->id);
 
         DB::connection('mysql_crm')->beginTransaction();
 
         try {
-            $this->processOrderAndSchedule($enrolment, $request->plan_type, $assignment, $finalFee);
+            $this->processOrderAndSchedule($enrolment, $request->plan_type, $assignment, $quote);
             
             $status = EnrolmentStatus::firstOrCreate(['status' => 'pending-payment']);
             $enrolment->update(['status_id' => $status->id]);
@@ -547,114 +493,133 @@ class CoursePurchaseController extends Controller
         }
     }
 
-    private function processOrderAndSchedule($enrolment, $planType, $assignment, $finalFee)
+    private function viewPlan(array $plan, string $description, $details = null): array
+    {
+        $viewInstallments = [];
+        foreach ($plan['installments'] as $installment) {
+            $offset = $installment['offset_months'];
+            $viewInstallments[] = $installment + [
+                'due' => $offset === 0 ? 'Today' : ($offset === 1 ? 'In 1 Month' : "In {$offset} Months"),
+            ];
+        }
+
+        return [
+            'title' => $plan['title'],
+            'description' => $description,
+            'amount' => $plan['amount_due_now'],
+            'total_amount' => $plan['total_amount'],
+            'number_of_installments' => $plan['number_of_installments'],
+            'installments' => $viewInstallments,
+            'details' => $details,
+        ];
+    }
+
+    private function processOrderAndSchedule($enrolment, string $planType, $assignment, array $quote): Order
     {
         $partner = Auth::user();
-        
-        // Cleanup existing (if any)
-        Order::where('enrolment_id', $enrolment->id)->where('status_id', 3)->forceDelete();
-        \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $enrolment->id)->delete();
+        $customPlan = null;
 
-        $paymentMode = '';
-        $planDepositAmount = 0;
-        $planMonths = 0;
-        $planMonthlyAmount = 0;
-        $planTitle = '';
+        if (str_starts_with($planType, 'installment_')) {
+            $planId = substr($planType, strlen('installment_'));
+            if (!ctype_digit($planId)) {
+                throw new DomainException('The selected payment plan is invalid.');
+            }
 
-        if ($planType == 'full') {
-            if (!$assignment->allow_full_payment) throw new \Exception("Full payment not allowed.");
-            $paymentMode = 'full';
-            $planTitle = 'Full Payment';
-            $planDepositAmount = $finalFee;
-            $planMonths = 0;
-            $planMonthlyAmount = 0;
-        } 
-        elseif ($planType == 'three_months') {
-            if (!$assignment->allow_three_months) throw new \Exception("3 Months split not allowed.");
-            $paymentMode = 'installment';
-            $planTitle = '3 Months Distributed';
-            $split = round($finalFee / 3, 2);
-            $planDepositAmount = $split;
-            $planMonths = 2; 
-            $planMonthlyAmount = $split;
-        }
-        else {
-            if (!$assignment->allow_installments) throw new \Exception("Installments not allowed.");
-            
-            // Extract ID if plan_type is installment_{id}
-            $planId = str_replace('installment_', '', $planType);
-            $plan = \App\Models\Crm\PartnerCoursePaymentPlan::where('pac_id', $assignment->id)
-                ->where('id', $planId)
+            $customPlan = \App\Models\Crm\PartnerCoursePaymentPlan::where('pac_id', $assignment->id)
+                ->where('id', (int) $planId)
                 ->where('status', 1)
-                ->firstOrFail();
-            
-            $paymentMode = 'installment';
-            $planTitle = "Installment Plan";
-            $planDepositAmount = $plan->deposit;
-            $planMonths = $plan->months;
-            $planMonthlyAmount = $plan->monthly_amount;
-            $finalFee = $plan->amount; // Use the total amount from the plan
+                ->first();
         }
+
+        $plan = $this->partnerPricing->buildPlan($assignment, $planType, $quote, $customPlan);
+        $futureInstallmentAmount = $plan['installments'][1]['amount'] ?? '0.00';
 
         $order = Order::create([
             'learner_id' => $enrolment->learner_id,
             'partner_learner_id' => $enrolment->partner_learner_id,
             'enrolment_id' => $enrolment->id,
-            'amount' => ($paymentMode === 'full') ? $finalFee : $planDepositAmount,
-            'plan_full_amount' => $finalFee,
+            'amount' => $plan['amount_due_now'],
+            'plan_full_amount' => $quote['final_course_fee'],
             'status_id' => 3, // Pending
-            'payment_mode' => $paymentMode,
-            'plan_deposit_amount' => $planDepositAmount,
-            'plan_months' => $planMonths,
-            'plan_monthly_amount' => $planMonthlyAmount,
-            'plan_title' => $planTitle,
+            'payment_mode' => $plan['payment_mode'],
+            'plan_deposit_amount' => $plan['amount_due_now'],
+            'plan_months' => $plan['number_of_installments'] - 1,
+            'plan_monthly_amount' => $futureInstallmentAmount,
+            'plan_title' => $plan['title'],
+            'plan_meta' => [
+                'source' => 'partner_course_assignment',
+                'quote' => $quote,
+                'selected_payment_plan' => $plan['type'],
+                'number_of_installments' => $plan['number_of_installments'],
+                'installment_amounts' => $plan['installment_amounts'],
+            ],
             'deposit_grace_until' => now()->addDays(7),
         ]);
 
         OrderDetail::create(['order_id' => $order->id, 'course_id' => $enrolment->course_id]);
 
         $startDate = now();
+        foreach ($plan['installments'] as $index => $installment) {
+            $dueDate = $startDate->copy()->addMonthsNoOverflow($installment['offset_months']);
+            $this->createInstallmentRecord(
+                $partner->id,
+                $enrolment,
+                $order,
+                $index,
+                $installment['amount'],
+                $dueDate,
+                $quote['final_course_fee'],
+                $plan['type'],
+                $plan['amount_due_now'],
+                $plan['number_of_installments']
+            );
 
-        if ($planType == 'full') {
-            $this->createInstallmentRecord($partner->id, $enrolment, $order, 0, $finalFee, $startDate, $finalFee, 'full', $finalFee, 1);
-        } 
-        elseif ($planType == 'three_months') {
-            $split = round($finalFee / 3, 2);
-            $this->createInstallmentRecord($partner->id, $enrolment, $order, 0, $split, $startDate, $finalFee, 'three_months', $split, 3);
-            for ($i = 1; $i <= 2; $i++) {
-                $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
-                $this->createInstallmentRecord($partner->id, $enrolment, $order, $i, $split, $dueDate, $finalFee, 'three_months', $split, 3);
+            if ($index > 0) {
                 OrderInstallment::create([
                     'order_id' => $order->id,
-                    'installment_no' => $i,
-                    'amount' => $split,
-                    'due_date' => $dueDate,
-                    'payment_status' => 'pending',
-                    'amount_paid' => 0,
-                ]);
-            }
-        } 
-        else {
-            $planId = str_replace('installment_', '', $planType);
-            $plan = \App\Models\Crm\PartnerCoursePaymentPlan::where('pac_id', $assignment->id)
-                ->where('id', $planId)
-                ->where('status', 1)
-                ->firstOrFail();
-
-            $this->createInstallmentRecord($partner->id, $enrolment, $order, 0, $plan->deposit, $startDate, $plan->amount, 'installment', $plan->deposit, $plan->months + 1);
-            for ($i = 1; $i <= $plan->months; $i++) {
-                $dueDate = $startDate->copy()->addMonthsNoOverflow($i);
-                $this->createInstallmentRecord($partner->id, $enrolment, $order, $i, $plan->monthly_amount, $dueDate, $plan->amount, 'installment', $plan->deposit, $plan->months + 1);
-                OrderInstallment::create([
-                    'order_id' => $order->id,
-                    'installment_no' => $i,
-                    'amount' => $plan->monthly_amount,
+                    'installment_no' => $index,
+                    'amount' => $installment['amount'],
                     'due_date' => $dueDate,
                     'payment_status' => 'pending',
                     'amount_paid' => 0,
                 ]);
             }
         }
+
+        EnrolmentPricingSnapshot::create([
+            'learner_id' => $enrolment->learner_id ?: null,
+            'enrolment_id' => $enrolment->id,
+            'order_id' => $order->id,
+            'course_id' => $enrolment->course_id,
+            'regular_fee' => $quote['original_course_fee'],
+            'discounted_fee' => $quote['final_course_fee'],
+            'discount_amount' => $quote['partner_discount_amount'],
+            'discount_percentage' => $quote['partner_discount_type'] === 'percentage' ? $quote['partner_discount_value'] : '0.00',
+            'initial_deposit' => $plan['amount_due_now'],
+            'installment_months' => $plan['number_of_installments'] - 1,
+            'installment_amount' => $futureInstallmentAmount,
+            'total_payable' => $quote['final_course_fee'],
+            'selected_plan_name' => $plan['title'],
+            'selected_plan_type' => $plan['payment_mode'] === 'full' ? 'full_fee' : 'installment',
+            'snapshot_json' => [
+                'source' => 'partner_dashboard',
+                'partner_id' => (int) $partner->id,
+                'learner_id' => $enrolment->learner_id ?: null,
+                'partner_learner_id' => $enrolment->partner_learner_id ?: null,
+                'course_id' => (int) $enrolment->course_id,
+                'partner_course_assignment_id' => (int) $assignment->id,
+                'original_course_fee' => $quote['original_course_fee'],
+                'partner_discount_type' => $quote['partner_discount_type'],
+                'partner_discount_value' => $quote['partner_discount_value'],
+                'partner_discount_amount' => $quote['partner_discount_amount'],
+                'final_course_fee' => $quote['final_course_fee'],
+                'selected_payment_plan' => $plan['type'],
+                'number_of_installments' => $plan['number_of_installments'],
+                'installment_amounts' => $plan['installment_amounts'],
+            ],
+        ]);
+
+        return $order;
     }
 
     private function createInstallmentRecord($partnerId, $enrolment, $order, $no, $amount, $date, $total, $planType, $deposit = 0, $count = 1)
@@ -682,9 +647,7 @@ class CoursePurchaseController extends Controller
     public function submitProof(Request $request, $enrolmentId)
     {
         $partner = Auth::user();
-        $enrolment = Enrolment::findOrFail($enrolmentId);
-
-        if ($enrolment->learner->org_id !== $partner->id) abort(403);
+        $enrolment = Enrolment::where('partner_id', $partner->id)->findOrFail($enrolmentId);
 
         $request->validate([
             'payment_proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',

@@ -13,10 +13,11 @@ use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Support\Facades\Log;
 use App\Models\Crm\PartnerLearner;
+use App\Services\PartnerCoursePricingService;
 
 class CheckoutController extends Controller
 {
-    public function createCheckoutSession(Request $request, $learnerId)
+    public function createCheckoutSession(Request $request, $learnerId, PartnerCoursePricingService $partnerPricing)
     {
         $partner = Auth::user();
 
@@ -46,7 +47,9 @@ class CheckoutController extends Controller
         } else {
             $enrolmentQuery->where('learner_id', $learner->id);
         }
-        $enrolment = $enrolmentQuery->findOrFail($request->enrolment_id);
+        $enrolment = $enrolmentQuery
+            ->where('partner_id', $partner->id)
+            ->findOrFail($request->enrolment_id);
 
         Log::info("PayNow: Checking for pending order", [
             'enrolment_id' => $enrolment->id,
@@ -158,7 +161,7 @@ class CheckoutController extends Controller
                     [
                         'price_data' => [
                             'currency' => 'gbp',
-                            'unit_amount' => (int) round($amountToPay * 100),
+                            'unit_amount' => $partnerPricing->toMinorUnits((string) $amountToPay),
                             'product_data' => [
                                 'name' => 'DirectSkills Course Payment',
                                 'description' => $description,
