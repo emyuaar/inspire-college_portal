@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Set Your Password - DirectSkills</title>
+    <title>{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }} - DirectSkills</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -85,8 +85,8 @@
             <div class="mb-4">
                 <img src="https://directskills.co.uk/images/DirectSkills_logo.png" alt="DirectSkills" class="h-10 mx-auto">
             </div>
-            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Set Your Password</h1>
-            <p class="text-slate-500 mt-2">Create a secure password to access your course.</p>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }}</h1>
+            <p class="text-slate-500 mt-2">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Create a secure password to access your course.' : 'Choose a new secure password for your account.' }}</p>
         </div>
 
         <div class="bg-white rounded-3xl shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
@@ -105,6 +105,7 @@
                     @csrf
                     <input type="hidden" name="token" value="{{ $token }}">
                     <input type="hidden" name="email" value="{{ $accountEmail }}">
+                    <input type="hidden" name="flow" value="{{ $flow ?? 'account_setup' }}">
 
                     {{-- Email Display (Read-only) --}}
                     <div class="mb-6">
@@ -148,13 +149,13 @@
 
                     <button type="submit" id="submitBtn" disabled
                             class="w-full py-4 ds-gradient text-white rounded-2xl font-bold shadow-lg shadow-blue-900/20 transition-all opacity-50 cursor-not-allowed">
-                        Complete Account Setup
+                        {{ ($flow ?? 'account_setup') === 'account_setup' ? 'Complete Account Setup' : 'Reset Password' }}
                     </button>
                 </form>
             </div>
             
             <div class="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
-                <p class="text-xs text-slate-400 font-medium">Secure Account Activation • DirectSkills Portal</p>
+                <p class="text-xs text-slate-400 font-medium">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Secure Account Activation' : 'Secure Password Reset' }} • DirectSkills Portal</p>
             </div>
         </div>
         

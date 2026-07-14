@@ -4,305 +4,291 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AccountSetupTokenService;
+use App\Services\MicrosoftGraphService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use App\Services\MicrosoftGraphService;
 
 class LearnerPasswordSetupController extends Controller
 {
-    /**
-     * Show the password setup form.
-     */
-    public function show(Request $request, $token)
+    private const SETUP_INVALID_MESSAGE = 'This account setup link is no longer valid. Please request a new setup email.';
+    private const SETUP_USED_MESSAGE = 'Your account has already been set up. Please sign in.';
+
+    public function show(Request $request, string $token, AccountSetupTokenService $setupTokens)
     {
-        $email = null;
-        $isActivation = false;
+        $email = $request->query('email');
+        $setup = $setupTokens->inspect($token, $email);
 
-        // 1. Check learner_activations first (New Secure Workflow)
-        $activation = DB::table('learner_activations')->where('token', $token)->first();
-
-        if ($activation) {
-            $isActivation = true;
-            $email = $activation->email;
-
-            // Enforce 1-hour expiration for activation links
-            if (Carbon::parse($activation->created_at)->addHours(1)->isPast()) {
-                DB::table('learner_activations')->where('token', $token)->delete();
-                return redirect()->route('portal.login')
-                    ->with('error', 'This activation link has expired. Please contact support.');
-            }
-        } else {
-            // 2. Fallback to standard password_reset_tokens
-            $tokens = DB::table('password_reset_tokens')->get();
-            foreach ($tokens as $t) {
-                if (Hash::check($token, $t->token) || $token === $t->token) {
-                    $email = $t->email;
-
-                    // Enforce 24-hour expiration for standard reset links
-                    if (Carbon::parse($t->created_at)->addHours(24)->isPast()) {
-                        return redirect()->route('portal.login')
-                            ->with('error', 'This password reset link has expired.');
-                    }
-                    break;
-                }
-            }
+        if ($setup['status'] === AccountSetupTokenService::STATUS_ALREADY_SETUP) {
+            return redirect()->route('portal.login')->with('info', self::SETUP_USED_MESSAGE);
         }
 
-        // Final fallback if email is not resolved from token
-        if (!$email) {
-            $email = $request->query('email');
+        if ($setup['status'] === AccountSetupTokenService::STATUS_VALID) {
+            return $this->passwordView($setup['user'], $token, 'account_setup');
         }
 
-        // Find user by email to resolve learner
-        $user = null;
-        $learner = null;
-        if ($email) {
-            $user = User::where('email_address', $email)->first();
-            if ($user) {
-                $learner = \App\Models\Crm\PartnerLearner::where('user_id', $user->id)->first();
-            }
+        if ($request->routeIs('learner.activate')) {
+            return redirect()->route('portal.login')->with('error', self::SETUP_INVALID_MESSAGE);
         }
 
-        $accountEmail = null;
-        if ($learner) {
-            $accountEmail = $learner->generated_email 
-                ?? $learner->ds_email 
-                ?? $learner->portal_email 
-                ?? $learner->email 
-                ?? null;
+        $reset = $this->inspectPasswordResetToken($token, $email);
+
+        if ($reset['status'] !== 'valid') {
+            return redirect()->route('portal.login')
+                ->with('error', $reset['status'] === 'expired'
+                    ? 'This password reset link has expired.'
+                    : 'Invalid or expired password reset link.');
         }
 
-        if (!$accountEmail) {
-            $accountEmail = ($user ? $user->email_address : null) ?? $email;
-        }
-
-        Log::info('Set password page loaded', [
-            'token_present' => !empty($token),
-            'learner_id' => $learner->id ?? null,
-            'account_email' => $accountEmail ?? null,
-        ]);
-
-        return view('auth.reset-password', [
-            'learner' => $learner,
-            'accountEmail' => $accountEmail,
-            'token' => $token,
-            'is_activation' => $isActivation
-        ]);
+        return $this->passwordView($reset['user'], $token, 'password_reset');
     }
 
-    /**
-     * Store the new password.
-     */
-    public function store(Request $request, MicrosoftGraphService $graphService)
+    public function store(Request $request, MicrosoftGraphService $graphService, AccountSetupTokenService $setupTokens)
     {
-        Log::info('Set password form submitted', [
-            'token_present' => $request->filled('token'),
-            'email_present' => $request->filled('email'),
-        ]);
-
         $request->validate([
-            'token' => ['required'],
-            'password' => [
-                'required',
-                'string',
-                'min:8',
-                'max:256',
-                'confirmed',
-                'regex:/[A-Z]/',
-                'regex:/[a-z]/',
-                'regex:/[0-9]/',
-                'regex:/[^A-Za-z0-9]/',
-                function ($attribute, $value, $fail) {
-                    $lower = strtolower($value);
-
-                    $blockedWords = [
-                        'password123!',
-                        'directskills123!',
-                        'welcome123!',
-                        'qwerty123!',
-                        'admin123!',
-                    ];
-
-                    if (in_array($lower, array_map('strtolower', $blockedWords))) {
-                        $fail('This password is too common. Please choose a stronger password.');
-                    }
-                },
-            ],
+            'token' => ['required', 'string'],
+            'email' => ['nullable', 'email'],
+            'flow' => ['nullable', 'in:account_setup,password_reset'],
+            'password' => $this->passwordRules(),
         ], [
-            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.'
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
         ]);
 
-        $isActivation = false;
-        $record = null;
-        $email = null;
+        $flow = $request->input('flow', 'account_setup');
 
-        // 1. Check learner_activations first
-        $record = DB::table('learner_activations')
-            ->where('token', $request->token)
-            ->first();
-
-        if ($record) {
-            $isActivation = true;
-            $email = $record->email;
-            // Expiry check
-            if (Carbon::parse($record->created_at)->addHours(1)->isPast()) {
-                DB::table('learner_activations')->where('token', $request->token)->delete();
-                return back()->withErrors(['email' => 'This activation link has expired.']);
-            }
-        } else {
-            // 2. Fallback to standard password_reset_tokens
-            // Laravel's default tokens are hashed in the DB, but our token might be plain text.
-            // Actually, we must loop through tokens if they are hashed, or just assume the plain token if not.
-            // Assuming we check the unhashed token in DB or hashed token.
-            $tokens = DB::table('password_reset_tokens')->get();
-            foreach ($tokens as $t) {
-                if (Hash::check($request->token, $t->token) || $request->token === $t->token) {
-                    $record = $t;
-                    $email = $t->email;
-                    break;
-                }
-            }
-
-            if (! $record) {
-                return back()->withErrors([
-                    'email' => 'Invalid or expired password reset link.',
-                ]);
-            }
-
-            if (Carbon::parse($record->created_at)->addHours(24)->isPast()) {
-                return back()->withErrors([
-                    'email' => 'This password reset link has expired.',
-                ]);
-            }
+        if ($flow === 'account_setup') {
+            return $this->storeAccountSetupPassword($request, $setupTokens, $graphService);
         }
 
-        $user = User::where('email_address', $email)->first();
+        return $this->storePasswordReset($request, $graphService);
+    }
 
-        if (!$user) {
-            return back()->withErrors(['email' => 'User not found.']);
+    private function storeAccountSetupPassword(Request $request, AccountSetupTokenService $setupTokens, MicrosoftGraphService $graphService)
+    {
+        $setup = $setupTokens->inspect($request->token, $request->input('email'));
+
+        if ($setup['status'] === AccountSetupTokenService::STATUS_ALREADY_SETUP) {
+            return redirect()->route('portal.login')->with('info', self::SETUP_USED_MESSAGE);
         }
 
-        // Additional password validation using user details
-        $lowerPassword = strtolower($request->password);
-        if (!empty($user->first_name) && str_contains($lowerPassword, strtolower($user->first_name))) {
-            return back()->withErrors(['password' => 'Password must not contain your first name.']);
+        if ($setup['status'] !== AccountSetupTokenService::STATUS_VALID) {
+            return back()->withErrors(['email' => self::SETUP_INVALID_MESSAGE])->withInput($request->except('password', 'password_confirmation'));
         }
 
-        if (!empty($user->sur_name) && str_contains($lowerPassword, strtolower($user->sur_name))) {
-            return back()->withErrors(['password' => 'Password must not contain your last name.']);
+        $passwordError = $this->personalizedPasswordError($setup['user'], $request->password);
+        if ($passwordError) {
+            return back()->withErrors(['password' => $passwordError])->withInput($request->except('password', 'password_confirmation'));
         }
 
-        if (!empty($user->email_address)) {
-            $emailPrefix = strtolower(strtok($user->email_address, '@'));
-            if ($emailPrefix && str_contains($lowerPassword, $emailPrefix)) {
-                return back()->withErrors(['password' => 'Password must not contain your email username.']);
-            }
+        $result = $setupTokens->consume($request->token, $request->password, $request->input('email'));
+
+        if ($result['status'] === AccountSetupTokenService::STATUS_ALREADY_SETUP) {
+            return redirect()->route('portal.login')->with('info', self::SETUP_USED_MESSAGE);
         }
 
-        Log::info('Learner password setup started', [
+        if ($result['status'] !== AccountSetupTokenService::STATUS_VALID) {
+            return back()->withErrors(['email' => self::SETUP_INVALID_MESSAGE])->withInput($request->except('password', 'password_confirmation'));
+        }
+
+        $user = $result['user'];
+        $this->syncCrmAfterPasswordSetup($user);
+        $this->syncMicrosoftPassword($user, $request->password, $graphService);
+
+        Log::info('Partner learner account setup completed', [
             'portal_user_id' => $user->id,
-            'email' => $user->email_address,
-            'is_activation' => $isActivation
         ]);
 
-        DB::connection('mysql_crm')->beginTransaction();
-        DB::connection('mysql_portal')->beginTransaction();
+        return redirect()->route('portal.login')
+            ->with('success', 'Your password has been set successfully. You can now log in.');
+    }
 
-        try {
+    private function storePasswordReset(Request $request, MicrosoftGraphService $graphService)
+    {
+        $reset = $this->inspectPasswordResetToken($request->token, $request->input('email'));
+
+        if ($reset['status'] !== 'valid') {
+            return back()->withErrors([
+                'email' => $reset['status'] === 'expired'
+                    ? 'This password reset link has expired.'
+                    : 'Invalid or expired password reset link.',
+            ]);
+        }
+
+        $passwordError = $this->personalizedPasswordError($reset['user'], $request->password);
+        if ($passwordError) {
+            return back()->withErrors(['password' => $passwordError])->withInput($request->except('password', 'password_confirmation'));
+        }
+
+        DB::connection('mysql_portal')->transaction(function () use ($request, $reset) {
+            $user = User::query()->whereKey($reset['user']->id)->lockForUpdate()->firstOrFail();
             $user->password = Hash::make($request->password);
-            $user->password_set_at = now();
-            if ($user->status_id == 1) { // If pending
-                $user->status_id = 2; // Active
+            if (empty($user->password_set_at)) {
+                $user->password_set_at = now();
             }
             $user->save();
 
-            // Update PartnerLearner and CRM user_details if it exists
+            DB::connection('mysql_portal')->table('password_reset_tokens')
+                ->where('email', $user->email_address)
+                ->delete();
+        });
+
+        $user = User::query()->findOrFail($reset['user']->id);
+        $this->syncMicrosoftPassword($user, $request->password, $graphService);
+
+        return redirect()->route('portal.login')
+            ->with('success', 'Your password has been reset successfully. You can now log in.');
+    }
+
+    private function passwordView(User $user, string $token, string $flow)
+    {
+        Log::info('Learner password page loaded', [
+            'token_present' => true,
+            'portal_user_id' => $user->id,
+            'flow' => $flow,
+        ]);
+
+        return view('auth.reset-password', [
+            'learner' => null,
+            'accountEmail' => $user->email_address,
+            'token' => $token,
+            'flow' => $flow,
+            'is_activation' => $flow === 'account_setup',
+        ]);
+    }
+
+    private function inspectPasswordResetToken(string $token, ?string $email): array
+    {
+        if (! $email) {
+            return ['status' => 'invalid'];
+        }
+
+        $record = DB::connection('mysql_portal')->table('password_reset_tokens')
+            ->where('email', $email)
+            ->first();
+
+        if (! $record || (! Hash::check($token, $record->token) && ! hash_equals((string) $record->token, $token))) {
+            return ['status' => 'invalid'];
+        }
+
+        $expiresInMinutes = (int) config('auth.passwords.users.expire', 60);
+        if (Carbon::parse($record->created_at)->addMinutes($expiresInMinutes)->isPast()) {
+            return ['status' => 'expired'];
+        }
+
+        $user = User::query()->where('email_address', $email)->first();
+        if (! $user) {
+            return ['status' => 'invalid'];
+        }
+
+        return ['status' => 'valid', 'record' => $record, 'user' => $user];
+    }
+
+    private function passwordRules(): array
+    {
+        return [
+            'required',
+            'string',
+            'min:8',
+            'max:256',
+            'confirmed',
+            'regex:/[A-Z]/',
+            'regex:/[a-z]/',
+            'regex:/[0-9]/',
+            'regex:/[^A-Za-z0-9]/',
+            function ($attribute, $value, $fail) {
+                $blockedWords = [
+                    'password123!',
+                    'directskills123!',
+                    'welcome123!',
+                    'qwerty123!',
+                    'admin123!',
+                ];
+
+                if (in_array(strtolower($value), array_map('strtolower', $blockedWords), true)) {
+                    $fail('This password is too common. Please choose a stronger password.');
+                }
+            },
+        ];
+    }
+
+    private function personalizedPasswordError(User $user, string $password): ?string
+    {
+        $lowerPassword = strtolower($password);
+
+        if (! empty($user->first_name) && str_contains($lowerPassword, strtolower($user->first_name))) {
+            return 'Password must not contain your first name.';
+        }
+
+        if (! empty($user->sur_name) && str_contains($lowerPassword, strtolower($user->sur_name))) {
+            return 'Password must not contain your last name.';
+        }
+
+        if (! empty($user->email_address)) {
+            $emailPrefix = strtolower(strtok($user->email_address, '@'));
+            if ($emailPrefix && str_contains($lowerPassword, $emailPrefix)) {
+                return 'Password must not contain your email username.';
+            }
+        }
+
+        return null;
+    }
+
+    private function syncCrmAfterPasswordSetup(User $user): void
+    {
+        try {
             $partnerLearner = \App\Models\Crm\PartnerLearner::where('user_id', $user->id)->first();
-            if ($partnerLearner) {
-                $partnerLearner->update([
-                    'activation_status' => 'completed',
-                    'account_status' => 'active'
-                ]);
-
-                // Sync data to CRM user_details safely
-                $userDetail = DB::connection('mysql_crm')->table('user_detail')->where('learner_id', $user->id)->first();
-                $updateData = [];
-
-                if (!$userDetail) {
-                    $updateData = [
-                        'learner_id' => $user->id,
-                        'personal_email' => $partnerLearner->personal_email ?? $partnerLearner->email,
-                        'contact' => $partnerLearner->phone,
-                        'dob' => $partnerLearner->dob,
-                        'address_line_1' => $partnerLearner->address,
-                        'country' => $partnerLearner->country,
-                    ];
-                    DB::connection('mysql_crm')->table('user_detail')->insert($updateData);
-                } else {
-                    $updateData = [
-                        'personal_email' => $userDetail->personal_email ?? ($partnerLearner->personal_email ?? $partnerLearner->email),
-                        'contact' => $userDetail->contact ?? $partnerLearner->phone,
-                        'dob' => $userDetail->dob ?? $partnerLearner->dob,
-                        'address_line_1' => $userDetail->address_line_1 ?? $partnerLearner->address,
-                        'country' => $userDetail->country ?? $partnerLearner->country,
-                    ];
-                    DB::connection('mysql_crm')->table('user_detail')->where('learner_id', $user->id)->update($updateData);
-                }
-                
-                Log::info('CRM user_detail updated during password setup', [
-                    'learner_id' => $user->id,
-                ]);
+            if (! $partnerLearner) {
+                return;
             }
 
-            // Sync with Microsoft Graph
-            try {
-                if ($user->ms_user_id) {
-                    $graphService->updateUserPassword($user->ms_user_id, $request->password);
-                    Log::info("MSGraphService: Synced password for MS user {$user->ms_user_id}");
-                } else {
-                    $graphService->provisionLearner($user, $request->password);
-                    Log::info("MSGraphService: Provisioned MS user for {$user->email_address}");
-                }
-            } catch (\Exception $e) {
-                Log::error("MSGraphService Error during password setup for user {$user->id}: " . $e->getMessage());
-                // Update portal user ms_error_message without failing transaction
-                $user->update(['ms_error_message' => 'Password Sync/Provision Failed: ' . $e->getMessage()]);
-            }
+            $partnerLearner->update([
+                'activation_status' => 'completed',
+                'account_status' => 'active',
+            ]);
 
-            // Cleanup the token
-            if ($isActivation) {
-                DB::table('learner_activations')
-                    ->where('token', $request->token)
-                    ->delete();
+            $userDetail = DB::connection('mysql_crm')->table('user_detail')->where('learner_id', $user->id)->first();
+            $detailData = [
+                'personal_email' => $userDetail->personal_email ?? ($partnerLearner->personal_email ?? $partnerLearner->email),
+                'contact' => $userDetail->contact ?? $partnerLearner->phone,
+                'dob' => $userDetail->dob ?? $partnerLearner->dob,
+                'address_line_1' => $userDetail->address_line_1 ?? $partnerLearner->address,
+                'country' => $userDetail->country ?? $partnerLearner->country,
+                'updated_at' => now(),
+            ];
+
+            if ($userDetail) {
+                DB::connection('mysql_crm')->table('user_detail')->where('learner_id', $user->id)->update($detailData);
             } else {
-                DB::table('password_reset_tokens')
-                    ->where('email', $email)
-                    ->delete();
+                $detailData['learner_id'] = $user->id;
+                $detailData['created_at'] = now();
+                DB::connection('mysql_crm')->table('user_detail')->insert($detailData);
             }
-
-            DB::connection('mysql_crm')->commit();
-            DB::connection('mysql_portal')->commit();
-
-            Log::info('Partner learner password setup completed', [
+        } catch (\Throwable $e) {
+            Log::error('CRM sync failed after account setup password save.', [
                 'portal_user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function syncMicrosoftPassword(User $user, string $password, MicrosoftGraphService $graphService): void
+    {
+        try {
+            if ($user->ms_user_id) {
+                $graphService->updateUserPassword($user->ms_user_id, $password);
+            } else {
+                $graphService->provisionLearner($user, $password);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Microsoft Graph password sync failed.', [
+                'portal_user_id' => $user->id,
+                'error' => $e->getMessage(),
             ]);
 
-            return redirect()->route('portal.login')
-                ->with('success', 'Your password has been set successfully. You can now log in.');
-
-        } catch (\Exception $e) {
-            DB::connection('mysql_crm')->rollBack();
-            DB::connection('mysql_portal')->rollBack();
-            
-            Log::error('Learner password setup failed', [
-                'portal_user_id' => $user->id ?? null,
-                'error' => $e->getMessage()
-            ]);
-
-            return back()->withErrors(['email' => 'An error occurred while saving your details. Please try again or contact support.']);
+            $user->update(['ms_error_message' => 'Password Sync/Provision Failed: ' . $e->getMessage()]);
         }
     }
 }

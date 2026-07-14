@@ -21,7 +21,7 @@ class LearnerActivationService
     public function activate($enrolment)
     {
         return DB::connection('mysql_crm')->transaction(function () use ($enrolment) {
-            $enrolment->refresh();
+            $enrolment = Enrolment::query()->lockForUpdate()->findOrFail($enrolment->id);
 
             // Do not activate if already active
             if ($enrolment->activation_status === 'active') {
@@ -86,16 +86,6 @@ class LearnerActivationService
                     $portalUser->save();
                 }
 
-                // Generate secure password setup token
-                $token = Str::random(64);
-                DB::connection('mysql_portal')->table('password_reset_tokens')->updateOrInsert(
-                    ['email' => $portalUser->email_address],
-                    [
-                        'token' => Hash::make($token),
-                        'created_at' => now(),
-                    ]
-                );
-
                 DB::connection('mysql_portal')->commit();
             } catch (\Exception $e) {
                 DB::connection('mysql_portal')->rollBack();
@@ -120,20 +110,19 @@ class LearnerActivationService
                 ->where('partner_learner_id', $partnerLearner->id)
                 ->update(['learner_id' => $portalUser->id]);
 
-            // Generate secure password setup token
-            $token = \Illuminate\Support\Str::random(64);
-            
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $portalUser->email_address],
-                [
-                    'token' => \Illuminate\Support\Facades\Hash::make($token),
-                    'created_at' => now(),
-                ]
-            );
-
             // Use config or env for portal URL
-            $portalUrl = env('LEARNER_PORTAL_URL', 'https://portal.directskills.co.uk');
-            $setupUrl = $portalUrl . '/reset-password/' . $token . '?email=' . urlencode($portalUser->email_address);
+            $setupToken = app(AccountSetupTokenService::class)->issueForUser($portalUser);
+
+            if (($setupToken['status'] ?? null) !== AccountSetupTokenService::STATUS_CREATED) {
+                Log::info('Activation email skipped because setup token was not created.', [
+                    'status' => $setupToken['status'] ?? null,
+                    'learner_id' => $portalUser->id,
+                ]);
+
+                return $enrolment;
+            }
+
+            $setupUrl = app(AccountSetupTokenService::class)->setupUrl($setupToken['token']);
 
             // Send activation email
             try {

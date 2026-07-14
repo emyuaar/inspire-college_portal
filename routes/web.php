@@ -18,15 +18,15 @@ Route::post('/logout', [AuthController::class, 'logout'])
 
 // Learner Activation / Password Setup Routes
 Route::get('/activate/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
-    ->middleware('guest')
+    ->middleware(['guest', 'throttle:10,1'])
     ->name('learner.activate');
 
 Route::post('/reset-password', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'store'])
-    ->middleware('guest')
+    ->middleware(['guest', 'throttle:5,1'])
     ->name('password.update');
 
 Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
-    ->middleware('guest')
+    ->middleware(['guest', 'throttle:10,1'])
     ->name('password.reset');
 
 Route::get('/reset-password', function() {

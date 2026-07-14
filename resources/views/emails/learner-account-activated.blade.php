@@ -83,8 +83,8 @@
                             </a>
 
                             <p style="font-size:12px; line-height:1.6; color:#6b7280; margin:20px 0 0 0;">
-                                This secure link may expire for your protection. If it expires, please request a new
-                                password reset from the learner login page.
+                                This secure setup link can be used once and remains valid until you set your password,
+                                receive a newer setup email, or the link is revoked.
                             </p>
                         </td>
                     </tr>
