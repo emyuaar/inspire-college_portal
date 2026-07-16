@@ -20,12 +20,20 @@ class LearnerActivationService
      */
     public function activate($enrolment)
     {
+        Log::info('ACTIVATION_START', [
+            'enrolment_id' => $enrolment->id,
+            'payment_status' => $enrolment->payment_status,
+        ]);
         return DB::connection('mysql_crm')->transaction(function () use ($enrolment) {
             $enrolment = Enrolment::query()->lockForUpdate()->findOrFail($enrolment->id);
 
             // Do not activate if already active
             if ($enrolment->activation_status === 'active') {
                 return $enrolment;
+            }
+
+            if (! in_array($enrolment->payment_status, ['paid', 'approved'], true)) {
+                throw new \DomainException('Cannot activate learner before payment is confirmed.');
             }
 
             // Get learner details from partner_learner

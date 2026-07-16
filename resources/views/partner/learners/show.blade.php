@@ -321,7 +321,13 @@
                                         </div>
                                     @endif
                                     
-                                    @if($statusName == 'pending-payment')
+                                    @php
+                                        $paymentRows = $enrolment->partnerInstallments;
+                                        $paymentSettled = $paymentRows->isNotEmpty()
+                                            && $paymentRows->every(fn ($row) => $row->status === 'paid');
+                                    @endphp
+
+                                    @if($statusName == 'pending-payment' && !$paymentSettled)
                                         <div class="mt-2 space-y-2">
                                             @php
                                                 $pendingInstallments = $enrolment->partnerInstallments()->where('status', '!=', 'paid')->get();

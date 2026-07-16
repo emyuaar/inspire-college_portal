@@ -51,6 +51,15 @@ class CheckoutController extends Controller
             ->where('partner_id', $partner->id)
             ->findOrFail($request->enrolment_id);
 
+        $latestOrder = Order::where('enrolment_id', $enrolment->id)
+            ->latest('id')->first();
+        if ($latestOrder && (int) $latestOrder->status_id === 1) {
+            return back()->with(
+                'error',
+                'This order is already paid. No new Stripe checkout was created.'
+            );
+        }
+
         Log::info("PayNow: Checking for pending order", [
             'enrolment_id' => $enrolment->id,
             'learner_id' => $isPending ? null : $learner->id,
