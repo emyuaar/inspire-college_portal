@@ -15,6 +15,15 @@ use App\Mail\LearnerAccountActivatedMail;
 
 class LearnerActivationService
 {
+    public function __construct(private readonly PaymentActivationEligibilityService $eligibility)
+    {
+    }
+
+    public function isPaymentRequirementSatisfied(Enrolment $enrolment): bool
+    {
+        return $this->eligibility->forEnrolment($enrolment)['eligible'];
+    }
+
     /**
      * Activate a learner account after payment confirmation.
      */
@@ -27,13 +36,9 @@ class LearnerActivationService
         return DB::connection('mysql_crm')->transaction(function () use ($enrolment) {
             $enrolment = Enrolment::query()->lockForUpdate()->findOrFail($enrolment->id);
 
-            // Do not activate if already active
-            if ($enrolment->activation_status === 'active') {
-                return $enrolment;
-            }
-
-            if (! in_array($enrolment->payment_status, ['paid', 'approved'], true)) {
-                throw new \DomainException('Cannot activate learner before payment is confirmed.');
+            $alreadyActivated = $enrolment->activation_status === 'active';
+            if (! $alreadyActivated && ! $this->isPaymentRequirementSatisfied($enrolment)) {
+                throw new \DomainException('Cannot activate learner before the payment required by its saved plan is confirmed.');
             }
 
             // Get learner details from partner_learner
@@ -117,6 +122,10 @@ class LearnerActivationService
             Order::where('enrolment_id', $enrolment->id)
                 ->where('partner_learner_id', $partnerLearner->id)
                 ->update(['learner_id' => $portalUser->id]);
+
+            if ($enrolment->welcome_email_sent_at) {
+                return $enrolment;
+            }
 
             // Use config or env for portal URL
             $setupToken = app(AccountSetupTokenService::class)->issueForUser($portalUser);
