@@ -500,7 +500,7 @@ class LearnerCourseController extends Controller
     private function safeDownloadFilename(string $name): string
     {
         $name = rawurldecode($name);
-        $name = preg_replace('/[\\\/:*?"<>|]+/', ' ', $name) ?: 'brief';
+        $name = preg_replace('~[\\/:*?"<>|]+~', ' ', $name) ?: 'brief';
         $name = preg_replace('/\s+/', ' ', $name) ?: 'brief';
 
         return trim($name) ?: 'brief';
