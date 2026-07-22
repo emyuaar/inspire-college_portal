@@ -452,6 +452,60 @@ class LearnerCourseController extends Controller
         return back()->with('error', 'Lesson file not available.');
     }
 
+    private function assignmentBriefDownloadName(AssignmentFile $brief, string $fallback = 'brief', ?string $extraSource = null): string
+    {
+        $rawName = trim((string) ($brief->file_name ?: ''));
+        $name = $rawName !== '' ? $rawName : $this->basenameFromFilenameLike($extraSource ?: $brief->file_path);
+        $name = $name ?: $fallback;
+        $name = $this->safeDownloadFilename($name);
+
+        if ($this->extensionFromFilenameLike($name)) {
+            return $name;
+        }
+
+        $extension = $this->extensionFromFilenameLike($brief->file_path)
+            ?: $this->extensionFromFilenameLike($brief->sharepoint_path ?? null)
+            ?: $this->extensionFromFilenameLike($brief->sharepoint_url ?? null)
+            ?: $this->extensionFromFilenameLike($extraSource)
+            ?: $this->extensionFromFilenameLike($fallback);
+
+        return $extension ? $name . '.' . $extension : $name;
+    }
+
+    private function basenameFromFilenameLike(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $path = parse_url((string) $value, PHP_URL_PATH) ?: (string) $value;
+        $path = rawurldecode($path);
+        $base = basename(str_replace('\\', '/', $path));
+
+        return $base !== '' && $base !== '.' ? $base : null;
+    }
+
+    private function extensionFromFilenameLike(?string $value): ?string
+    {
+        $base = $this->basenameFromFilenameLike($value);
+        if (!$base) {
+            return null;
+        }
+
+        $extension = strtolower((string) pathinfo($base, PATHINFO_EXTENSION));
+
+        return preg_match('/^[a-z0-9]{1,10}$/', $extension) ? $extension : null;
+    }
+
+    private function safeDownloadFilename(string $name): string
+    {
+        $name = rawurldecode($name);
+        $name = preg_replace('/[\\\/:*?"<>|]+/', ' ', $name) ?: 'brief';
+        $name = preg_replace('/\s+/', ' ', $name) ?: 'brief';
+
+        return trim($name) ?: 'brief';
+    }
+
     public function downloadAssignmentBrief(AssignmentFile $brief, SharePointService $sp)
     {
         $user = Auth::user();
@@ -469,8 +523,10 @@ class LearnerCourseController extends Controller
         }
 
         $inline = request()->routeIs('portal.learner.assignment.brief.inline');
+        $downloadName = $this->assignmentBriefDownloadName($brief);
+
         if (!blank($brief->sharepoint_item_id)) {
-            return $sp->streamByItemId($brief->sharepoint_item_id, $brief->file_name ?? 'brief', $inline, $brief->drive_id);
+            return $sp->streamByItemId($brief->sharepoint_item_id, $downloadName, $inline, $brief->drive_id);
         }
 
         if (!blank($brief->file_path) && !filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
@@ -479,7 +535,7 @@ class LearnerCourseController extends Controller
 
         if (!blank($brief->file_path) && filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
             try {
-                return $sp->streamByShareUrl($brief->file_path, $brief->file_name ?? 'brief', $inline);
+                return $sp->streamByShareUrl($brief->file_path, $downloadName, $inline);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Assignment brief SharePoint URL fallback failed', [
                     'brief_id' => $brief->id,
@@ -535,7 +591,7 @@ class LearnerCourseController extends Controller
             abort(403);
         }
 
-        $downloadName = $brief->file_name ?: basename($fullReal);
+        $downloadName = $this->assignmentBriefDownloadName($brief, basename($fullReal), $fullReal);
 
         return response()->download($fullReal, $downloadName);
     }
