@@ -45,7 +45,7 @@ class LearnerCourseController extends Controller
         // If it's NOT in allowed statuses, check if Order is Paid (ID 1)
         if (!in_array($statusStr, $allowedStatuses)) {
             $enrolment->load('latestOrder');
-            if (!$enrolment->latestOrder || $enrolment->latestOrder->status_id !== 1) {
+            if (!$enrolment->latestOrder || (int) $enrolment->latestOrder->status_id !== 1) {
                 return false;
             }
         }

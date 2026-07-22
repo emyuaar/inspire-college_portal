@@ -23,42 +23,37 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($enrolments as $enrolment)
                     @php
-                        $showContinue = false; // Safe default
+                        $showContinue = false;
+                        $course = $enrolment->course ?? null;
 
-                        // Always define status first
-                        $statusStr = strtolower($enrolment->status->status ?? '');
-
-                        // Access Logic
                         $requirementsMet = Auth::user()->areRequirementsMet();
                         $isVerified = Auth::user()->isVerified();
+                        $statusStr = strtolower($enrolment->status->status ?? '');
+                        $denied = in_array($statusStr, ['denied', 'archived']);
 
-                        // Payment Logic via Model Helper
-                        $accessAllowed = $enrolment->installment_access_allowed;
+                        $latestOrder = $enrolment->latestOrder;
+                        $isOrderPaid = $latestOrder && (int) $latestOrder->status_id === 1;
+                        $isPaid = $latestOrder ? $isOrderPaid : in_array($statusStr, ['active', 'paid', 'approved']);
 
-                        // If access is BLOCKED by installments, force status to pending-payment
-                        if (!$accessAllowed) {
+                        if ($latestOrder && !$isOrderPaid) {
                             $statusStr = 'pending-payment';
                         }
 
-                        // Determine if Paid (for badge purposes)
-                        $paymentDetails = $enrolment->payment_status_details;
-                        $isPaid = $paymentDetails['status'] === 'paid';
+                        $accessStatus = $enrolment->installment_access_status;
+                        $accessAllowed = $accessStatus->allowed;
+                        $blockReason = null;
 
-                        // Gate: Verified AND (Active/Paid/Approved) AND AccessAllowed
-                        // If accessAllowed is false, statusStr is pending-payment, so check below handles it.
+                        if (!$accessAllowed) {
+                            $statusStr = 'pending-payment';
+                            $blockReason = $accessStatus->reason;
+                        }
+
                         $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved', 'installments_active']);
+                        $showContinue = $isVerified && !$denied && $isActiveOrPaid && $accessAllowed;
 
-                        $showContinue = $isVerified && $isActiveOrPaid && $accessAllowed;
-
-                        // Visuals
                         $isPaymentPending = $statusStr === 'pending-payment';
                         $isUnderReview = $requirementsMet && !$isVerified;
                         $isPaidPending = $isPaid && $isUnderReview;
-
-                        $denied = $statusStr === 'denied';
-
-                        // Course (you are using $course below, so define it)
-                        $course = $enrolment->course ?? null;
                     @endphp
 
                     <x-ui.card class="h-full flex flex-col hover:shadow-md transition-shadow duration-200" padding="p-0">

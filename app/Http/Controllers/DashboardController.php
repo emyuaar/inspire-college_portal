@@ -71,7 +71,7 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        $enrolments = Enrolment::with(['course.category'])
+        $enrolments = Enrolment::with(['course.category', 'status', 'latestOrder'])
             ->where('learner_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get();
