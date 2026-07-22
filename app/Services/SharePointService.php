@@ -224,6 +224,7 @@ class SharePointService
     public function streamByItemId(string $itemId, string $downloadName = 'file', bool $inline = false, ?string $driveId = null)
     {
         $driveId = $driveId ?: $this->driveId();
+        $metadataName = $this->extensionFromName($downloadName) ? null : $this->driveItemName($driveId, $itemId);
 
         $res = Http::timeout(300)
             ->withToken($this->token())
@@ -236,6 +237,7 @@ class SharePointService
 
         $body = $res->toPsrResponse()->getBody();
         $contentType = $res->header('Content-Type') ?? 'application/octet-stream';
+        $downloadName = $this->downloadNameWithExtension($downloadName, $contentType, $metadataName, $res->header('Content-Disposition'));
         $disposition = $inline ? 'inline' : 'attachment';
 
         return response()->streamDownload(function () use ($body) {
@@ -277,6 +279,7 @@ class SharePointService
     public function streamByShareUrl(string $sharingUrl, string $downloadName = 'file', bool $inline = false)
     {
         $encodedUrl = 'u!' . rtrim(strtr(base64_encode($sharingUrl), '+/', 'u_'), '=');
+        $metadataName = $this->extensionFromName($downloadName) ? null : $this->sharedDriveItemName($encodedUrl);
 
         $res = Http::timeout(300)
             ->withToken($this->token())
@@ -289,6 +292,7 @@ class SharePointService
 
         $body = $res->toPsrResponse()->getBody();
         $contentType = $res->header('Content-Type') ?? 'application/octet-stream';
+        $downloadName = $this->downloadNameWithExtension($downloadName, $contentType, $metadataName, $res->header('Content-Disposition'));
         $disposition = $inline ? 'inline' : 'attachment';
 
         return response()->streamDownload(function () use ($body) {
@@ -306,6 +310,100 @@ class SharePointService
         ]);
     }
 
+    private function driveItemName(string $driveId, string $itemId): ?string
+    {
+        try {
+            $res = Http::timeout(30)
+                ->withToken($this->token())
+                ->get("https://graph.microsoft.com/v1.0/drives/{$driveId}/items/{$itemId}", [
+                    '$select' => 'name',
+                ]);
+
+            return $res->successful() ? $res->json('name') : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function sharedDriveItemName(string $encodedUrl): ?string
+    {
+        try {
+            $res = Http::timeout(30)
+                ->withToken($this->token())
+                ->get("https://graph.microsoft.com/v1.0/shares/{$encodedUrl}/driveItem", [
+                    '$select' => 'name',
+                ]);
+
+            return $res->successful() ? $res->json('name') : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function downloadNameWithExtension(string $downloadName, ?string $contentType, ?string ...$sources): string
+    {
+        $downloadName = trim($downloadName) !== '' ? trim($downloadName) : 'file';
+        if ($this->extensionFromName($downloadName)) {
+            return $downloadName;
+        }
+
+        foreach ($sources as $source) {
+            $source = $this->filenameFromContentDisposition($source) ?: $source;
+            $extension = $this->extensionFromName($source);
+            if ($extension) {
+                return $downloadName . '.' . $extension;
+            }
+        }
+
+        $extension = $this->extensionFromMime($contentType);
+        return $extension ? $downloadName . '.' . $extension : $downloadName;
+    }
+
+    private function filenameFromContentDisposition(?string $contentDisposition): ?string
+    {
+        if (!$contentDisposition) {
+            return null;
+        }
+
+        if (preg_match("~filename\*=UTF-8''([^;]+)~i", $contentDisposition, $match)) {
+            return rawurldecode(trim($match[1], ' \"'));
+        }
+
+        if (preg_match('~filename="?([^";]+)"?~i', $contentDisposition, $match)) {
+            return trim($match[1]);
+        }
+
+        return null;
+    }
+
+    private function extensionFromName(?string $name): ?string
+    {
+        if (!$name) {
+            return null;
+        }
+
+        $path = parse_url($name, PHP_URL_PATH) ?: $name;
+        $extension = strtolower((string) pathinfo(rawurldecode($path), PATHINFO_EXTENSION));
+
+        return preg_match('/^[a-z0-9]{1,10}$/', $extension) ? $extension : null;
+    }
+
+    private function extensionFromMime(?string $contentType): ?string
+    {
+        $contentType = strtolower(trim(explode(';', (string) $contentType)[0]));
+
+        return match ($contentType) {
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'text/plain' => 'txt',
+            default => null,
+        };
+    }
     public function downloadFileContent(?string $driveId, ?string $itemId, ?string $path): string
     {
         $driveId = $driveId ?: config('services.sharepoint.drive_id');
