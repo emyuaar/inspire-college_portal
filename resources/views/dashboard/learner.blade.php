@@ -84,21 +84,21 @@
                 </x-slot>
 
                 <dl class="space-y-4 text-sm">
-                    <div class="flex justify-between border-b border-slate-50 pb-2">
-                        <dt class="text-slate-500">Full Name</dt>
-                        <dd class="font-bold text-slate-800 text-right">{{ $user->first_name }} {{ $user->sur_name }}
+                    <div class="flex justify-between gap-4 border-b border-slate-50 pb-2">
+                        <dt class="text-slate-500 shrink-0">Full Name</dt>
+                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-words">{{ $user->first_name }} {{ $user->sur_name }}
                         </dd>
                     </div>
-                    <div class="flex justify-between border-b border-slate-50 pb-2">
-                        <dt class="text-slate-500">Email Address</dt>
-                        <dd class="font-bold text-slate-800 text-right max-w-[180px]"
+                    <div class="flex justify-between gap-4 border-b border-slate-50 pb-2">
+                        <dt class="text-slate-500 shrink-0">Email Address</dt>
+                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-all leading-5"
                             title="{{ $user->email_address }}">
                             {{ $user->email_address }}
                         </dd>
                     </div>
-                    <div class="flex justify-between pt-1">
-                        <dt class="text-slate-500">Student ID</dt>
-                        <dd class="font-bold text-slate-800 text-right">ICOL{{ $user->id }}</dd>
+                    <div class="flex justify-between gap-4 pt-1">
+                        <dt class="text-slate-500 shrink-0">Student ID</dt>
+                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-words">ICOL{{ $user->id }}</dd>
                     </div>
                 </dl>
             </x-ui.card>
