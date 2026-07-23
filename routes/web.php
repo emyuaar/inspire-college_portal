@@ -16,6 +16,22 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('portal.logout');
 
+Route::get('/activate/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
+    ->middleware(['guest', 'throttle:10,1'])
+    ->name('learner.activate');
+
+Route::post('/reset-password', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'store'])
+    ->middleware(['guest', 'throttle:5,1'])
+    ->name('password.update');
+
+Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
+    ->middleware(['guest', 'throttle:10,1'])
+    ->name('password.reset');
+
+Route::get('/reset-password', function () {
+    return redirect()->route('portal.login')->with('info', 'Please use the secure link sent to your email to set your password.');
+})->middleware('guest')->name('password.request');
+
 // DEBUG ROUTE
 Route::get('/debug-webhook', function () {
     $statuses = \App\Models\Crm\EnrolmentStatus::all();

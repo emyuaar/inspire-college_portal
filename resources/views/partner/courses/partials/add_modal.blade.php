@@ -60,7 +60,7 @@
       <div class="modal-footer bg-white border-top border-slate-100">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         
-        <form action="{{ route('partner.courses.store', $learner->id) }}" method="POST" id="addCoursesForm">
+        <form action="{{ route('partner.courses.store', ($isPending ?? false) ? 'pending-' . $learner->id : $learner->id) }}" method="POST" id="addCoursesForm">
             @csrf
             {{-- Hidden inputs injected by JS --}}
             <div id="hiddenInputsContainer"></div>

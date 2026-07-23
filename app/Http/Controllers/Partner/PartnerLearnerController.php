@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Crm\Enrolment;
+use App\Models\Crm\PartnerLearner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\DB;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
 use App\Services\PaymentProcessingService;
@@ -28,12 +28,17 @@ class PartnerLearnerController extends Controller
             abort(403, 'Unauthorized. Partners only.');
         }
 
-        $learners = User::myLearners($partner->id)
+        $activeLearners = User::myLearners($partner->id)
             ->with(['enrolments', 'enrolments.status']) // Assuming relationships exist or will filter in view
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('partner.learners.index', compact('partner', 'learners'));
+        $pendingLearners = PartnerLearner::where('partner_id', $partner->id)
+            ->where('activation_status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('partner.learners.index', compact('partner', 'activeLearners', 'pendingLearners'));
     }
 
     /**
@@ -42,7 +47,32 @@ class PartnerLearnerController extends Controller
     public function show(Request $request, $id, PricingService $pricingService, PaymentProcessingService $paymentService)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($id);
+        $isPending = false;
+
+        if (str_starts_with((string) $id, 'pending-')) {
+            $isPending = true;
+            $pendingId = (int) str_replace('pending-', '', (string) $id);
+            $pendingLearner = PartnerLearner::where('partner_id', $partner->id)->findOrFail($pendingId);
+
+            if ($pendingLearner->user_id && $pendingLearner->activation_status === 'active') {
+                $activeLearner = User::myLearners($partner->id)->find($pendingLearner->user_id);
+                if ($activeLearner) {
+                    $learner = $activeLearner;
+                    $isPending = false;
+                } else {
+                    $learner = $pendingLearner;
+                }
+            } else {
+                $learner = $pendingLearner;
+            }
+        } else {
+            $learner = User::myLearners($partner->id)->find($id);
+
+            if (! $learner) {
+                $learner = PartnerLearner::where('partner_id', $partner->id)->findOrFail($id);
+                $isPending = true;
+            }
+        }
 
         // Check for synchronous payment confirmation (Fix for localhost/missed webhooks)
         if ($request->has('payment') && $request->payment === 'success' && $request->filled('session_id')) {
@@ -63,7 +93,9 @@ class PartnerLearnerController extends Controller
             }
         }
 
-        $enrolments = Enrolment::where('learner_id', $learner->id)
+        $enrolments = Enrolment::query()
+            ->when($isPending, fn ($query) => $query->where('partner_learner_id', $learner->id))
+            ->when(! $isPending, fn ($query) => $query->where('learner_id', $learner->id))
             ->with(['course', 'status'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -105,12 +137,12 @@ class PartnerLearnerController extends Controller
         })->filter()->values(); // Filter nulls and re-index
 
         // Fetch Partner Installments (Manual Plan)
-        $installments = \App\Models\Partner\PartnerLearnerInstallment::where('learner_id', $learner->id)
+        $installments = \App\Models\Partner\PartnerLearnerInstallment::whereIn('enrolment_id', $enrolments->pluck('id'))
             ->with('course') // meaningful info
             ->orderBy('due_date', 'asc')
             ->get();
 
-        return view('partner.learners.show', compact('learner', 'enrolments', 'courses', 'installments'));
+        return view('partner.learners.show', compact('learner', 'enrolments', 'courses', 'installments', 'isPending'));
     }
 
     /**
@@ -124,76 +156,58 @@ class PartnerLearnerController extends Controller
     /**
      * Store New Learner
      */
-    public function store(Request $request, \App\Services\MicrosoftGraphService $graphService)
+    public function store(Request $request)
     {
         $partner = Auth::user();
 
-        // Validate Personal Email
         $request->validate([
-            'first_name' => 'required|string|max:255',
-            'sur_name' => 'required|string|max:255',
-            'email_address' => 'required|email', // Check format. Uniqueness? Maybe in CRM details later.
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
-            ],
+            'first_name' => 'required|string|max:60',
+            'middle_name' => 'nullable|string|max:60',
+            'sur_name' => 'required|string|max:60',
+            'email_address' => 'required|email',
+            'contact_number' => 'nullable|string|max:50',
+            'dob' => 'nullable|date',
+            'gender' => 'nullable|string|max:20',
+            'address_line_1' => 'nullable|string|max:255',
+            'address_line_2' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:100',
+            'state' => 'nullable|string|max:100',
+            'country' => 'nullable|string|max:100',
+            'zip_code' => 'nullable|string|max:30',
         ]);
 
+        DB::connection('mysql_crm')->beginTransaction();
+
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
-
-            // 1. Create User in Portal DB with TEMP email (to get ID)
-            // We use a safe temp generic email
-            $tempEmail = 'temp_' . uniqid() . '@inspirecollegeoflearning.com';
-
-            $learner = User::create([
-                'org_id' => $partner->id,
-                'status_id' => 1, // Pending
+            $partnerLearner = PartnerLearner::create([
+                'partner_id' => $partner->id,
                 'first_name' => $request->first_name,
-                'sur_name' => $request->sur_name,
-                'email_address' => $tempEmail,
-                'password' => Hash::make($request->password),
-            ]);
-
-            // 2. Generate Correct DS Email
-            $studentCode = config('app.student_email_prefix', 'ICOL') . $learner->id;
-            $dsEmail = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
-
-            // 3. Update Portal User with DS Email
-            $learner->update([
-                'email_address' => $dsEmail
-            ]);
-
-            // 4. Save Personal Email to CRM
-            // Using the Crm\UserDetail model we created
-            \App\Models\Crm\UserDetail::create([
-                'learner_id' => $learner->id,
+                'middle_name' => $request->middle_name ?? '',
+                'last_name' => $request->sur_name,
                 'personal_email' => $request->email_address,
-                // Add other fields if necessary or nullable
+                'phone' => $request->contact_number,
+                'dob' => $request->dob,
+                'gender' => $request->gender,
+                'address_line_1' => $request->address_line_1,
+                'address_line_2' => $request->address_line_2 ?? '',
+                'city' => $request->city,
+                'state' => $request->state ?? '',
+                'country' => $request->country,
+                'zip_code' => $request->zip_code,
+                'payment_status' => 'pending',
+                'activation_status' => 'pending',
+                'enrolment_status' => 'pending_payment',
+                'account_status' => 'pending',
+                'created_by_partner_id' => $partner->id,
             ]);
 
-            // 5. Create in Microsoft Graph (Disabled initially) using DS Email
-            // Note: Password is set to user input as per requirement
-            $msUser = $graphService->createPendingLearner($learner, $request->password);
+            DB::connection('mysql_crm')->commit();
 
-            // 6. Update with MS ID
-            $learner->update([
-                'ms_user_id' => $msUser['id'],
-                'ms_provisioned_at' => now(),
-            ]);
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            return redirect()->route('partner.learners.index')
-                ->with('success', "Learner created successfully. Login Email: {$dsEmail} (Pending Approval).");
+            return redirect()->route('partner.learners.show', 'pending-' . $partnerLearner->id)
+                ->with('success', 'Learner profile created successfully. Add a course and submit payment to continue.');
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::connection('mysql_crm')->rollBack();
             return back()->with('error', 'Error creating learner: ' . $e->getMessage())->withInput();
         }
     }

@@ -14,6 +14,7 @@ class User extends Authenticatable
     protected $table = 'users';
 
     protected $fillable = [
+        'role_id',
         'org_id',
         'stripe_customer_id',
         'first_name',
@@ -21,6 +22,7 @@ class User extends Authenticatable
         'sur_name',
         'email_address',
         'password',
+        'password_set_at',
         'status_id',
         'crm_approved',
         'crm_approved_at',
@@ -33,7 +35,13 @@ class User extends Authenticatable
     protected $casts = [
         'crm_approved' => 'boolean',
         'crm_approved_at' => 'datetime',
+        'password_set_at' => 'datetime',
     ];
+
+    public function getNameAttribute()
+    {
+        return trim($this->first_name . ' ' . $this->sur_name);
+    }
 
     protected $hidden = [
         'password',

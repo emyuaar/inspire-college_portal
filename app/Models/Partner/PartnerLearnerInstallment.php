@@ -35,6 +35,10 @@ class PartnerLearnerInstallment extends Model
         'payment_reference',
         'stripe_payment_intent_id',
         'receipt_path',
+        'submitted_amount',
+        'approved_by',
+        'approved_at',
+        'rejection_reason',
         'notes',
     ];
 
@@ -45,6 +49,8 @@ class PartnerLearnerInstallment extends Model
         'deposit_amount' => 'decimal:2',
         'installment_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
+        'submitted_amount' => 'decimal:2',
+        'approved_at' => 'datetime',
     ];
 
     public function partner()
@@ -70,5 +76,10 @@ class PartnerLearnerInstallment extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    public function paymentProofs()
+    {
+        return $this->hasMany(PartnerPaymentProof::class, 'partner_learner_installment_id');
     }
 }

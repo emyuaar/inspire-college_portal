@@ -9,6 +9,7 @@ use App\Models\Crm\Enrolment;
 use App\Models\Crm\EnrolmentStatus;
 use App\Models\Crm\Order;
 use App\Models\Crm\OrderInstallment;
+use App\Models\Crm\PartnerLearner;
 use App\Services\PricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -71,9 +72,9 @@ class CoursePurchaseController extends Controller
     public function create($learnerId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        [$learner, $isPending] = $this->resolvePartnerLearner($partner->id, $learnerId);
 
-        if (!$learner->crm_approved) {
+        if (!$isPending && !$learner->crm_approved) {
             return back()->with('error', 'Learner is not approved yet.');
         }
 
@@ -114,7 +115,7 @@ class CoursePurchaseController extends Controller
         // For now, let's assume the create view just lists titles. If it shows Price, we might need to mock it.
         // Let's pass the raw course objects for selection.
 
-        return view('partner.courses.create', compact('learner', 'courses'));
+        return view('partner.courses.create', compact('learner', 'courses', 'isPending'));
     }
 
     /**
@@ -123,9 +124,9 @@ class CoursePurchaseController extends Controller
     public function store(Request $request, $learnerId)
     {
         $partner = Auth::user();
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        [$learner, $isPending] = $this->resolvePartnerLearner($partner->id, $learnerId);
 
-        if (!$learner->crm_approved) {
+        if (!$isPending && !$learner->crm_approved) {
             abort(403, 'Learner not approved.');
         }
 
@@ -154,7 +155,9 @@ class CoursePurchaseController extends Controller
             $count = 0;
             foreach ($request->course_ids as $courseId) {
                 // Prevent duplicates
-                $exists = Enrolment::where('learner_id', $learner->id)
+                $exists = Enrolment::query()
+                    ->when($isPending, fn ($query) => $query->where('partner_learner_id', $learner->id))
+                    ->when(! $isPending, fn ($query) => $query->where('learner_id', $learner->id))
                     ->where('course_id', $courseId)
                     ->whereHas('status', function ($q) {
                         $q->whereIn('status', ['active', 'pending-payment', 'pending-plan']);
@@ -164,23 +167,31 @@ class CoursePurchaseController extends Controller
                 if ($exists)
                     continue;
 
-                Enrolment::create([
+                $payload = [
                     'course_id' => $courseId,
-                    'learner_id' => $learner->id,
                     'partner_id' => $partner->id, // Track Partner
                     'status_id' => $status->id,
-                ]);
+                ];
+
+                if ($isPending) {
+                    $payload['learner_id'] = 0;
+                    $payload['partner_learner_id'] = $learner->id;
+                } else {
+                    $payload['learner_id'] = $learner->id;
+                }
+
+                Enrolment::create($payload);
                 $count++;
             }
 
             DB::connection('mysql_crm')->commit();
 
             if ($count == 0) {
-                return redirect()->route('partner.learners.show', $learner->id)
+                return redirect()->route('partner.learners.show', $this->routeLearnerId($learner, $isPending))
                     ->with('warning', 'No new courses added (Learner already enrolled or invalid course).');
             }
 
-            return redirect()->route('partner.learners.show', $learner->id)
+            return redirect()->route('partner.learners.show', $this->routeLearnerId($learner, $isPending))
                 ->with('success', "$count course(s) added. Please select a payment plan for each.");
 
         } catch (\Exception $e) {
@@ -198,12 +209,12 @@ class CoursePurchaseController extends Controller
         $enrolment = Enrolment::with(['course', 'learner', 'status'])
             ->findOrFail($enrolmentId);
 
-        if ($enrolment->learner->org_id !== $partner->id) {
+        if (! $this->partnerOwnsEnrolment($enrolment, $partner->id)) {
             abort(403, 'Unauthorized access to enrolment.');
         }
 
         if ($enrolment->status->status !== 'pending-plan') {
-            return redirect()->route('partner.learners.show', $enrolment->learner_id)
+            return redirect()->route('partner.learners.show', $this->routeEnrolmentLearnerId($enrolment))
                 ->with('warning', 'Plan already selected or enrolment active.');
         }
 
@@ -253,7 +264,7 @@ class CoursePurchaseController extends Controller
         $partner = Auth::user();
         $enrolment = Enrolment::findOrFail($enrolmentId);
 
-        if ($enrolment->learner->org_id !== $partner->id)
+        if (! $this->partnerOwnsEnrolment($enrolment, $partner->id))
             abort(403);
 
         $request->validate([
@@ -302,21 +313,38 @@ class CoursePurchaseController extends Controller
 
             // Create Order
             $order = Order::create(array_merge([
-                'learner_id' => $enrolment->learner_id,
+                'learner_id' => $enrolment->learner_id ?: 0,
+                'partner_learner_id' => $enrolment->partner_learner_id,
                 'enrolment_id' => $enrolment->id,
                 'amount' => $amount,
                 'status_id' => 0, // Pending
             ], $snapshot));
 
             // Create Future Installments if needed
-            if ($request->plan_type == 'installment') {
+            if ($request->plan_type == 'full') {
+                \App\Models\Partner\PartnerLearnerInstallment::create([
+                    'partner_id' => $partner->id,
+                    'learner_id' => $enrolment->learner_id ?: ($enrolment->partner_learner_id ?: 0),
+                    'enrolment_id' => $enrolment->id,
+                    'order_id' => $order->id,
+                    'course_id' => $enrolment->course_id,
+                    'plan_type' => 'full',
+                    'total_amount' => $amount,
+                    'deposit_amount' => $amount,
+                    'installment_amount' => $amount,
+                    'installments_count' => 1,
+                    'installment_no' => 0,
+                    'due_date' => now(),
+                    'status' => 'pending',
+                ]);
+            } elseif ($request->plan_type == 'installment') {
                 $plan = $assignment->plans->where('plan_type', 'installment')->first();
                 $startDate = now();
 
                 // Deposit Row (Installment 0)
                 \App\Models\Partner\PartnerLearnerInstallment::create([
                     'partner_id' => $partner->id,
-                    'learner_id' => $enrolment->learner_id,
+                    'learner_id' => $enrolment->learner_id ?: ($enrolment->partner_learner_id ?: 0),
                     'enrolment_id' => $enrolment->id,
                     'order_id' => $order->id,
                     'course_id' => $enrolment->course_id,
@@ -334,7 +362,7 @@ class CoursePurchaseController extends Controller
                 for ($i = 1; $i <= $plan->months; $i++) {
                     \App\Models\Partner\PartnerLearnerInstallment::create([
                         'partner_id' => $partner->id,
-                        'learner_id' => $enrolment->learner_id,
+                        'learner_id' => $enrolment->learner_id ?: ($enrolment->partner_learner_id ?: 0),
                         'enrolment_id' => $enrolment->id,
                         'course_id' => $enrolment->course_id,
                         'plan_type' => 'deposit_installments',
@@ -352,13 +380,55 @@ class CoursePurchaseController extends Controller
             $enrolment->update(['status_id' => $status->id]);
             DB::connection('mysql_crm')->commit();
 
-            return redirect()->route('partner.learners.show', $enrolment->learner_id)
+            return redirect()->route('partner.learners.show', $this->routeEnrolmentLearnerId($enrolment))
                 ->with('success', 'Plan selected. Please proceed to payment.');
 
         } catch (\Exception $e) {
             DB::connection('mysql_crm')->rollBack();
             return back()->with('error', 'Error: ' . $e->getMessage());
         }
+    }
+
+    private function resolvePartnerLearner(int $partnerId, string|int $learnerId): array
+    {
+        if (str_starts_with((string) $learnerId, 'pending-')) {
+            $id = (int) str_replace('pending-', '', (string) $learnerId);
+            return [PartnerLearner::where('partner_id', $partnerId)->findOrFail($id), true];
+        }
+
+        $learner = User::myLearners($partnerId)->find($learnerId);
+        if ($learner) {
+            return [$learner, false];
+        }
+
+        return [PartnerLearner::where('partner_id', $partnerId)->findOrFail($learnerId), true];
+    }
+
+    private function partnerOwnsEnrolment(Enrolment $enrolment, int $partnerId): bool
+    {
+        if ((int) $enrolment->partner_id === $partnerId) {
+            return true;
+        }
+
+        if ($enrolment->partner_learner_id) {
+            return PartnerLearner::where('partner_id', $partnerId)->where('id', $enrolment->partner_learner_id)->exists();
+        }
+
+        return $enrolment->learner && (int) $enrolment->learner->org_id === $partnerId;
+    }
+
+    private function routeEnrolmentLearnerId(Enrolment $enrolment): string|int
+    {
+        if ($enrolment->partner_learner_id) {
+            return 'pending-' . $enrolment->partner_learner_id;
+        }
+
+        return $enrolment->learner_id;
+    }
+
+    private function routeLearnerId($learner, bool $isPending): string|int
+    {
+        return $isPending ? 'pending-' . $learner->id : $learner->id;
     }
 
 }

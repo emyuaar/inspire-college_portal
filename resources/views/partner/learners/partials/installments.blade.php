@@ -37,6 +37,7 @@
                             amount: {!! json_encode((float) ($inst->installment_amount ?? 0)) !!},
                             paid: {!! json_encode((float) ($inst->paid_amount ?? 0)) !!},
                             status: {!! json_encode(strtolower($inst->status ?? 'pending')) !!},
+                            can_stripe: {!! json_encode(!($isPending ?? false)) !!},
                             checkout_url: {!! json_encode(route("partner.installments.checkout", $inst->id)) !!}
                         },
                     @endforeach
@@ -263,7 +264,7 @@
                                 <td class="px-4 py-3 text-right align-top">
                                     <div x-show="row.status !== 'paid'" class="flex gap-2 justify-end">
                                         {{-- Pay Button --}}
-                                        <a :href="row.checkout_url"
+                                        <a x-show="row.can_stripe" :href="row.checkout_url"
                                             class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-ds-navy rounded shadow-sm hover:bg-[#00203a] hover:shadow-md transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-navy">
                                             Pay
                                         </a>
@@ -383,8 +384,15 @@
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1.5 text-slate-600">Proof of Payment</label>
-                                        <input type="file" name="receipt"
+                                        <input type="file" name="receipt" required
                                             class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200 cursor-pointer">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold mb-1.5 text-slate-600">Notes <span
+                                                class="text-slate-400 font-normal">(Optional)</span></label>
+                                        <textarea name="notes" rows="2"
+                                            class="w-full text-sm border-slate-200 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                            placeholder="Any details for admissions or finance"></textarea>
                                     </div>
                                 </div>
                                 <div

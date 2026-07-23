@@ -5,7 +5,7 @@
 @section('content')
     <div class="max-w-2xl mx-auto px-4 py-8">
         <div class="mb-6">
-            <a href="{{ route('partner.learners.show', $enrolment->learner_id) }}"
+            <a href="{{ route('partner.learners.show', $enrolment->partner_learner_id ? 'pending-' . $enrolment->partner_learner_id : $enrolment->learner_id) }}"
                 class="text-slate-500 hover:text-slate-700 flex items-center gap-2 text-sm">
                 &larr; Back to Learner
             </a>

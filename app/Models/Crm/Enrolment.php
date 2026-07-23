@@ -13,8 +13,14 @@ class Enrolment extends Model
     protected $fillable = [
         'course_id',
         'learner_id',
+        'partner_learner_id',
         'partner_id',
         'status_id',
+        'payment_status',
+        'activation_status',
+        'enrolment_status',
+        'activated_at',
+        'welcome_email_sent_at',
     ];
 
     public function course()
@@ -25,6 +31,11 @@ class Enrolment extends Model
     public function learner()
     {
         return $this->belongsTo(\App\Models\User::class, 'learner_id');
+    }
+
+    public function partnerLearner()
+    {
+        return $this->belongsTo(PartnerLearner::class, 'partner_learner_id');
     }
 
     public function partner()
@@ -45,6 +56,11 @@ class Enrolment extends Model
     public function orders()
     {
         return $this->hasMany(Order::class, 'enrolment_id');
+    }
+
+    public function partnerInstallments()
+    {
+        return $this->hasMany(\App\Models\Partner\PartnerLearnerInstallment::class, 'enrolment_id');
     }
 
     /**

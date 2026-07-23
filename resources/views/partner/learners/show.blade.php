@@ -13,7 +13,7 @@
             </svg>
         </a>
         <div>
-            <h1 class="text-xl font-bold text-slate-900">{{ $learner->first_name }} {{ $learner->sur_name }}</h1>
+            <h1 class="text-xl font-bold text-slate-900">{{ $learner->first_name }} {{ $learner->sur_name ?? $learner->last_name }}</h1>
             <p class="text-sm text-slate-500">Learner Profile & Enrolments</p>
         </div>
     </div>
@@ -25,7 +25,9 @@
             
             <x-ui.card title="Learner Profile" subtitle="Account & Provisioning Status">
                 <x-slot name="actions">
-                     @if(!$learner->crm_approved)
+                     @if($isPending ?? false)
+                        <x-ui.badge variant="warning">Activation Pending</x-ui.badge>
+                     @elseif(!$learner->crm_approved)
                         <x-ui.badge variant="warning">Pending Approval</x-ui.badge>
                     @elseif($learner->status_id == 2)
                          <x-ui.badge variant="success">Active</x-ui.badge>
@@ -41,8 +43,8 @@
                              {{ substr($learner->first_name, 0, 1) }}{{ substr($learner->sur_name, 0, 1) }}
                         </div>
                         <div>
-                            <div class="font-bold text-slate-800">{{ $learner->first_name }} {{ $learner->sur_name }}</div>
-                            <div class="text-slate-500">{{ $learner->email_address }}</div>
+                            <div class="font-bold text-slate-800">{{ $learner->first_name }} {{ $learner->sur_name ?? $learner->last_name }}</div>
+                            <div class="text-slate-500">{{ $learner->email_address ?? $learner->personal_email }}</div>
                         </div>
                     </div>
 
@@ -50,7 +52,9 @@
                     <div class="flex justify-between py-1">
                         <dt class="text-slate-500">CRM Approval</dt>
                         <dd class="text-right">
-                             @if($learner->crm_approved)
+                             @if($isPending ?? false)
+                                <span class="font-bold text-slate-400">Awaiting Payment</span>
+                             @elseif($learner->crm_approved)
                                 <span class="font-bold text-slate-700 flex items-center justify-end gap-1">
                                     <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                     Approved
@@ -65,7 +69,7 @@
                     <div class="flex justify-between py-1">
                         <dt class="text-slate-500">Microsoft 365</dt>
                         <dd class="text-right">
-                             @if($learner->ms_user_id)
+                             @if(!($isPending ?? false) && $learner->ms_user_id)
                                  @if($learner->status_id == 2)
                                      <span class="font-bold text-emerald-600">Active</span>
                                  @else
@@ -139,7 +143,7 @@
         <div class="lg:col-span-7 space-y-6">
             <x-ui.card title="Enrolled Courses" subtitle="Manage payment plans and view progress">
                 <x-slot name="actions">
-                    @if($learner->crm_approved)
+                    @if(($isPending ?? false) || $learner->crm_approved)
                         <x-ui.button variant="outline" size="sm" data-bs-toggle="modal" data-bs-target="#addCourseModal">
                             <x-slot name="icon">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -198,12 +202,12 @@
                                 
                                 <div class="shrink-0 pt-1">
                                     {{-- Actions --}}
-                                    @if($statusName == 'pending-plan' && $learner->crm_approved)
+                                    @if($statusName == 'pending-plan' && (($isPending ?? false) || $learner->crm_approved))
                                         <x-ui.button variant="brand" size="sm" href="{{ route('partner.enrolments.choose_plan', $enrolment->id) }}">
                                             Select Plan
                                         </x-ui.button>
                                     
-                                    @elseif($statusName == 'pending-payment' && $learner->crm_approved)
+                                    @elseif($statusName == 'pending-payment' && !($isPending ?? false) && $learner->crm_approved)
                                         <form action="{{ route('partner.checkout', $learner->id) }}" method="POST" 
                                               x-data="{ 
                                                 expanded: false, 
