@@ -33,8 +33,38 @@ class PartnerLearnerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $partnerLearnersByUser = PartnerLearner::where('partner_id', $partner->id)
+            ->whereIn('user_id', $activeLearners->pluck('id'))
+            ->orderByDesc('id')
+            ->get()
+            ->unique('user_id')
+            ->keyBy('user_id');
+
+        $seenLearnerKeys = [];
+        $activeLearners = $activeLearners->filter(function ($learner) use ($partnerLearnersByUser, &$seenLearnerKeys) {
+            $partnerLearner = $partnerLearnersByUser->get($learner->id);
+            $key = strtolower(trim($partnerLearner?->personal_email ?: $learner->email_address));
+
+            if (isset($seenLearnerKeys[$key])) {
+                return false;
+            }
+
+            $seenLearnerKeys[$key] = true;
+            return true;
+        })->values();
+
+        $activatedPersonalEmails = PartnerLearner::where('partner_id', $partner->id)
+            ->whereNotNull('user_id')
+            ->whereIn('activation_status', ['active', 'completed'])
+            ->pluck('personal_email')
+            ->filter()
+            ->unique()
+            ->values();
+
         $pendingLearners = PartnerLearner::where('partner_id', $partner->id)
             ->where('activation_status', 'pending')
+            ->whereNull('user_id')
+            ->when($activatedPersonalEmails->isNotEmpty(), fn ($query) => $query->whereNotIn('personal_email', $activatedPersonalEmails))
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -176,6 +206,23 @@ class PartnerLearnerController extends Controller
             'zip_code' => 'nullable|string|max:30',
         ]);
 
+        $personalEmail = strtolower(trim($request->email_address));
+        $existingLearner = PartnerLearner::where('partner_id', $partner->id)
+            ->where('personal_email', $personalEmail)
+            ->orderByDesc('user_id')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existingLearner) {
+            if ($existingLearner->user_id) {
+                return redirect()->route('partner.learners.show', $existingLearner->user_id)
+                    ->with('info', 'This learner already exists. Opening the existing learner profile.');
+            }
+
+            return redirect()->route('partner.learners.show', 'pending-' . $existingLearner->id)
+                ->with('info', 'This learner already exists and is still awaiting payment/activation.');
+        }
+
         DB::connection('mysql_crm')->beginTransaction();
 
         try {
@@ -184,7 +231,7 @@ class PartnerLearnerController extends Controller
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name ?? '',
                 'last_name' => $request->sur_name,
-                'personal_email' => $request->email_address,
+                'personal_email' => $personalEmail,
                 'phone' => $request->contact_number,
                 'dob' => $request->dob,
                 'gender' => $request->gender,
