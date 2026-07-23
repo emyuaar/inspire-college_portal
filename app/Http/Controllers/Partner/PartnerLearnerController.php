@@ -28,6 +28,8 @@ class PartnerLearnerController extends Controller
             abort(403, 'Unauthorized. Partners only.');
         }
 
+        $this->reconcileActivatedPartnerLearners((int) $partner->id);
+
         $activeLearners = User::myLearners($partner->id)
             ->with(['enrolments', 'enrolments.status']) // Assuming relationships exist or will filter in view
             ->orderBy('created_at', 'desc')
@@ -64,11 +66,41 @@ class PartnerLearnerController extends Controller
         $pendingLearners = PartnerLearner::where('partner_id', $partner->id)
             ->where('activation_status', 'pending')
             ->whereNull('user_id')
+            ->whereDoesntHave('enrolments', fn ($query) => $query->where('learner_id', '>', 0))
             ->when($activatedPersonalEmails->isNotEmpty(), fn ($query) => $query->whereNotIn('personal_email', $activatedPersonalEmails))
             ->orderBy('created_at', 'desc')
             ->get();
 
         return view('partner.learners.index', compact('partner', 'activeLearners', 'pendingLearners'));
+    }
+
+    private function reconcileActivatedPartnerLearners(int $partnerId): void
+    {
+        $pendingLearners = PartnerLearner::where('partner_id', $partnerId)
+            ->whereNull('user_id')
+            ->whereHas('enrolments', fn ($query) => $query->where('learner_id', '>', 0))
+            ->with(['enrolments' => fn ($query) => $query->where('learner_id', '>', 0)->latest('id')])
+            ->get();
+
+        foreach ($pendingLearners as $pendingLearner) {
+            $enrolment = $pendingLearner->enrolments->first();
+            if (! $enrolment) {
+                continue;
+            }
+
+            $portalUser = User::myLearners($partnerId)->find($enrolment->learner_id);
+            if (! $portalUser) {
+                continue;
+            }
+
+            $pendingLearner->update([
+                'user_id' => $portalUser->id,
+                'email' => $portalUser->email_address,
+                'account_status' => $portalUser->status_id == 2 ? 'active' : 'pending',
+                'activation_status' => $portalUser->crm_approved ? 'active' : 'pending',
+                'enrolment_status' => $enrolment->enrolment_status ?: ($portalUser->crm_approved ? 'active' : 'pending_payment'),
+            ]);
+        }
     }
 
     /**
