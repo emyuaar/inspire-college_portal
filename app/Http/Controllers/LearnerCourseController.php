@@ -662,24 +662,18 @@ class LearnerCourseController extends Controller
         }
 
         if (!blank($lesson->file_path)) {
-            if (\Storage::disk('public')->exists($lesson->file_path)) {
-                return response()->download(\Storage::disk('public')->path($lesson->file_path), $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
-            }
+            // LMS files exist in both the portal disk and the CRM public disk
+            // depending on when the lesson was created. Resolve both layouts
+            // through the same protected path resolver used by secure lessons.
+            $fullPath = $this->secureDocumentService->resolvePath($lesson->file_path);
 
-            // 2. Try CRM storage root
-            $crmRoot = config('services.crm.storage_root');
-            if ($crmRoot) {
-                $crmRootReal = realpath($crmRoot);
-                if ($crmRootReal) {
-                    // LMS resources are on 'public' disk in CRM, so storage/app/public/{file_path}
-                    $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $lesson->file_path), '\\/');
-                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $relative;
+            if ($fullPath) {
+                $downloadName = $lesson->file_name
+                    ?? $lesson->title . '.' . pathinfo($fullPath, PATHINFO_EXTENSION);
 
-                    $fullReal = realpath($fullPath);
-                    if ($fullReal && is_file($fullReal) && strpos($fullReal, $crmRootReal) === 0) {
-                        return response()->download($fullReal, $lesson->title . '.' . pathinfo($fullReal, PATHINFO_EXTENSION));
-                    }
-                }
+                return response()->download($fullPath, $downloadName, [
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
             }
         }
 
