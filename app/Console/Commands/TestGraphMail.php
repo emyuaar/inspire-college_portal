@@ -31,7 +31,7 @@ class TestGraphMail extends Command
         try {
             $graph = new \App\Services\MicrosoftGraphService();
             $subject = 'Test Microsoft Graph API SendMail';
-            $body = '<h1>Hello from DirectSkills</h1><p>This is a manual test email via Microsoft Graph API.</p>';
+            $body = '<h1>Hello from Inspire College</h1><p>This is a manual test email via Microsoft Graph API.</p>';
             
             $graph->sendMail($subject, $body, $email);
             

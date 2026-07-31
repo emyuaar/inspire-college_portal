@@ -133,7 +133,7 @@ final class UiVariants
                 'summaryIcon' => 'text-emerald-500',
                 'submissionBox' => 'bg-slate-50 border border-slate-100 text-slate-700',
                 'uploadFileButton' => 'file:bg-ds-pink',
-                'uploadFileHoverButton' => 'hover:file:bg-pink-700',
+                'uploadFileHoverButton' => 'hover:file:bg-blue-700',
                 'uploadInputBorderHover' => 'hover:border-ds-pink/30',
             ],
         ];

@@ -35,7 +35,7 @@
                     $colors = $n->colorClasses();
                 @endphp
                 <a href="{{ route('partner.notifications.read', $n->id) }}"
-                   class="group flex items-start gap-5 p-5 bg-white rounded-2xl border {{ $n->isUnread() ? 'border-ds-pink/20 shadow-md shadow-pink-50' : 'border-slate-100 shadow-sm' }} hover:shadow-lg transition-all duration-200">
+                   class="group flex items-start gap-5 p-5 bg-white rounded-2xl border {{ $n->isUnread() ? 'border-ds-pink/20 shadow-md shadow-blue-50' : 'border-slate-100 shadow-sm' }} hover:shadow-lg transition-all duration-200">
 
                     {{-- Icon --}}
                     <div class="shrink-0 w-12 h-12 rounded-2xl {{ $colors['bg'] }} flex items-center justify-center">

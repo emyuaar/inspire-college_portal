@@ -8,9 +8,9 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-black text-slate-900 leading-tight">Support Tickets</h1>
-            <p class="text-xs font-bold text-slate-500 uppercase tracking-tighter">Manage your conversations with DirectSkills staff</p>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-tighter">Manage your conversations with Inspire College staff</p>
         </div>
-        <x-ui.button variant="primary" href="{{ route('partner.support.create') }}" class="bg-ds-pink border-ds-pink hover:bg-pink-700">
+        <x-ui.button variant="primary" href="{{ route('partner.support.create') }}" class="bg-ds-pink border-ds-pink hover:bg-blue-700">
             <x-slot name="icon">
                 <i class="fa-solid fa-plus text-xs"></i>
             </x-slot>

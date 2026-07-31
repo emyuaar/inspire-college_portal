@@ -247,7 +247,7 @@
                                 @else
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="{{ route('partner.installments.checkout', $inst->id) }}" 
-                                            class="inline-flex items-center justify-center px-4 py-2 bg-ds-pink text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-pink-700 shadow-lg shadow-pink-200 transition-all hover:-translate-y-0.5 active:translate-y-0">
+                                            class="inline-flex items-center justify-center px-4 py-2 bg-ds-pink text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0">
                                             Pay Now
                                         </a>
                                         <button type="button" x-data @click="$dispatch('open-payment-modal', {id: {{ $inst->id }}})"
@@ -331,13 +331,13 @@
                                 <div x-data="{ fileName: null }">
                                     <label class="block text-[10px] font-black uppercase tracking-widest mb-2 text-slate-500">Receipt Image/PDF</label>
                                     <div class="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-2xl transition-all cursor-pointer group relative overflow-hidden"
-                                         :class="fileName ? 'border-ds-pink bg-pink-50/30' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'">
+                                         :class="fileName ? 'border-ds-pink bg-blue-50/30' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'">
                                         <div class="space-y-2 text-center" x-show="!fileName">
                                             <div class="h-14 w-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform group-hover:bg-indigo-100 group-hover:text-indigo-600 text-slate-400">
                                                 <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
                                             </div>
                                             <div class="flex justify-center text-xs">
-                                                <span class="font-black text-ds-pink group-hover:text-pink-700 transition-colors">Choose file</span>
+                                                <span class="font-black text-ds-pink group-hover:text-blue-700 transition-colors">Choose file</span>
                                                 <p class="pl-1 text-slate-500 font-bold">or drop here</p>
                                             </div>
                                             <p class="text-[10px] text-slate-400 font-medium">High quality JPG, PNG or PDF (Max 5MB)</p>

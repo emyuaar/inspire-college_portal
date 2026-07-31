@@ -241,39 +241,29 @@
         }
 
         async function loadSecurePdf() {
-            const pdfDataUrl = "{{ route('learner.lessons.secure-pdf-data', $lesson->id) }}" + "?t=" + Date.now();
-
-            console.log('Loading secure PDF data:', pdfDataUrl);
+            const pdfStreamUrl = url + (url.includes('?') ? '&' : '?') + "t=" + Date.now();
 
             try {
-                const res = await fetch(pdfDataUrl, {
+                const res = await fetch(pdfStreamUrl, {
                     method: 'GET',
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: {
-                        'Accept': 'application/json',
+                        'Accept': 'application/pdf',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
 
-                console.log('PDF JSON status:', res.status);
-
                 if (!res.ok) {
-                    throw new Error('PDF data fetch failed: ' + res.status);
+                    throw new Error('PDF stream fetch failed: ' + res.status);
                 }
 
-                const result = await res.json();
-
-                if (!result.success || !result.data) {
-                    throw new Error('Invalid PDF data response');
+                const contentType = (res.headers.get('content-type') || '').toLowerCase();
+                if (!contentType.includes('application/pdf')) {
+                    throw new Error('Secure document endpoint did not return a PDF');
                 }
 
-                const binaryString = atob(result.data);
-                const bytes = new Uint8Array(binaryString.length);
-
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
+                const bytes = new Uint8Array(await res.arrayBuffer());
 
                 const loadingTask = pdfjsLib.getDocument({
                     data: bytes,

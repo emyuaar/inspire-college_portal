@@ -271,9 +271,12 @@ class Enrolment extends Model
                     continue;
                 }
 
-                // If Overdue
-                // 'overdue' status OR (due_date passed AND no grace)
-                if ($inst->payment_status === 'overdue' || ($inst->due_date && $inst->due_date < $now->startOfDay())) {
+                // A stored "overdue" value is only actionable once its due date
+                // has actually passed. Older records can retain that value after
+                // a plan is recreated/rescheduled, so status alone must not block
+                // a future installment.
+                $isPastDue = $inst->due_date && $inst->due_date < $now->startOfDay();
+                if ($isPastDue || ($inst->payment_status === 'overdue' && ! $inst->due_date)) {
                     return false; // Block access
                 }
 
@@ -339,7 +342,8 @@ class Enrolment extends Model
             $now = now()->startOfDay();
 
             foreach ($unpaidInstallments as $inst) {
-                if ($inst->payment_status === 'overdue' || ($inst->due_date && $inst->due_date < $now)) {
+                $isPastDue = $inst->due_date && $inst->due_date < $now;
+                if ($isPastDue || ($inst->payment_status === 'overdue' && ! $inst->due_date)) {
                     if ($inst->grace_until && $inst->grace_until >= $now) {
                         return null; // In grace
                     }

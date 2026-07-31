@@ -52,7 +52,7 @@
                             <div class="flex items-center justify-between gap-8 mb-1.5">
                                 <span class="text-[9px] font-black uppercase tracking-widest opacity-80"
                                       :class="message.is_self ? 'text-blue-100' : 'text-ds-pink'"
-                                      x-text="message.is_self ? 'DirectSkills Partner' : 'DirectSkills Support'">
+                                      x-text="message.is_self ? 'Inspire College Partner' : 'Inspire College Support'">
                                 </span>
                                 <span class="text-[8px] font-bold uppercase tracking-tighter opacity-50" x-text="message.created_at"></span>
                             </div>
@@ -83,7 +83,7 @@
                                 Average support response: 1-2 hours
                             </div>
                             <button type="submit" 
-                                    class="bg-ds-pink text-white rounded-xl h-11 px-8 flex items-center justify-center gap-3 transition-all hover:bg-pink-700 hover:shadow-lg disabled:opacity-50 disabled:grayscale" 
+                                    class="bg-ds-pink text-white rounded-xl h-11 px-8 flex items-center justify-center gap-3 transition-all hover:bg-blue-700 hover:shadow-lg disabled:opacity-50 disabled:grayscale"
                                     :disabled="!newMessage.trim() || sending">
                                 <span x-show="!sending" class="flex items-center gap-2">
                                     <span class="text-xs font-black uppercase tracking-widest text-white">Send Reply</span>

@@ -64,20 +64,20 @@ class MicrosoftGraphService
     {
         $token = $this->getAccessToken();
 
-        // 1. Determine UPN (DS{id}@domain)
-        // Assumption: We want to use the standard DS email format if possible, 
+        // 1. Determine UPN (ICOL{id}@domain)
+        // Inspire College learner accounts use the ICOL email prefix.
         // to match CRM logic.
-        $domain = 'directskills.co.uk'; // Ideally from config, but hardcoded in CRM example too? No, CRM used config.
+        $domain = 'inspirecollegeoflearning.com'; // Fallback for the Inspire College tenant.
         // Let's assume we can get it from the user's current email or use a standard one.
-        // CRM logic: $dsEmail = "DS{$dsNo}@{$domain}";
+        // CRM logic: $icolEmail = "ICOL{$dsNo}@{$domain}";
         // I'll stick to what the CRM does to ensure consistency.
         // I need the domain.
-        // If not in config, I'll fallback to 'directskills.co.uk'. 
+        // If not in config, fall back to the Inspire College domain.
         // Or extract from existing email if it matches pattern?
         // Safest is to generate it:
         $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'directskills.co.uk'); // Add domain to config if needed, logic below
-        $upn = "DS{$dsNo}@{$domain}";
+        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com');
+        $upn = "ICOL{$dsNo}@{$domain}";
 
         // If user already has ms_user_id, check if they exist?
         // Idempotency handled by createUserOrGetExisting
@@ -194,8 +194,8 @@ class MicrosoftGraphService
         $token = $this->getAccessToken();
 
         $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'directskills.co.uk');
-        $upn = "DS{$dsNo}@{$domain}"; // Or use $user->email_address if already set to DS email
+        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com');
+        $upn = "ICOL{$dsNo}@{$domain}"; // Or use $user->email_address if already set
 
         $displayName = trim($user->first_name . ' ' . $user->sur_name);
 
@@ -331,7 +331,7 @@ class MicrosoftGraphService
         $token = $this->getAccessToken();
 
         $senderEmail = config('mail.from.address', 'hello@example.com');
-        $senderName = config('mail.from.name', 'DirectSkills');
+        $senderName = config('mail.from.name', 'Inspire College');
         $saveToSentItems = (bool) config('mail.save_to_sent_items', true);
 
         $url = "https://graph.microsoft.com/v1.0/users/{$senderEmail}/sendMail";

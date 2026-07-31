@@ -5,6 +5,17 @@
         <form method="POST" action="{{ route('portal.profile.personal.update') }}" enctype="multipart/form-data" class="space-y-8">
             @csrf
 
+            @if ($errors->any())
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p class="font-bold">Please correct the following before saving:</p>
+                    <ul class="mt-1 list-disc pl-5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             {{-- 1. Basic Details (Read Only) --}}
             <div class="bg-slate-50 p-6 rounded-xl border border-slate-100">
                 <div class="flex items-center justify-between mb-4">
@@ -105,7 +116,7 @@
             <div>
                  <div class="flex items-center justify-between mb-4">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-ds-navy">Documents</h3>
-                    <span class="text-xs text-slate-400">PDF, JPG, PNG allowed</span>
+                    <span class="text-xs text-slate-400">PDF, JPG, PNG allowed · Max 20MB per file</span>
                 </div>
 
                 <div class="space-y-4">
@@ -113,12 +124,12 @@
                     {{-- Identity --}}
                     <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Identity Documents <span class="text-slate-500 font-normal text-xs ml-1">(Multiple allowed)</span></label>
-                        <input type="file" name="identity_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#00203a] transition-all"/>
+                        <input type="file" name="identity_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#0B1220] transition-all"/>
                         
                         @if($identityDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($identityDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-navy transition-colors">
+                                    <a href="{{ route('portal.profile.document.download', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-navy transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>
@@ -130,12 +141,12 @@
                     {{-- Education --}}
                     <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Educational Documents <span class="text-slate-500 font-normal text-xs ml-1">(Multiple allowed)</span></label>
-                        <input type="file" name="education_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#00203a] transition-all"/>
+                        <input type="file" name="education_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#0B1220] transition-all"/>
                         
                          @if($educationDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($educationDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-pink transition-colors">
+                                    <a href="{{ route('portal.profile.document.download', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-pink transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>
@@ -147,12 +158,12 @@
                     {{-- Experience --}}
                      <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Experience Documents <span class="text-slate-500 font-normal text-xs ml-1">(Optional)</span></label>
-                        <input type="file" name="experience_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#00203a] transition-all"/>
+                        <input type="file" name="experience_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#0B1220] transition-all"/>
                         
                          @if($experienceDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($experienceDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-slate-500 transition-colors">
+                                    <a href="{{ route('portal.profile.document.download', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-slate-500 transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>

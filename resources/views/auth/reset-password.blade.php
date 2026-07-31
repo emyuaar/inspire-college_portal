@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }} - DirectSkills</title>
+    <title>{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }} - Inspire College</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -25,7 +25,7 @@
             margin-bottom: 10px;
             font-size: 13px;
             font-weight: 800;
-            color: #01345B;
+            color: #0F172A;
         }
 
         .ds-password-rules ul {
@@ -83,7 +83,7 @@
         {{-- Logo --}}
         <div class="text-center mb-8">
             <div class="mb-4">
-                <img src="https://directskills.co.uk/images/DirectSkills_logo.png" alt="DirectSkills" class="h-10 mx-auto">
+                <img src="{{ asset('images/1000ppi/logo.png') }}" alt="Inspire College" class="h-10 mx-auto">
             </div>
             <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }}</h1>
             <p class="text-slate-500 mt-2">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Create a secure password to access your course.' : 'Choose a new secure password for your account.' }}</p>
@@ -155,12 +155,12 @@
             </div>
             
             <div class="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
-                <p class="text-xs text-slate-400 font-medium">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Secure Account Activation' : 'Secure Password Reset' }} • DirectSkills Portal</p>
+                <p class="text-xs text-slate-400 font-medium">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Secure Account Activation' : 'Secure Password Reset' }} • Inspire College Portal</p>
             </div>
         </div>
         
         <p class="text-center mt-8 text-slate-400 text-sm">
-            Need help? Contact <a href="mailto:support@directskills.co.uk" class="text-slate-600 font-bold hover:underline">Support</a>
+            Need help? Contact <a href="mailto:support@inspirecollegeoflearning.com" class="text-slate-600 font-bold hover:underline">Support</a>
         </p>
     </div>
 

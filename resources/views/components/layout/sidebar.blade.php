@@ -25,8 +25,8 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-ds-navy text-white transition-transform duration-300 ease-in-out transform -translate-x-full lg:translate-x-0 lg:static lg:block shadow-xl lg:shadow-none">
     
     {{-- Branding --}}
-    <div class="h-16 flex items-center justify-center pl-0 pr-6 border-b border-white/10 bg-[#00203a]">
-        <img src="https://directskills.co.uk/images/DirectSKills%20inverted-02.png" alt="DirectSkills" class="h-12">
+    <div class="h-16 flex items-center justify-center pl-0 pr-6 border-b border-white/10 bg-[#0B1220]">
+        <img src="{{ asset('images/1000ppi/logo-white.png') }}" alt="Inspire College" class="h-12">
         {{-- Close button for mobile --}}
         <button id="closeSidebar" class="lg:hidden ml-auto text-white/70 hover:text-white">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -42,7 +42,7 @@
                 $isActive = $active === $key || request()->routeIs($item['route']);
             @endphp
             <a href="{{ route($item['route']) }}" 
-               class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 {{ $isActive ? 'bg-ds-pink text-white shadow-lg shadow-pink-900/20' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+               class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 {{ $isActive ? 'bg-ds-pink text-white shadow-lg shadow-blue-900/20' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
                 <svg class="w-5 h-5 {{ $isActive ? 'text-white' : 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     {!! $item['icon'] !!}
                 </svg>

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Crm\UserDetail;
 use App\Models\Crm\LearnerDocument;
@@ -37,6 +38,18 @@ class ProfileController extends Controller
         ));
     }
 
+    public function downloadDocument(int $documentId)
+    {
+        $document = LearnerDocument::where('learner_id', Auth::id())->findOrFail($documentId);
+
+        abort_unless(Storage::disk('public')->exists($document->file_path), 404, 'Document not found.');
+
+        return Storage::disk('public')->download(
+            $document->file_path,
+            $document->title ?: basename($document->file_path)
+        );
+    }
+
     public function updatePersonal(Request $request)
     {
         $user = Auth::user();
@@ -53,9 +66,12 @@ class ProfileController extends Controller
             'state'          => ['nullable', 'string', 'max:100'],
             'zip_code'       => ['nullable', 'string', 'max:20'],
 
-            'identity_documents.*'   => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'education_documents.*'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'experience_documents.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'identity_documents'     => ['nullable', 'array'],
+            'education_documents'    => ['nullable', 'array'],
+            'experience_documents'   => ['nullable', 'array'],
+            'identity_documents.*'   => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
+            'education_documents.*'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
+            'experience_documents.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:20480'],
         ]);
 
         $detail = UserDetail::firstOrNew(['learner_id' => $user->id]);
@@ -209,6 +225,12 @@ class ProfileController extends Controller
 
             // store in public disk (storage/app/public/...)
             $path = $file->storeAs($dir, $safeName, 'public');
+
+            if (!$path) {
+                throw ValidationException::withMessages([
+                    $inputName => 'The document could not be saved. Please try again.',
+                ]);
+            }
 
             // DB save (update model/table fields as per your schema)
             \App\Models\Crm\LearnerDocument::create([

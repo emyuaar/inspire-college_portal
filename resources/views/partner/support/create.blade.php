@@ -75,7 +75,7 @@
 
             <div class="pt-4">
                 <button type="submit" 
-                        class="w-full py-5 bg-ds-pink text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-pink-500/10 transition-all hover:bg-pink-700 hover:shadow-2xl hover:shadow-pink-500/20 active:scale-[0.98] flex items-center justify-center gap-3 group">
+                        class="w-full py-5 bg-ds-pink text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-500/10 transition-all hover:bg-blue-700 hover:shadow-2xl hover:shadow-blue-500/20 active:scale-[0.98] flex items-center justify-center gap-3 group">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>

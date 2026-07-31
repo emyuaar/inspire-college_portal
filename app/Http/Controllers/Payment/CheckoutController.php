@@ -172,7 +172,7 @@ class CheckoutController extends Controller
                             'currency' => 'gbp',
                             'unit_amount' => $partnerPricing->toMinorUnits((string) $amountToPay),
                             'product_data' => [
-                                'name' => 'DirectSkills Course Payment',
+                                'name' => 'Inspire College Course Payment',
                                 'description' => $description,
                                 'metadata' => [
                                     'course_name' => $enrolment->course->title ?? 'Course',

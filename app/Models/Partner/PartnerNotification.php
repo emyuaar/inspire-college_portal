@@ -88,7 +88,7 @@ class PartnerNotification extends Model
             'green'  => ['bg' => 'bg-green-100', 'text' => 'text-green-600'],
             'amber'  => ['bg' => 'bg-amber-100', 'text' => 'text-amber-600'],
             'blue'   => ['bg' => 'bg-blue-100',  'text' => 'text-blue-600'],
-            'pink'   => ['bg' => 'bg-pink-100',  'text' => 'text-pink-600'],
+            'pink'   => ['bg' => 'bg-blue-100',  'text' => 'text-blue-600'],
             default  => ['bg' => 'bg-slate-100', 'text' => 'text-slate-500'],
         };
     }

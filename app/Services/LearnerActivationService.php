@@ -88,7 +88,7 @@ class LearnerActivationService
 
                     // If the email was not set (generated), update it now
                     if (!$partnerLearner->email) {
-                        $dsEmail = "DS" . $portalUser->id . "@directskills.co.uk";
+                        $dsEmail = "ICOL" . $portalUser->id . "@" . config('services.ms.domain', 'inspirecollegeoflearning.com');
                         $portalUser->update(['email_address' => $dsEmail]);
                         $partnerLearner->update(['email' => $dsEmail]);
                     }

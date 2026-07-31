@@ -279,7 +279,7 @@
                                     <div x-show="row.status !== 'paid' && row.status !== 'awaiting_approval'" class="flex gap-2 justify-end">
                                         {{-- Pay Button --}}
                                         <a :href="row.checkout_url"
-                                            class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-ds-navy rounded shadow-sm hover:bg-[#00203a] hover:shadow-md transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-navy">
+                                            class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-ds-navy rounded shadow-sm hover:bg-[#0B1220] hover:shadow-md transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-navy">
                                             Pay
                                         </a>
 

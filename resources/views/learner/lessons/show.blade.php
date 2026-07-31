@@ -32,7 +32,7 @@
                             </span>
                             @if($lesson->video_url)
                                 <span
-                                    class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-ds-pink uppercase tracking-wide">
+                                    class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-ds-pink uppercase tracking-wide">
                                     Video
                                 </span>
                             @endif
@@ -89,7 +89,7 @@
                         :course-name="$module->course->title ?? ''"
                         :course-id="$module->course_id ?? null"
                         :lesson-id="$lesson->id ?? null">
-                        <div class="prose prose-slate max-w-none prose-headings:text-ds-navy prose-a:text-ds-pink hover:prose-a:text-pink-700 prose-img:rounded-xl">
+                        <div class="prose prose-slate max-w-none prose-headings:text-ds-navy prose-a:text-ds-pink hover:prose-a:text-blue-700 prose-img:rounded-xl">
                             {!! \App\Helpers\ContentObfuscator::obfuscate($lesson->content) !!}
                         </div>
                     </x-protected-content-guard>

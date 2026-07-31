@@ -18,14 +18,21 @@ use App\Services\LearnerLogger;
 use App\Models\LearnerCourseUnitSelection;
 use App\Services\Lms\UnitSelectionService;
 use App\Services\Lms\CreditCompletionService;
+use App\Services\SecureLessonDocumentService;
 
 class LearnerCourseController extends Controller
 {
     protected $accessService;
+    protected SecureLessonDocumentService $secureDocumentService;
 
-    public function __construct(SharePointService $sp, \App\Services\EnrolmentAccessService $accessService)
+    public function __construct(
+        SharePointService $sp,
+        \App\Services\EnrolmentAccessService $accessService,
+        SecureLessonDocumentService $secureDocumentService
+    )
     {
         $this->accessService = $accessService;
+        $this->secureDocumentService = $secureDocumentService;
     }
 
     /**
@@ -159,6 +166,18 @@ class LearnerCourseController extends Controller
                 ->pluck('name', 'id')
                 ->toArray();
         }
+
+        // Inspire College currently keeps the submission status as a compact
+        // enum, while the actual Pass/Fail verification state lives on the CRM
+        // grade sheet cell. Resolve IQA approval separately for the learner UI.
+        $iqaSamplingStatusNameById = [];
+        $crmSchema = DB::connection('mysql_crm')->getSchemaBuilder();
+        if ($crmSchema->hasTable('iqa_sampling_statuses')) {
+            $iqaSamplingStatusNameById = DB::connection('mysql_crm')
+                ->table('iqa_sampling_statuses')
+                ->pluck('name', 'id')
+                ->toArray();
+        }
         
         $unitSelections = collect();
         $creditSummary = null;
@@ -177,6 +196,7 @@ class LearnerCourseController extends Controller
             'modules' => $modules,
             'hasExtraAttemptTable' => $hasExtraAttemptTable,
             'submissionStatusNameById' => $submissionStatusNameById,
+            'iqaSamplingStatusNameById' => $iqaSamplingStatusNameById,
             'creditBased' => $creditBased,
             'unitSelections' => $unitSelections,
             'creditSummary' => $creditSummary,
@@ -242,12 +262,6 @@ class LearnerCourseController extends Controller
         $modFolder = $sp->safeName($moduleTitle);
         $assFolder = $sp->safeName($assignment->title);
 
-        // create folder structure
-        $path1 = $sp->ensureFolder('', $courseFolder);
-        $path2 = $sp->ensureFolder($path1, $dsFolder);
-        $path3 = $sp->ensureFolder($path2, $modFolder);
-        $path4 = $sp->ensureFolder($path3, $assFolder);
-
         // Calculate Attempt No
         $attemptNo = (int) (AssignmentSubmission::where('assignment_id', $assignment->id)
             ->where('learner_id', $user->id)
@@ -284,29 +298,78 @@ class LearnerCourseController extends Controller
         }
         // ----------------------------------
 
-        // Process uploads
-        foreach ($files as $file) {
-            $originalName = $file->getClientOriginalName();
-            $baseName = pathinfo($originalName, PATHINFO_FILENAME);
-            $ext = strtolower($file->getClientOriginalExtension());
-            $fileName = $sp->safeName($baseName) . '_' . time() . '_' . \Illuminate\Support\Str::random(4) . '.' . $ext;
-            
-            $size = $file->getSize();
+        $storageMode = 'sharepoint';
+        $sharePointPath = null;
 
-            if ($size <= 3.5 * 1024 * 1024) {
-                $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
-            } else {
-                $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+        try {
+            $path1 = $sp->ensureFolder('', $courseFolder);
+            $path2 = $sp->ensureFolder($path1, $dsFolder);
+            $path3 = $sp->ensureFolder($path2, $modFolder);
+            $path4 = $sp->ensureFolder($path3, $assFolder);
+            $sharePointPath = $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder;
+
+            foreach ($files as $file) {
+                $originalName = $file->getClientOriginalName();
+                $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+                $ext = strtolower($file->getClientOriginalExtension());
+                $fileName = $sp->safeName($baseName) . '_' . time() . '_' . \Illuminate\Support\Str::random(4) . '.' . $ext;
+                $size = $file->getSize();
+
+                $uploaded = $size <= 3.5 * 1024 * 1024
+                    ? $sp->uploadSmallFile($path4, $fileName, $file->getRealPath())
+                    : $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+
+                $uploadedFiles[] = [
+                    'name' => $originalName,
+                    'stored_file_name' => null,
+                    'path' => $sharePointPath . '/' . $fileName,
+                    'item_id' => $uploaded['id'] ?? null,
+                    'url' => $uploaded['webUrl'] ?? null,
+                    'size' => $size,
+                    'mime' => $file->getClientMimeType(),
+                ];
+            }
+        } catch (\Throwable $e) {
+            $message = strtolower($e->getMessage());
+            $isQuotaError = str_contains($message, 'quotalimitreached')
+                || str_contains($message, 'quota limit reached');
+
+            if (!$isQuotaError) {
+                throw $e;
             }
 
-            $uploadedFiles[] = [
-                'name' => $originalName,
-                'path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
-                'item_id' => $uploaded['id'] ?? null,
-                'url' => $uploaded['webUrl'] ?? null,
-                'size' => $size,
-                'mime' => $file->getClientMimeType()
-            ];
+            $storageMode = 'local';
+            $uploadedFiles = [];
+            $localDirectory = 'assignment-submissions/' . $assignment->id
+                . '/learner-' . $user->id . '/attempt-' . ($attemptNo + 1);
+
+            \Illuminate\Support\Facades\Log::warning('SharePoint quota reached; storing assignment submission locally.', [
+                'assignment_id' => $assignment->id,
+                'learner_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            foreach ($files as $file) {
+                $originalName = $file->getClientOriginalName();
+                $baseName = $sp->safeName(pathinfo($originalName, PATHINFO_FILENAME));
+                $ext = strtolower($file->getClientOriginalExtension());
+                $storedName = $baseName . '_' . time() . '_' . \Illuminate\Support\Str::random(6) . ($ext ? '.' . $ext : '');
+                $storedPath = $file->storeAs($localDirectory, $storedName, 'local');
+
+                if (!$storedPath) {
+                    throw new \RuntimeException('The local fallback could not store the uploaded assignment file.');
+                }
+
+                $uploadedFiles[] = [
+                    'name' => $originalName,
+                    'stored_file_name' => $storedPath,
+                    'path' => null,
+                    'item_id' => null,
+                    'url' => null,
+                    'size' => $file->getSize(),
+                    'mime' => $file->getClientMimeType(),
+                ];
+            }
         }
 
         $primaryFile = $uploadedFiles[0];
@@ -316,12 +379,13 @@ class LearnerCourseController extends Controller
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
             'file_name' => $primaryFile['name'],
-            'status_id' => 1, // Submitted
+            'status' => 'submitted',
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $primaryFile['item_id'],
             'sharepoint_path' => $primaryFile['path'],
             'sharepoint_url' => $primaryFile['url'],
+            'stored_file_name' => $primaryFile['stored_file_name'],
         ]);
 
         if ($assignment->module?->isUnit() && $assignment->module?->unit_type === 'optional') {
@@ -350,6 +414,7 @@ class LearnerCourseController extends Controller
             \App\Models\AssignmentSubmissionFile::create([
                 'assignment_submission_id' => $submission->id,
                 'file_name' => $uFile['name'],
+                'stored_file_name' => $uFile['stored_file_name'],
                 'sharepoint_item_id' => $uFile['item_id'],
                 'sharepoint_path' => $uFile['path'],
                 'sharepoint_url' => $uFile['url'],
@@ -385,7 +450,11 @@ class LearnerCourseController extends Controller
             throw $e;
         }
 
-        return back()->with('success', 'Your assignment files have been submitted');
+        $successMessage = $storageMode === 'local'
+            ? 'Your assignment files have been submitted successfully. They are securely saved and will be moved to the learning system after storage maintenance.'
+            : 'Your assignment files have been submitted';
+
+        return back()->with('success', $successMessage);
     }
 
     public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
@@ -400,12 +469,16 @@ class LearnerCourseController extends Controller
             $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
         }
 
-        if (!$submission->sharepoint_item_id) {
-            return back()->with('error', 'File not found on SharePoint.');
-        }
-
         // inline if route is "inline" OR query inline=1
         $inline = request()->routeIs('portal.learner.submission.inline') || request()->boolean('inline', false);
+
+        if (!$submission->sharepoint_item_id && $submission->stored_file_name) {
+            return $this->streamLocalSubmissionFile($submission->stored_file_name, $submission->file_name ?? 'submission', $inline);
+        }
+
+        if (!$submission->sharepoint_item_id) {
+            return back()->with('error', 'File not found.');
+        }
 
         return $sp->streamByItemId(
             $submission->sharepoint_item_id,
@@ -427,11 +500,15 @@ class LearnerCourseController extends Controller
             $this->assertModuleContentAccessible($user->id, $file->submission->assignment->course_id, $file->submission->assignment->module_id);
         }
 
-        if (!$file->sharepoint_item_id) {
-            return back()->with('error', 'File not found on SharePoint.');
+        $inline = request()->boolean('inline', true);
+
+        if (!$file->sharepoint_item_id && $file->stored_file_name) {
+            return $this->streamLocalSubmissionFile($file->stored_file_name, $file->file_name ?? 'submission', $inline);
         }
 
-        $inline = request()->boolean('inline', true);
+        if (!$file->sharepoint_item_id) {
+            return back()->with('error', 'File not found.');
+        }
 
         return $sp->streamByItemId(
             $file->sharepoint_item_id,
@@ -452,13 +529,36 @@ class LearnerCourseController extends Controller
             $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
         }
 
+        if (!$submission->sharepoint_item_id && $submission->stored_file_name) {
+            return redirect()->route('portal.learner.submission.inline', $submission);
+        }
+
         if (!$submission->sharepoint_item_id) {
-            return back()->with('error', 'File not found on SharePoint.');
+            return back()->with('error', 'File not found.');
         }
 
         $url = $sp->temporaryDownloadUrlByItemId($submission->sharepoint_item_id);
 
         return redirect()->away($url);
+    }
+
+    private function streamLocalSubmissionFile(string $storedPath, string $downloadName, bool $inline = false)
+    {
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+
+        if (!$disk->exists($storedPath)) {
+            return back()->with('error', 'The submitted file is no longer available.');
+        }
+
+        $absolutePath = $disk->path($storedPath);
+        $headers = [
+            'Content-Type' => mime_content_type($absolutePath) ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        return $inline
+            ? response()->file($absolutePath, $headers)
+            : response()->download($absolutePath, $downloadName, $headers);
     }
 
     public function viewLesson(Lesson $lesson)
@@ -823,31 +923,7 @@ class LearnerCourseController extends Controller
             abort(404, 'Document file path missing.');
         }
 
-        $fullReal = null;
-        $crmRoot = "D:\\Laravel\\test\\crm-directskills\\storage\\app";
-        $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
-        $fullPath = $crmRoot . DIRECTORY_SEPARATOR . $relative;
-
-        if (file_exists($fullPath) && is_file($fullPath)) {
-            $fullReal = $fullPath;
-        } else {
-            $crmRootConfig = config('services.crm.storage_root');
-            if ($crmRootConfig) {
-                $relativeConfig = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
-                $fullPathConfig = rtrim($crmRootConfig, '/\\') . DIRECTORY_SEPARATOR . $relativeConfig;
-                if (file_exists($fullPathConfig) && is_file($fullPathConfig)) {
-                    $fullReal = $fullPathConfig;
-                }
-            }
-        }
-
-        if (!$fullReal) {
-            if (\Storage::disk('public')->exists($filePath)) {
-                $fullReal = \Storage::disk('public')->path($filePath);
-            } elseif (\Storage::disk('local')->exists($filePath)) {
-                $fullReal = \Storage::disk('local')->path($filePath);
-            }
-        }
+        $fullReal = $this->secureDocumentService->resolvePath($filePath);
 
         \Log::info('Secure PDF stream debug', [
             'lesson_id' => $lesson->id,
@@ -857,12 +933,16 @@ class LearnerCourseController extends Controller
             'size' => ($fullReal && file_exists($fullReal)) ? filesize($fullReal) : null,
         ]);
 
-        if (!$fullReal || !file_exists($fullReal)) {
+        if (!$fullReal) {
             \Log::error('PDF missing', [
                 'lesson_id' => $lesson->id,
-                'path' => $fullReal ?? 'null'
+                'file_path' => $filePath,
             ]);
             abort(404, 'File not found');
+        }
+
+        if (strtolower(pathinfo($fullReal, PATHINFO_EXTENSION)) !== 'pdf') {
+            abort(415, 'Secure viewer supports PDF documents only.');
         }
 
         $absolutePath = $fullReal;
@@ -907,34 +987,14 @@ class LearnerCourseController extends Controller
             abort(404, 'Document file path missing.');
         }
 
-        $fullReal = null;
-        $crmRoot = "D:\\Laravel\\test\\crm-directskills\\storage\\app";
-        $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
-        $fullPath = $crmRoot . DIRECTORY_SEPARATOR . $relative;
-
-        if (file_exists($fullPath) && is_file($fullPath)) {
-            $fullReal = $fullPath;
-        } else {
-            $crmRootConfig = config('services.crm.storage_root');
-            if ($crmRootConfig) {
-                $relativeConfig = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
-                $fullPathConfig = rtrim($crmRootConfig, '/\\') . DIRECTORY_SEPARATOR . $relativeConfig;
-                if (file_exists($fullPathConfig) && is_file($fullPathConfig)) {
-                    $fullReal = $fullPathConfig;
-                }
-            }
-        }
+        $fullReal = $this->secureDocumentService->resolvePath($filePath);
 
         if (!$fullReal) {
-            if (\Storage::disk('public')->exists($filePath)) {
-                $fullReal = \Storage::disk('public')->path($filePath);
-            } elseif (\Storage::disk('local')->exists($filePath)) {
-                $fullReal = \Storage::disk('local')->path($filePath);
-            }
+            abort(404, 'File not found');
         }
 
-        if (!$fullReal || !file_exists($fullReal)) {
-            abort(404, 'File not found');
+        if (strtolower(pathinfo($fullReal, PATHINFO_EXTENSION)) !== 'pdf') {
+            abort(415, 'Secure viewer supports PDF documents only.');
         }
 
         if (filesize($fullReal) > 50 * 1024 * 1024) {

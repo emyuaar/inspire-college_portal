@@ -3,12 +3,17 @@
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --ds-navy: #01345B;
-        --ds-pink: #A91A6A;
-        --ds-navy-rgb: 1, 52, 91;
-        --ds-pink-rgb: 169, 26, 106;
-    }
+:root {
+    --inspire-navy: #0F172A;
+    --inspire-accent: #2774AE;
+    --inspire-navy-rgb: 15, 23, 42;
+    --inspire-accent-rgb: 39, 116, 174;
+    /* Compatibility aliases used by the cloned learner layouts. */
+    --ds-navy: var(--inspire-navy);
+    --ds-pink: var(--inspire-accent);
+    --ds-navy-rgb: var(--inspire-navy-rgb);
+    --ds-pink-rgb: var(--inspire-accent-rgb);
+}
 
     /* Custom Prose Overrides for Lessons */
     .prose hr {

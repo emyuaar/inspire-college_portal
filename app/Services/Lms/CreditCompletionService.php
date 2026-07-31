@@ -114,13 +114,21 @@ class CreditCompletionService
     {
         if ($assignmentIds->isEmpty()) return [];
 
-        $finalSubmissionIds = DB::connection('mysql_portal')
+        $portalSchema = \Illuminate\Support\Facades\Schema::connection('mysql_portal');
+        $submissions = DB::connection('mysql_portal')
             ->table('assignment_submissions as s')
-            ->join('assignment_submission_statuses as ss', 'ss.id', '=', 's.status_id')
             ->where('s.learner_id', $learnerId)
-            ->whereIn('s.assignment_id', $assignmentIds)
-            ->whereIn('ss.name', ['graded', 'iqa_approved'])
-            ->pluck('s.id');
+            ->whereIn('s.assignment_id', $assignmentIds);
+
+        if ($portalSchema->hasTable('assignment_submission_statuses')
+            && $portalSchema->hasColumn('assignment_submissions', 'status_id')) {
+            $submissions->join('assignment_submission_statuses as ss', 'ss.id', '=', 's.status_id')
+                ->whereIn('ss.name', ['graded', 'iqa_approved']);
+        } else {
+            $submissions->where('s.status', 'graded');
+        }
+
+        $finalSubmissionIds = $submissions->pluck('s.id');
         if ($finalSubmissionIds->isEmpty()) return [];
 
         return DB::connection('mysql_crm')

@@ -39,6 +39,7 @@ return [
         'tenant_id'     => env('MS_TENANT_ID'),
         'client_id'     => env('MS_CLIENT_ID'),
         'client_secret' => env('MS_CLIENT_SECRET'),
+        'domain'        => env('MS_DOMAIN', 'inspirecollegeoflearning.com'),
         'student_sku_id' => env('MS_STUDENT_SKU_ID'),
         'student_group_id' => env('MS_STUDENT_GROUP_ID'),
     ],

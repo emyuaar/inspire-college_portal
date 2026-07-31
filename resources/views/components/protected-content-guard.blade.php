@@ -30,7 +30,7 @@
         visibility: visible !important;
         font-size: 20px;
         padding: 40px;
-        color: #01345B;
+        color: #0F172A;
     }
 }
 
@@ -206,7 +206,7 @@ body.devtools-detected .devtools-warning {
             document.body.classList.add('protected-blur');
 
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText('Screenshot is disabled for protected DirectSkills content.').catch(function () {});
+                navigator.clipboard.writeText('Screenshot is disabled for protected Inspire College content.').catch(function () {});
             }
 
             window.logProtectedEvent('screenshot_key_attempt');
@@ -272,7 +272,7 @@ body.devtools-detected .devtools-warning {
     <!-- Watermark Elements (Subtle text only) -->
     <div class="protected-watermark-text">
         @for ($i = 0; $i < 40; $i++)
-            <span>{{ $learnerEmail }} • DirectSkills</span>
+            <span>{{ $learnerEmail }} • Inspire College</span>
         @endfor
     </div>
 

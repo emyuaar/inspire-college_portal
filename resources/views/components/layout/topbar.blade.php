@@ -19,7 +19,7 @@
         </h1>
         
         {{-- Mobile Logo --}}
-        <img src="https://directskills.co.uk/images/DirectSkills_logo.webp" alt="DirectSkills" class="h-8 sm:hidden">
+        <img src="{{ asset('images/1000ppi/logo.png') }}" alt="Inspire College" class="h-8 sm:hidden">
     </div>
 
     {{-- Right Actions --}}
@@ -55,7 +55,7 @@
                     </div>
                     <div>
                         <button @click="markAllRead()" x-show="unread > 0" x-cloak
-                            class="text-[11px] font-bold text-ds-pink hover:text-pink-700 transition-colors"
+                            class="text-[11px] font-bold text-ds-pink hover:text-blue-700 transition-colors"
                             title="Mark all as read">
                             Mark all read
                         </button>

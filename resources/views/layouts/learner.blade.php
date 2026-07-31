@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Learner Portal') - DirectSkills</title>
+    <title>@yield('title', 'Learner Portal') - Inspire College</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
@@ -14,8 +14,8 @@
            ========================= */
 
         :root {
-            --ds-navy: #01345b;
-            --ds-pink: #a91a6a;
+            --ds-navy: #0F172A;
+            --ds-pink: #2774AE;
 
             --pwa-bg: #f1f5f9;
             --pwa-card: #ffffff;
@@ -407,7 +407,7 @@
             {{-- Left: Logo + Main Nav --}}
             <div class="flex items-center gap-6">
                 <a href="{{ route('portal.learner.dashboard') }}" class="flex items-center gap-2">
-                    <img src="https://directskills.co.uk/images/DirectSkills_logo.webp" class="h-7" alt="DirectSkills">
+                    <img src="{{ asset('images/1000ppi/logo.png') }}" class="h-7" alt="Inspire College">
                     <span class="text-sm text-slate-600 font-medium">
                         Learner Portal
                     </span>

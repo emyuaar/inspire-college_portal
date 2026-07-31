@@ -12,9 +12,9 @@
     $baseClasses = 'inline-flex items-center justify-center rounded-full font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
     $variants = [
-        'primary' => 'bg-ds-navy text-white hover:bg-[#00203a] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
-        'brand' => 'bg-ds-navy text-white hover:bg-[#00203a] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
-        'secondary' => 'bg-ds-pink text-white hover:bg-[#8f165a] focus:ring-ds-pink shadow-lg shadow-pink-900/10 active:scale-[0.98]',
+        'primary' => 'bg-ds-navy text-white hover:bg-[#0B1220] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
+        'brand' => 'bg-ds-navy text-white hover:bg-[#0B1220] focus:ring-ds-navy shadow-lg shadow-blue-900/10 active:scale-[0.98]',
+        'secondary' => 'bg-ds-pink text-white hover:bg-[#1E5A8A] focus:ring-ds-pink shadow-lg shadow-blue-900/10 active:scale-[0.98]',
         'outline' => 'bg-white border-2 border-slate-200 text-slate-700 hover:border-ds-navy hover:text-ds-navy focus:ring-ds-navy active:bg-slate-50',
         'danger' => 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600 shadow-md shadow-red-900/10',
         'ghost' => 'bg-transparent text-slate-600 hover:text-ds-navy hover:bg-slate-100',

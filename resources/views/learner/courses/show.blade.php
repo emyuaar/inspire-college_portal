@@ -197,7 +197,7 @@
                                                 class="w-2 h-2 rounded-full bg-blue-400"></span> {{ $module->lessons->count() }}
                                             Notes</span>
                                         <span class="flex items-center gap-1"><span
-                                                class="w-2 h-2 rounded-full bg-pink-400"></span>
+                                                class="w-2 h-2 rounded-full bg-blue-400"></span>
                                             {{ $module->assignments->count() }} Tasks</span>
                                     </div>
                                 </div>
@@ -318,8 +318,13 @@
 
                                                         $submissionStatusName = null;
                                                         if ($submission) {
-                                                            $submissionStatusName = $submissionStatusNameById[$submission->status_id] ?? null;
+                                                            $submissionStatusName = $submission->status
+                                                                ?? ($submissionStatusNameById[$submission->status_id] ?? null);
                                                         }
+                                                        $iqaStatusName = $assignment->grade_cell?->iqa_sampling_status_id
+                                                            ? ($iqaSamplingStatusNameById[$assignment->grade_cell->iqa_sampling_status_id] ?? null)
+                                                            : null;
+                                                        $iqaApproved = in_array(strtolower((string) $iqaStatusName), ['approved', 'approved with actions'], true);
 
                                                         // Attempt limits: standard 2 + any assessor-granted overrides (do not reset history)
                                                         $standardMaxAttempts = 2;
@@ -361,7 +366,7 @@
                                                             $allowUpload = false;
                                                         } elseif ($isPass) {
                                                             // Learners must not see Pass until IQA verification is actually completed.
-                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            $isVerified = $submissionStatusName === 'iqa_approved' || $iqaApproved;
                                                             if ($isVerified) {
                                                                 $badgeVariant = 'success';
                                                                 $badgeText = 'Passed';
@@ -375,7 +380,7 @@
                                                         } elseif ($isFail && !$isActiveReset) {
                                                             // Learners must not see Fail until IQA verification is actually completed,
                                                             // unless a resubmission has been granted (then they are in resubmit flow).
-                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            $isVerified = $submissionStatusName === 'iqa_approved' || $iqaApproved;
                                                             if ($isVerified) {
                                                                 $badgeVariant = 'error';
                                                                 $badgeText = 'Failed';

@@ -29,7 +29,7 @@ class LearnerAccountActivatedMail extends Mailable
      */
     public function build()
     {
-        return $this->subject('Your DirectSkills Learner Account Is Ready')
+        return $this->subject('Your Inspire College Learner Account Is Ready')
             ->view('emails.learner-account-activated');
     }
 }

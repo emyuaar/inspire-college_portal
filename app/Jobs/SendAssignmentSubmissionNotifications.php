@@ -116,7 +116,7 @@ class SendAssignmentSubmissionNotifications implements ShouldQueue
                     ->toArray();
             }
 
-            $supervisorEmail = 'supervisor@directskills.co.uk';
+            $supervisorEmail = config('mail.supervisor_email', 'supervisor@inspirecollegeoflearning.com');
             $toEmails = [$supervisorEmail];
             $ccEmails = array_unique(array_filter($assessmentManagers));
             $bccEmails = array_unique(array_filter($assessmentCheckers));

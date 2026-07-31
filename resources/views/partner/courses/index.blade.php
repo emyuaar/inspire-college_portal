@@ -41,7 +41,7 @@
                         <div class="relative aspect-[16/10] overflow-hidden bg-slate-100">
                             @if($course->image)
                                 @php 
-                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://directskills.co.uk/storage/' . $course->image;
+                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://inspirecollegeoflearning.com/storage/' . $course->image;
                                 @endphp
                                 <img src="{{ $imgSrc }}" 
                                      alt="{{ $course->title }}" 
@@ -157,11 +157,11 @@
                         {{-- Footer Actions --}}
                         <div class="p-6 pt-0 mt-auto flex items-center gap-2">
                              <a href="{{ route('partner.learners.create') }}?course_id={{ $course->id }}" 
-                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-ds-pink text-white rounded-xl text-xs font-black shadow-lg shadow-pink-200 hover:bg-pink-700 hover:shadow-xl transition-all">
+                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-ds-pink text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-blue-700 hover:shadow-xl transition-all">
                                 <i class="fa-solid fa-plus-circle"></i>
                                 Enroll Now
                             </a>
-                            <a href="https://directskills.co.uk/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
+                            <a href="https://inspirecollegeoflearning.com/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
                                class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors">
                                Details
                             </a>

@@ -32,7 +32,7 @@
             </div>
             
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                <x-ui.button variant="primary" href="{{ route('partner.learners.create') }}" class="shadow-lg shadow-blue-900/40 border-white/10 bg-ds-pink border-ds-pink hover:bg-pink-700">
+                <x-ui.button variant="primary" href="{{ route('partner.learners.create') }}" class="shadow-lg shadow-blue-900/40 border-white/10 bg-ds-pink border-ds-pink hover:bg-blue-700">
                     <x-slot name="icon">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -109,7 +109,7 @@
                     <h3 class="text-xl font-black text-slate-900">£{{ number_format($totalRevenue, 0) }}</h3>
                     <p class="text-[9px] text-slate-400 font-medium mt-1 uppercase tracking-tighter">Total Collected</p>
                 </div>
-                <div class="p-2 bg-pink-50 rounded-lg text-ds-pink">
+                <div class="p-2 bg-blue-50 rounded-lg text-ds-pink">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -205,7 +205,7 @@
                     <h3 class="text-sm font-bold text-slate-900">Recent Onboardings</h3>
                     <p class="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Newly added learner accounts</p>
                 </div>
-                <a href="{{ route('partner.learners.index') }}" class="text-xs font-bold text-ds-pink hover:text-pink-700 transition-colors">Manage All</a>
+                <a href="{{ route('partner.learners.index') }}" class="text-xs font-bold text-ds-pink hover:text-blue-700 transition-colors">Manage All</a>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -260,7 +260,7 @@
                     <h3 class="text-sm font-bold text-slate-900">Recent Transactions</h3>
                     <p class="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Payments received for your learners</p>
                 </div>
-                <a href="{{ route('partner.transactions.index') }}" class="text-xs font-bold text-ds-pink hover:text-pink-700 transition-colors">View Reports</a>
+                <a href="{{ route('partner.transactions.index') }}" class="text-xs font-bold text-ds-pink hover:text-blue-700 transition-colors">View Reports</a>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">

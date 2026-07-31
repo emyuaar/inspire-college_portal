@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Your DirectSkills Learner Account Is Ready</title>
+    <title>Your Inspire College Learner Account Is Ready</title>
 </head>
 
 <body style="margin:0; padding:0; background:#f4f7fb; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
@@ -20,8 +20,8 @@
                     style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08);">
 
                     <tr>
-                        <td style="background:#01345B; padding:28px 32px; text-align:center;">
-                            <img src="https://directskills.co.uk/images/DirectSkills_logo.webp" alt="DirectSkills"
+                        <td style="background:#0F172A; padding:28px 32px; text-align:center;">
+                            <img src="{{ asset('images/1000ppi/logo.png') }}" alt="Inspire College"
                                 style="max-width:180px; height:auto;">
                         </td>
                     </tr>
@@ -33,7 +33,7 @@
                                 Account Activated
                             </div>
 
-                            <h1 style="margin:0; color:#01345B; font-size:26px; line-height:1.3;">
+                            <h1 style="margin:0; color:#0F172A; font-size:26px; line-height:1.3;">
                                 Your Learner Account Is Ready
                             </h1>
 
@@ -51,7 +51,7 @@
                                 style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:14px;">
                                 <tr>
                                     <td style="padding:22px;">
-                                        <h2 style="margin:0 0 14px 0; color:#01345B; font-size:18px;">
+                                        <h2 style="margin:0 0 14px 0; color:#0F172A; font-size:18px;">
                                             Course Details
                                         </h2>
 
@@ -97,7 +97,7 @@
                                     <td style="padding:16px 18px;">
                                         <p style="margin:0; font-size:14px; line-height:1.6; color:#374151;">
                                             If you did not expect this email or need any help accessing your course,
-                                            please contact the DirectSkills support team.
+                                            please contact the Inspire College support team.
                                         </p>
                                     </td>
                                 </tr>
@@ -110,7 +110,7 @@
                             style="background:#f9fafb; padding:20px 32px; text-align:center; border-top:1px solid #e5e7eb;">
                             <p style="margin:0; font-size:13px; color:#6b7280;">
                                 Thank you,<br>
-                                <strong style="color:#01345B;">DirectSkills Team</strong>
+                                <strong style="color:#0F172A;">Inspire College Team</strong>
                             </p>
                         </td>
                     </tr>

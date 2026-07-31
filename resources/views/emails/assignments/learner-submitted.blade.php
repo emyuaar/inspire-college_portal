@@ -19,9 +19,9 @@
                     <!-- Header -->
                     <tr>
                         <td align="center"
-                            style="background-color: #01345B; padding: 30px 20px; border-bottom: 4px solid #d63384;">
-                            <img src="https://directskills.co.uk/images/DirectSKills%20inverted-02.png"
-                                alt="DirectSkills Logo" width="220"
+                            style="background-color: #0F172A; padding: 30px 20px; border-bottom: 4px solid #d63384;">
+                            <img src="{{ asset('images/1000ppi/logo-white.png') }}"
+                                alt="Inspire College Logo" width="220"
                                 style="display: block; max-width: 220px; height: auto;">
                         </td>
                     </tr>
@@ -29,7 +29,7 @@
                     <!-- Title Area -->
                     <tr>
                         <td style="padding: 35px 35px 20px 35px; text-align: center;">
-                            <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #01345B;">Assignment
+                            <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #0F172A;">Assignment
                                 Submitted Successfully</h1>
                             <p style="margin: 10px 0 0 0; font-size: 16px; color: #666666;">Your submission has been
                                 securely received by our system.</p>
@@ -73,7 +73,7 @@
                                                     style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #64748b;">
                                                     <strong>File Submitted:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #01345B; font-weight: 600; word-break: break-all;">
+                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #0F172A; font-weight: 600; word-break: break-all;">
                                                     {{ $fileName ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
@@ -103,7 +103,7 @@
 
                             <p style="font-size: 16px; line-height: 24px; color: #333333; margin: 0;">
                                 Kind regards,<br>
-                                <strong>Portal DirectSkills</strong>
+                                <strong>Portal Inspire College</strong>
                             </p>
                         </td>
                     </tr>
@@ -111,12 +111,12 @@
                     <!-- Footer -->
                     <tr>
                         <td
-                            style="background-color: #01345B; padding: 25px 30px; text-align: center; border-top: 1px solid #104b77;">
+                            style="background-color: #0F172A; padding: 25px 30px; text-align: center; border-top: 1px solid #104b77;">
                             <p
                                 style="margin: 0 0 10px 0; font-size: 16px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px;">
-                                DirectSkills</p>
+                                Inspire College</p>
                             <p style="margin: 0 0 5px 0; font-size: 13px; color: #cbd5e1;">This is an automated
-                                notification from the DirectSkills Assessment System.</p>
+                                notification from the Inspire College Assessment System.</p>
                             <p style="margin: 0; font-size: 13px; color: #94a3b8;">Please do not reply directly to this
                                 email.</p>
                         </td>

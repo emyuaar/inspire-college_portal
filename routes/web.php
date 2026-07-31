@@ -185,6 +185,8 @@ Route::middleware('auth')->group(function () {
             ->name('portal.profile.personal');
         Route::post('/profile/personal', [App\Http\Controllers\ProfileController::class, 'updatePersonal'])
             ->name('portal.profile.personal.update');
+        Route::get('/profile/documents/{document}/download', [App\Http\Controllers\ProfileController::class, 'downloadDocument'])
+            ->name('portal.profile.document.download');
 
         // RPL Information
         Route::get('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'editRpl'])
@@ -237,9 +239,11 @@ Route::middleware('auth')->group(function () {
             ->name('portal.learner.secure_doc.view');
 
         Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
             ->name('portal.learner.secure_doc.stream');
 
         Route::get('/learner/lessons/{lesson}/secure-pdf-data', [LearnerCourseController::class, 'securePdfData'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
             ->name('learner.lessons.secure-pdf-data');
 
         // Lesson file (SharePoint proxy)
@@ -266,7 +270,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/debug-pdf-test', function () {
-    $path = "D:\\Laravel\\test\\crm-directskills\\storage\\app\\public\\lms\\resources\\1777451086_Care Standards Act 2000.pdf";
+    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College-CRM/storage/app')), '/\\')
+        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
 
     if (!file_exists($path)) {
         abort(404, 'File not found on CRM path.');
@@ -280,7 +285,8 @@ Route::get('/debug-pdf-test', function () {
 });
 
 Route::get('/debug-pdf-secure-test', function () {
-    $path = "D:\\Laravel\\test\\crm-directskills\\storage\\app\\public\\lms\\resources\\1777451086_Care Standards Act 2000.pdf";
+    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College-CRM/storage/app')), '/\\')
+        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
 
     if (!file_exists($path)) {
         abort(404, 'File not found on CRM path.');

@@ -201,7 +201,7 @@ class LearnerPasswordSetupController extends Controller
             function ($attribute, $value, $fail) {
                 $blockedWords = [
                     'password123!',
-                    'directskills123!',
+                    'inspirecollege123!',
                     'welcome123!',
                     'qwerty123!',
                     'admin123!',

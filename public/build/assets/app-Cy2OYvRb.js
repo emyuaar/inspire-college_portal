@@ -13,7 +13,7 @@
                         </div>
                         <h3 class="text-xl font-bold text-slate-800 mb-2">Session Expired</h3>
                         <p class="text-slate-500 text-sm mb-6">Your session has expired for security reasons. Please log in again to continue.</p>
-                        <button onclick="window.location.reload();" class="w-full bg-[#A91A6A] hover:bg-[#8f165a] text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-pink-900/10 transition-all active:scale-[0.98]">
+                        <button onclick="window.location.reload();" class="w-full bg-[#2774AE] hover:bg-[#1E5A8A] text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-900/10 transition-all active:scale-[0.98]">
                             Sign in again
                         </button>
                     </div>
