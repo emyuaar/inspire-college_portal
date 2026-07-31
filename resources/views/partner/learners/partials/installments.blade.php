@@ -31,13 +31,16 @@
                             course_id: {{ $inst->course_id ?? 'null' }},
                             due_date: {!! json_encode(optional($inst->due_date)->format('c')) !!}, // ISO 8601 full
                             due_date_formatted: {!! json_encode(optional($inst->due_date)->format("M d, Y") ?? 'N/A') !!},
-                            is_overdue: {!! json_encode($inst->due_date && $inst->due_date->lt(now()) && $inst->status != 'paid') !!},
+                            urgency: {!! json_encode($inst->urgency) !!},
+                            is_overdue: {!! json_encode($inst->urgency === 'overdue') !!},
+                            is_due_soon: {!! json_encode($inst->urgency === 'due_soon') !!},
                             label: {!! json_encode($inst->installment_no == 0 ? "Deposit" : "Month " . $inst->installment_no) !!},
                             course_title: {!! json_encode($inst->course->title ?? "Course") !!},
                             amount: {!! json_encode((float) ($inst->installment_amount ?? 0)) !!},
                             paid: {!! json_encode((float) ($inst->paid_amount ?? 0)) !!},
                             status: {!! json_encode(strtolower($inst->status ?? 'pending')) !!},
-                            can_stripe: {!! json_encode(!($isPending ?? false)) !!},
+                            receipt_path: {!! json_encode($inst->receipt_path) !!},
+                            rejection_reason: {!! json_encode($inst->rejection_reason) !!},
                             checkout_url: {!! json_encode(route("partner.installments.checkout", $inst->id)) !!}
                         },
                     @endforeach
@@ -123,6 +126,8 @@
                     switch (status) {
                         case 'paid': return 'bg-green-100 text-green-800 border border-green-200';
                         case 'partial': return 'bg-amber-100 text-amber-800 border border-amber-200';
+                        case 'awaiting_approval': return 'bg-blue-100 text-blue-800 border border-blue-200';
+                        case 'rejected': return 'bg-red-100 text-red-800 border border-red-200';
                         // Note: 'overdue' is computed, not a database status usually, but if needed:
                         case 'overdue': return 'bg-red-100 text-red-800 border border-red-200';
                         default: return 'bg-slate-100 text-slate-600 border border-slate-200';
@@ -132,7 +137,7 @@
         }
     </script>
 
-    <div class="mt-8" x-data="installmentTable()">
+    <div class="mt-8" x-data="installmentTable()" id="financial-section">
         <div class="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between">
             <h3 class="text-lg font-bold text-slate-800">Installment Plan</h3>
 
@@ -243,6 +248,9 @@
                                     <div x-show="row.is_overdue"
                                         class="text-[10px] text-red-500 font-bold uppercase tracking-wider mt-0.5">Overdue
                                     </div>
+                                    <div x-show="row.is_due_soon"
+                                        class="text-[10px] text-amber-500 font-bold uppercase tracking-wider mt-0.5">Due Soon
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 align-top">
                                     <div class="flex flex-col">
@@ -250,6 +258,12 @@
                                             x-text="row.label"></span>
                                         <span class="text-slate-700 font-medium leading-snug line-clamp-2"
                                             :title="row.course_title" x-text="row.course_title"></span>
+                                        <template x-if="row.status === 'rejected' && row.rejection_reason">
+                                            <div class="mt-1 flex items-start gap-1.5 p-1.5 bg-red-50 border border-red-100 rounded text-[10px] text-red-600 italic">
+                                                <svg class="w-3 h-3 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                <span x-text="'Rejected: ' + row.rejection_reason"></span>
+                                            </div>
+                                        </template>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-right font-medium text-slate-700 align-top"
@@ -262,9 +276,9 @@
                                         x-text="row.status"></span>
                                 </td>
                                 <td class="px-4 py-3 text-right align-top">
-                                    <div x-show="row.status !== 'paid'" class="flex gap-2 justify-end">
+                                    <div x-show="row.status !== 'paid' && row.status !== 'awaiting_approval'" class="flex gap-2 justify-end">
                                         {{-- Pay Button --}}
-                                        <a x-show="row.can_stripe" :href="row.checkout_url"
+                                        <a :href="row.checkout_url"
                                             class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-ds-navy rounded shadow-sm hover:bg-[#00203a] hover:shadow-md transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ds-navy">
                                             Pay
                                         </a>
@@ -275,6 +289,15 @@
                                             Proof
                                         </button>
                                     </div>
+
+                                    {{-- Awaiting Approval State --}}
+                                    <div x-show="row.status === 'awaiting_approval'" class="flex flex-col items-end gap-1">
+                                         <span class="text-[10px] font-bold text-blue-600 uppercase tracking-tight bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">Awaiting Approval</span>
+                                         <template x-if="row.receipt_path">
+                                             <a :href="'/storage/' + row.receipt_path" target="_blank" class="text-[10px] text-blue-500 underline hover:text-blue-700 font-medium transition-colors">View Submitted Proof</a>
+                                         </template>
+                                    </div>
+
                                     <div x-show="row.status === 'paid'"
                                         class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" viewBox="0 0 20 20"
@@ -351,6 +374,13 @@
                                     </button>
                                 </div>
                                 <div class="modal-body relative p-6 text-left space-y-5">
+                                    @if($inst->status === 'rejected')
+                                        <div class="p-3 bg-red-50 rounded border border-red-100 text-xs text-red-700">
+                                            <span class="font-bold block mb-1">Previous Proof Rejected:</span>
+                                            {{ $inst->rejection_reason ?? 'Please upload a valid payment receipt.' }}
+                                        </div>
+                                    @endif
+
                                     <div class="bg-blue-50 p-3 rounded border border-blue-100">
                                         <div class="text-xs text-blue-500 font-semibold uppercase tracking-wide mb-1">Paying for
                                         </div>
@@ -383,16 +413,16 @@
                                             placeholder="e.g. Bank Transfer Ref, Check #123">
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-bold mb-1.5 text-slate-600">Proof of Payment</label>
-                                        <input type="file" name="receipt" required
-                                            class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200 cursor-pointer">
-                                    </div>
+                                         <label class="block text-xs font-bold mb-1.5 text-slate-600">Proof of Payment</label>
+                                         <input type="file" name="receipt" required
+                                             class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200 cursor-pointer">
+                                     </div>
                                     <div>
-                                        <label class="block text-xs font-bold mb-1.5 text-slate-600">Notes <span
+                                        <label class="block text-xs font-bold mb-1.5 text-slate-600">Additional Notes <span
                                                 class="text-slate-400 font-normal">(Optional)</span></label>
                                         <textarea name="notes" rows="2"
                                             class="w-full text-sm border-slate-200 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
-                                            placeholder="Any details for admissions or finance"></textarea>
+                                            placeholder="Any details for admissions..."></textarea>
                                     </div>
                                 </div>
                                 <div

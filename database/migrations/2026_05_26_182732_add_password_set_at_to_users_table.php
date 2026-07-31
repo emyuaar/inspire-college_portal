@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::connection('mysql_portal')->table('users', function (Blueprint $table) {
+        Schema::table('users', function (Blueprint $table) {
             $table->timestamp('password_set_at')->nullable()->after('password');
         });
     }
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::connection('mysql_portal')->table('users', function (Blueprint $table) {
+        Schema::table('users', function (Blueprint $table) {
             $table->dropColumn('password_set_at');
         });
     }

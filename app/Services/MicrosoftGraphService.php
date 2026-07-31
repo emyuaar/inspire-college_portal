@@ -27,14 +27,29 @@ class MicrosoftGraphService
 
     protected function getAccessToken()
     {
+        Log::info('Graph token request started', [
+            'tenant_id_exists' => !empty(config('services.ms.tenant_id') ?: env('MS_TENANT_ID')),
+            'client_id_exists' => !empty(config('services.ms.client_id') ?: env('MS_CLIENT_ID')),
+            'client_secret_exists' => !empty(config('services.ms.client_secret') ?: env('MS_CLIENT_SECRET')),
+        ]);
+
         $response = Http::asForm()->post("https://login.microsoftonline.com/{$this->tenantId}/oauth2/v2.0/token", [
             'grant_type' => 'client_credentials',
-            'client_id'     => $this->clientId,
+            'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
-            'scope'         => 'https://graph.microsoft.com/.default',
+            'scope' => 'https://graph.microsoft.com/.default',
+        ]);
+
+        Log::info('Graph token response received', [
+            'status' => $response->status(),
+            'successful' => $response->successful(),
         ]);
 
         if ($response->failed()) {
+            Log::error('Graph token request failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
             throw new Exception('Failed to get MS access token: ' . $response->body());
         }
 
@@ -48,9 +63,21 @@ class MicrosoftGraphService
     public function provisionLearner(User $user, string $plainPassword = null)
     {
         $token = $this->getAccessToken();
-        
-        $studentCode = config('app.student_email_prefix', 'ICOL') . $user->id;
-        $upn = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
+
+        // 1. Determine UPN (DS{id}@domain)
+        // Assumption: We want to use the standard DS email format if possible, 
+        // to match CRM logic.
+        $domain = 'inspirecollege.co.uk'; // Ideally from config, but hardcoded in CRM example too? No, CRM used config.
+        // Let's assume we can get it from the user's current email or use a standard one.
+        // CRM logic: $dsEmail = "DS{$dsNo}@{$domain}";
+        // I'll stick to what the CRM does to ensure consistency.
+        // I need the domain.
+        // If not in config, I'll fallback to 'inspirecollege.co.uk'. 
+        // Or extract from existing email if it matches pattern?
+        // Safest is to generate it:
+        $dsNo = $user->id;
+        $domain = config('services.ms.domain', 'inspirecollege.co.uk'); // Add domain to config if needed, logic below
+        $upn = "DS{$dsNo}@{$domain}";
 
         // If user already has ms_user_id, check if they exist?
         // Idempotency handled by createUserOrGetExisting
@@ -59,41 +86,41 @@ class MicrosoftGraphService
             // A. Create or Get User
             $displayName = trim($user->first_name . ' ' . $user->sur_name);
             if (!$plainPassword) {
-                 // If no password provided (e.g. async job), we might need to reset or skip?
-                 // Current flow in PaymentProcessingService doesn't have plain password of the user easily available 
-                 // UNLESS we are in the flow where user is registering?
-                 // Wait, for payment webhook, we assume user accounts exist.
-                 // If we create a NEW MS account, we need a password.
-                 // We can generate a temporary one or use a distinct one.
-                 // Or we can try to reset it to something known?
-                 // CRM logic requires password.
-                 // Since we don't know the user's plaintext password in Portal (hashed), 
-                 // we might have to generate a random one and save it? 
-                 // modifying the portal password?
-                 // CRM logic line 80: $portalUser->password = Hash::make($plainPassword);
-                 // It RESETS the portal password to the one used for MS.
-                 // This implies we should generate a secure password, set it for MS, and set it for Portal.
-                 // BUT this might disrupt the user if they just signed up?
-                 // If they signed up, they know their password.
-                 // We cannot retrieve it.
-                 // If we use a different password for MS, they have 2 passwords.
-                 // The requirement says "Provision Microsoft account using SAME DS email + SAME password."
-                 // This is tricky if we don't have the plain password.
-                 // However, usually this runs at ONBOARDING where we might have it in session?
-                 // But here it's Payment Webhook.
-                 // Strategy: Generate a random password, set it on MS, and UPDATING Portal password is risky if they are logged in?
-                 // Maybe we only do this if ms_user_id is null?
-                 // If ms_user_id is null, it means they were never provisioned.
-                 // We can generate a password, email it to them?
-                 // OR we leave password management to them via "Forgot Password"?
-                 // Let's generate a strong random password if we are creating the user.
-                 $plainPassword = \Illuminate\Support\Str::random(12) . '!Aa1';
-                 // We will update the local user implementation to match if we want sync.
-                 // But changing user's portal password might lock them out of Portal!
-                 // Better to NOT change Portal password unless we must.
-                 // MS account needs a password. We give it one.
-                 // The user might need to reset it.
-                 // Let's proceed with generated password for MS.
+                // If no password provided (e.g. async job), we might need to reset or skip?
+                // Current flow in PaymentProcessingService doesn't have plain password of the user easily available 
+                // UNLESS we are in the flow where user is registering?
+                // Wait, for payment webhook, we assume user accounts exist.
+                // If we create a NEW MS account, we need a password.
+                // We can generate a temporary one or use a distinct one.
+                // Or we can try to reset it to something known?
+                // CRM logic requires password.
+                // Since we don't know the user's plaintext password in Portal (hashed), 
+                // we might have to generate a random one and save it? 
+                // modifying the portal password?
+                // CRM logic line 80: $portalUser->password = Hash::make($plainPassword);
+                // It RESETS the portal password to the one used for MS.
+                // This implies we should generate a secure password, set it for MS, and set it for Portal.
+                // BUT this might disrupt the user if they just signed up?
+                // If they signed up, they know their password.
+                // We cannot retrieve it.
+                // If we use a different password for MS, they have 2 passwords.
+                // The requirement says "Provision Microsoft account using SAME DS email + SAME password."
+                // This is tricky if we don't have the plain password.
+                // However, usually this runs at ONBOARDING where we might have it in session?
+                // But here it's Payment Webhook.
+                // Strategy: Generate a random password, set it on MS, and UPDATING Portal password is risky if they are logged in?
+                // Maybe we only do this if ms_user_id is null?
+                // If ms_user_id is null, it means they were never provisioned.
+                // We can generate a password, email it to them?
+                // OR we leave password management to them via "Forgot Password"?
+                // Let's generate a strong random password if we are creating the user.
+                $plainPassword = \Illuminate\Support\Str::random(12) . '!Aa1';
+                // We will update the local user implementation to match if we want sync.
+                // But changing user's portal password might lock them out of Portal!
+                // Better to NOT change Portal password unless we must.
+                // MS account needs a password. We give it one.
+                // The user might need to reset it.
+                // Let's proceed with generated password for MS.
             }
 
             $msUser = $this->createUserOrGetExisting($token, $upn, $displayName, $plainPassword);
@@ -130,7 +157,7 @@ class MicrosoftGraphService
             // "Provision Microsoft account using SAME DS email + SAME password."
             // Yes, it seems the intention is to standardize identity.
             if ($user->email_address !== $upn) {
-                $user->email_address = $upn; 
+                $user->email_address = $upn;
                 Log::info("MSGraphService: Updated Portal Email to matches MS UPN.", ['new_email' => $upn]);
             }
             // Update password?
@@ -145,7 +172,7 @@ class MicrosoftGraphService
             // but set it on MS. They can use "Forgot Password" on MS if needed?
             // MS doesn't have easy self-service reset without setup.
             // I will NOT update portal password for safety, but I accepted the $plainPassword arg.
-            
+
             $user->save();
 
             return true;
@@ -165,9 +192,10 @@ class MicrosoftGraphService
     public function createPendingLearner(User $user, string $plainPassword)
     {
         $token = $this->getAccessToken();
-        
-        $studentCode = config('app.student_email_prefix', 'ICOL') . $user->id;
-        $upn = $studentCode . '@' . config('app.student_email_domain', 'inspirecollegeoflearning.com');
+
+        $dsNo = $user->id;
+        $domain = config('services.ms.domain', 'inspirecollege.co.uk');
+        $upn = "DS{$dsNo}@{$domain}"; // Or use $user->email_address if already set to DS email
 
         $displayName = trim($user->first_name . ' ' . $user->sur_name);
 
@@ -179,7 +207,7 @@ class MicrosoftGraphService
     {
         // Try create
         $mailNickname = explode('@', $upn)[0];
-        
+
         $payload = [
             'accountEnabled' => $enabled,
             'displayName' => $displayName,
@@ -250,7 +278,7 @@ class MicrosoftGraphService
 
         if ($response->failed()) {
             // 400 or 409 if already member
-             if (str_contains($response->body(), 'One or more added object references already exist')) {
+            if (str_contains($response->body(), 'One or more added object references already exist')) {
                 return;
             }
             throw new Exception('Failed to add to group: ' . $response->body());
@@ -262,7 +290,7 @@ class MicrosoftGraphService
         $token = $this->getAccessToken();
         return $this->enableUserWithToken($token, $userId);
     }
-    
+
     protected function enableUserWithToken($token, $userId)
     {
         $response = Http::withToken($token)
@@ -275,5 +303,111 @@ class MicrosoftGraphService
         }
 
         return true;
+    }
+
+    public function updateUserPassword(string $msUserId, string $newPassword)
+    {
+        $token = $this->getAccessToken();
+
+        $payload = [
+            'passwordProfile' => [
+                'forceChangePasswordNextSignIn' => false,
+                'password' => $newPassword,
+            ],
+        ];
+
+        $response = Http::withToken($token)
+            ->patch("https://graph.microsoft.com/v1.0/users/{$msUserId}", $payload);
+
+        if ($response->failed()) {
+            throw new Exception('Failed to update MS user password: ' . $response->body());
+        }
+
+        return true;
+    }
+
+    public function sendMail(string $subject, string $htmlBody, array|string $to, array|string $cc = [], array|string $bcc = [])
+    {
+        $token = $this->getAccessToken();
+
+        $senderEmail = config('mail.from.address', 'hello@example.com');
+        $senderName = config('mail.from.name', 'Inspire College');
+        $saveToSentItems = (bool) config('mail.save_to_sent_items', true);
+
+        $url = "https://graph.microsoft.com/v1.0/users/{$senderEmail}/sendMail";
+
+        $toArr = is_string($to) ? [$to] : $to;
+        $ccArr = is_string($cc) ? [$cc] : $cc;
+        $bccArr = is_string($bcc) ? [$bcc] : $bcc;
+
+        Log::info('Graph sendMail request started', [
+            'sender' => $senderEmail,
+            'subject' => $subject,
+            'to_count' => count($toArr),
+            'cc_count' => count($ccArr),
+            'bcc_count' => count($bccArr),
+            'save_to_sent_items' => $saveToSentItems,
+            'endpoint' => $url,
+        ]);
+
+        $payload = [
+            'message' => [
+                'subject' => $subject,
+                'body' => [
+                    'contentType' => 'HTML',
+                    'content' => $htmlBody,
+                ],
+                'toRecipients' => $this->formatRecipients($toArr),
+                'ccRecipients' => $this->formatRecipients($ccArr),
+                'bccRecipients' => $this->formatRecipients($bccArr),
+                'from' => [
+                    'emailAddress' => [
+                        'address' => $senderEmail,
+                        'name' => $senderName,
+                    ],
+                ],
+            ],
+            'saveToSentItems' => $saveToSentItems,
+        ];
+
+        $response = Http::withToken($token)->post($url, $payload);
+
+        Log::info('Graph sendMail response received', [
+            'sender' => $senderEmail,
+            'subject' => $subject,
+            'status' => $response->status(),
+            'successful' => $response->successful() || $response->status() === 202,
+            'body' => $response->body(),
+        ]);
+
+        if ($response->failed() && $response->status() !== 202) {
+            Log::error('Graph sendMail failed', [
+                'sender' => $senderEmail,
+                'subject' => $subject,
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'to' => $toArr,
+                'cc' => $ccArr,
+                'bcc' => $bccArr,
+            ]);
+            throw new Exception('Failed to send email via Microsoft Graph: ' . $response->body());
+        }
+
+        return true;
+    }
+
+    protected function formatRecipients(array|string $recipients): array
+    {
+        if (is_string($recipients)) {
+            $recipients = [$recipients];
+        }
+
+        return array_values(array_map(function ($email) {
+            return [
+                'emailAddress' => [
+                    'address' => trim($email),
+                ]
+            ];
+        }, array_filter($recipients)));
     }
 }

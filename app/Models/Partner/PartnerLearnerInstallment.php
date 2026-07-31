@@ -2,18 +2,19 @@
 
 namespace App\Models\Partner;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\User;
 use App\Models\Crm\Enrolment;
 use App\Models\Crm\Order;
+use App\Models\User;
 use App\Models\Website\Course;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class PartnerLearnerInstallment extends Model
 {
     use HasFactory;
 
     protected $connection = 'mysql_crm';
+
     protected $table = 'partner_learner_installments';
 
     protected $fillable = [
@@ -35,23 +36,47 @@ class PartnerLearnerInstallment extends Model
         'payment_reference',
         'stripe_payment_intent_id',
         'receipt_path',
+        'notes',
         'submitted_amount',
         'approved_by',
         'approved_at',
         'rejection_reason',
-        'notes',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'paid_at' => 'datetime',
+        'approved_at' => 'datetime',
         'total_amount' => 'decimal:2',
         'deposit_amount' => 'decimal:2',
         'installment_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'submitted_amount' => 'decimal:2',
-        'approved_at' => 'datetime',
     ];
+
+    /**
+     * Get the urgency status of the installment
+     * Returns: 'overdue', 'due_soon', or 'normal'
+     */
+    public function getUrgencyAttribute()
+    {
+        if ($this->status === 'paid') {
+            return 'paid';
+        }
+
+        $today = now()->startOfDay();
+        $nextWeek = now()->addDays(7)->endOfDay();
+
+        if ($this->due_date->lt($today)) {
+            return 'overdue';
+        }
+
+        if ($this->due_date->isBetween($today, $nextWeek)) {
+            return 'due_soon';
+        }
+
+        return 'normal';
+    }
 
     public function partner()
     {

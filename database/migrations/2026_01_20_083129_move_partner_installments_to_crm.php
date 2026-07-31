@@ -13,7 +13,8 @@ return new class extends Migration {
         // Drop from Portal DB (Mistake cleanup)
         Schema::connection('mysql_portal')->dropIfExists('partner_learner_installments');
 
-        if (! Schema::connection('mysql_crm')->hasTable('partner_learner_installments')) {
+        // Create in CRM DB (Correct location)
+        if (!Schema::connection('mysql_crm')->hasTable('partner_learner_installments')) {
             Schema::connection('mysql_crm')->create('partner_learner_installments', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('partner_id');

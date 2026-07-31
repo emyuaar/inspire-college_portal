@@ -4,117 +4,188 @@
 @section('active-page', 'courses')
 
 @section('content')
-    <div class="space-y-6">
-
-        <div class="flex items-center justify-between">
+    <div class="space-y-8 pb-12">
+        {{-- Header Section --}}
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Assigned Courses</h1>
-                <p class="text-slate-500 mt-1">View your assigned courses and pricing details.</p>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Course Catalogue</h1>
+                <p class="text-slate-500 mt-2 font-medium flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-ds-pink"></i>
+                    Your assigned courses and exclusive partner pricing.
+                </p>
             </div>
 
-            <a href="{{ route('partner.learners.create') }}"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-ds-pink hover:bg-pink-700 text-white rounded-lg transition-colors duration-200">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span class="font-medium">Enroll Learner</span>
-            </a>
+            <div class="flex items-center gap-3">
+                 {{-- Search Header --}}
+                 <form action="{{ route('partner.courses.index') }}" method="GET" class="relative group">
+                    <input type="text" name="search" value="{{ $search }}" 
+                        placeholder="Search courses..."
+                        class="pl-10 pr-4 py-2.5 w-64 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-ds-pink/20 focus:border-ds-pink transition-all shadow-sm">
+                    <i class="fa-solid fa-search absolute left-4 top-3 text-slate-400 group-focus-within:text-ds-pink transition-colors"></i>
+                 </form>
+
+                 <a href="{{ route('partner.learners.create') }}"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-ds-navy hover:bg-slate-800 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-bold text-sm">
+                    <i class="fa-solid fa-user-plus"></i>
+                    Enroll New Learner
+                </a>
+            </div>
         </div>
 
         @if($courses->count() > 0)
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 @foreach($courses as $course)
-                    <div
-                        class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col h-full">
+                    <div class="group bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
+                        
+                        {{-- Course Image & Badges --}}
+                        <div class="relative aspect-[16/10] overflow-hidden bg-slate-100">
+                            @if($course->image)
+                                @php 
+                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://inspirecollege.co.uk/storage/' . $course->image;
+                                @endphp
+                                <img src="{{ $imgSrc }}" 
+                                     alt="{{ $course->title }}" 
+                                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            @else
+                                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+                                    <i class="fa-solid fa-building-columns text-4xl text-slate-200"></i>
+                                </div>
+                            @endif
+
+                            {{-- Category Overlay --}}
+                            @if($course->category)
+                            <div class="absolute top-4 left-4">
+                                <span class="px-3 py-1 bg-white/90 backdrop-blur text-[10px] font-black text-ds-navy uppercase tracking-widest rounded-full shadow-sm">
+                                    {{ $course->category->name }}
+                                </span>
+                            </div>
+                            @endif
+
+                            {{-- Pricing Badges Overlay --}}
+                            <div class="absolute bottom-4 left-4 flex gap-2">
+                                @if($course->allow_two)
+                                    <span class="px-2.5 py-1 bg-cyan-500 text-white text-[9px] font-black uppercase rounded shadow-sm">2 Months</span>
+                                @endif
+                                @if($course->allow_three)
+                                    <span class="px-2.5 py-1 bg-indigo-500 text-white text-[9px] font-black uppercase rounded shadow-sm">3 Months</span>
+                                @endif
+                                @if($course->installment_plan['available'])
+                                    <span class="px-2.5 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase rounded shadow-sm">
+                                        Installments Available
+                                    </span>
+                                @endif
+                                @if($course->full_plan['available'])
+                                    <span class="px-2.5 py-1 bg-blue-500 text-white text-[9px] font-black uppercase rounded shadow-sm">
+                                        Full Pay Ready
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
 
                         {{-- Card Header --}}
-                        <div class="p-5 border-b border-slate-100 bg-slate-50/50">
-                            <h3 class="font-bold text-lg text-slate-800 line-clamp-2 min-h-[3.5rem] leading-snug">
+                        <div class="p-6 pb-0">
+                            <h3 class="font-black text-lg text-slate-800 leading-tight line-clamp-2 min-h-[3rem] group-hover:text-ds-pink transition-colors">
                                 {{ $course->title }}
                             </h3>
-                            @if($course->is_promo)
-                                <span
-                                    class="inline-flex items-center px-2 py-1 mt-3 rounded text-xs font-medium bg-green-100 text-green-700">
-                                    Promo Active
-                                </span>
+                            @if(!empty($course->excerpt))
+                                <p class="text-xs text-slate-500 mt-2 line-clamp-2">{{ $course->excerpt }}</p>
                             @endif
                         </div>
 
-                        {{-- Card Body --}}
-                        <div class="p-5 space-y-4 flex-1">
-
-                            {{-- Pricing --}}
+                        {{-- Card Body: Pricing --}}
+                        <div class="p-6 space-y-5 flex-1">
+                            
+                            {{-- Pricing Grid --}}
                             <div class="space-y-3">
-                                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Pricing Options</h4>
-
-                                {{-- Full Plan --}}
-                                <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                    <span class="text-sm font-medium text-slate-600">Full Payment</span>
+                                {{-- Full Payment Row --}}
+                                <div class="flex justify-between items-center p-3 rounded-2xl bg-slate-50 border border-slate-100 group/row hover:bg-blue-50/50 transition-colors">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-blue-500 shadow-sm">
+                                            <i class="fa-solid fa-credit-card text-xs"></i>
+                                        </div>
+                                        <span class="text-xs font-bold text-slate-600">Full Price</span>
+                                    </div>
                                     @if($course->full_plan['available'])
-                                        <span class="font-bold text-slate-800">£{{ number_format($course->full_plan['amount']) }}</span>
+                                        <span class="font-black text-slate-900">£{{ number_format($course->full_plan['amount'], 2) }}</span>
                                     @else
-                                        <span class="text-xs text-slate-400 italic">Not available</span>
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase italic">Restricted</span>
                                     @endif
                                 </div>
 
-                                {{-- Installment Plan --}}
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-2">
+                                {{-- Installment Row --}}
+                                @if($course->installment_plan['available'])
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-4 group/inst hover:bg-emerald-50/30 transition-colors">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-sm font-medium text-slate-600">Installments</span>
-                                        @if($course->installment_plan['available'])
-                                            <span class="font-bold text-slate-800">Available</span>
-                                        @else
-                                            <span class="text-xs text-slate-400 italic">Not available</span>
-                                        @endif
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-500 shadow-sm">
+                                                <i class="fa-solid fa-calendar-check text-xs"></i>
+                                            </div>
+                                            <span class="text-xs font-bold text-slate-600">Installments</span>
+                                        </div>
+                                        <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">Enabled</span>
                                     </div>
 
-                                    @if($course->installment_plan['available'])
-                                        <div class="pt-2 mt-2 border-t border-slate-200 grid grid-cols-2 gap-2 text-xs">
-                                            <div>
-                                                <span class="block text-slate-400">Deposit</span>
-                                                <span
-                                                    class="font-semibold text-slate-700">£{{ number_format($course->installment_plan['deposit']) }}</span>
-                                            </div>
-                                            <div class="text-right">
-                                                <span class="block text-slate-400">Monthly</span>
-                                                <span
-                                                    class="font-semibold text-slate-700">£{{ number_format($course->installment_plan['monthly_amount']) }}</span>
-                                                <span class="text-slate-400">x {{ $course->installment_plan['months'] }}</span>
-                                            </div>
+                                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/60">
+                                        <div>
+                                            <span class="block text-[10px] font-bold text-slate-400 uppercase">Deposit</span>
+                                            <span class="text-sm font-black text-slate-800">£{{ number_format($course->installment_plan['deposit'], 2) }}</span>
                                         </div>
-                                    @endif
+                                        <div class="text-right">
+                                            <span class="block text-[10px] font-bold text-slate-400 uppercase">Plan</span>
+                                            <span class="text-sm font-black text-slate-800">£{{ number_format($course->installment_plan['monthly_amount'], 2) }} <span class="text-[10px] font-bold text-slate-400">/mo</span></span>
+                                            <span class="block text-[10px] font-bold text-emerald-600 uppercase">{{ $course->installment_plan['months'] + 1 }} Months</span>
+                                        </div>
+                                    </div>
                                 </div>
+                                @endif
                             </div>
 
-                            {{-- Notes --}}
+                            {{-- Partner Commercial Notes --}}
                             @if(!empty($course->assignment_notes))
-                                <div class="pt-4 border-t border-slate-100 mt-2">
-                                    <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Partner Notes</h4>
-                                    <p class="text-sm text-slate-600 italic bg-amber-50 p-3 rounded border border-amber-100">
-                                        "{{ $course->assignment_notes }}"
-                                    </p>
+                                <div class="p-4 rounded-2xl bg-ds-pink/5 border border-ds-pink/10 flex gap-3">
+                                    <i class="fa-solid fa-circle-info text-ds-pink mt-0.5 text-xs"></i>
+                                    <div>
+                                        <p class="text-[10px] font-black text-ds-pink uppercase tracking-widest mb-1">Commercial Note</p>
+                                        <p class="text-xs text-slate-600 font-medium leading-relaxed italic">
+                                            "{{ $course->assignment_notes }}"
+                                        </p>
+                                    </div>
                                 </div>
                             @endif
+                        </div>
 
+                        {{-- Footer Actions --}}
+                        <div class="p-6 pt-0 mt-auto flex items-center gap-2">
+                             <a href="{{ route('partner.learners.create') }}?course_id={{ $course->id }}" 
+                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-ds-pink text-white rounded-xl text-xs font-black shadow-lg shadow-pink-200 hover:bg-pink-700 hover:shadow-xl transition-all">
+                                <i class="fa-solid fa-plus-circle"></i>
+                                Enroll Now
+                            </a>
+                            <a href="https://inspirecollege.co.uk/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
+                               class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors">
+                               Details
+                            </a>
                         </div>
                     </div>
                 @endforeach
             </div>
         @else
-            <div class="text-center py-16 bg-white rounded-xl border border-slate-200 border-dashed">
-                <div class="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
+            <div class="text-center py-20 bg-white rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center">
+                <div class="w-24 h-24 rounded-full bg-slate-50 flex items-center justify-center mb-6">
+                    <i class="fa-solid fa-swatchbook text-4xl text-slate-300"></i>
                 </div>
-                <h3 class="text-lg font-medium text-slate-900">No Courses Assigned</h3>
-                <p class="text-slate-500 max-w-sm mx-auto mt-2">
-                    You currently have no courses assigned to your partner account. Please contact support if you believe this
-                    is an error.
+                <h3 class="text-2xl font-black text-slate-900">Catalogue Empty</h3>
+                <p class="text-slate-500 max-w-sm mx-auto mt-3 font-medium">
+                    {{ $search ? 'No courses match your search criteria. Try a different term or clear the filter.' : 'You currently have no courses assigned to your account.' }}
                 </p>
+                @if($search)
+                <a href="{{ route('partner.courses.index') }}" class="mt-8 px-6 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg">
+                    Clear Search
+                </a>
+                @endif
             </div>
         @endif
+    </div>
 
     </div>
 @endsection

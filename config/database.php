@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'mysql_portal'),
 
     /*
     |--------------------------------------------------------------------------
@@ -48,6 +48,20 @@ return [
         | DEFAULT: PORTAL (LMS) DATABASE
         |--------------------------------------------------------------------------
         */
+        'mysql' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', 3306),
+            'database' => env('DB_DATABASE', 'inspire-college_portal'),
+            'username' => env('DB_USERNAME', 'inspire-college_portal'),
+            'password' => env('DB_PASSWORD', '=1Z3cfh4^Y]Xsnb3'),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation'=> 'utf8mb4_unicode_ci',
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'mysql_portal' => [
             'driver' => 'mysql',
             'host' => env('DB_HOST', '127.0.0.1'),
@@ -57,7 +71,7 @@ return [
             'password' => env('DB_PASSWORD', '=1Z3cfh4^Y]Xsnb3'),
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
+            'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
             'engine' => null,
         ],
@@ -76,7 +90,7 @@ return [
             'password' => env('DB_CRM_PASSWORD', '=C1A)kpTJXvhZ;ylm'),
             'unix_socket' => env('DB_CRM_SOCKET', ''),
             'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
+            'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
             'engine' => null,
         ],
@@ -95,7 +109,7 @@ return [
             'password' => env('DB_WEBSITE_PASSWORD', 'jBkx)=)K}u9T,4q-'),
             'unix_socket' => env('DB_WEBSITE_SOCKET', ''),
             'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
+            'collation'=> 'utf8mb4_unicode_ci',
             'strict' => true,
             'engine' => null,
         ],
@@ -185,7 +199,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')) . '-database-'),
+            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-database-'),
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 

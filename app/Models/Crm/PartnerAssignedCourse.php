@@ -12,8 +12,29 @@ class PartnerAssignedCourse extends Model
     protected $fillable = [
         'partner_id',
         'course_id',
+        'discount_type',
+        'discount_value',
+        'allow_full_payment',
+        'allow_two_months',
+        'allow_three_months',
+        'allow_installments',
+        'status',
         'notes',
     ];
+
+    protected $casts = [
+        'discount_value' => 'decimal:2',
+        'allow_full_payment' => 'boolean',
+        'allow_two_months' => 'boolean',
+        'allow_three_months' => 'boolean',
+        'allow_installments' => 'boolean',
+    ];
+
+    public function installmentPlans()
+    {
+        return $this->hasMany(PartnerInstallmentPlan::class, 'partner_id', 'partner_id')
+                    ->whereColumn('course_id', 'course_id');
+    }
 
     public function plans()
     {

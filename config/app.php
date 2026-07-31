@@ -123,7 +123,4 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'student_email_prefix' => env('STUDENT_EMAIL_PREFIX', 'ICOL'),
-    'student_email_domain' => env('STUDENT_EMAIL_DOMAIN', 'inspirecollegeoflearning.com'),
-
 ];

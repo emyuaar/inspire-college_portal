@@ -8,7 +8,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {
-            --ds-navy: #0f172a;
+            --ds-navy: #01345B;
             --ds-pink: #A91A6A;
         }
 
@@ -41,7 +41,7 @@
 
     {{-- LEFT COLUMN: BRANDING (Desktop Only) --}}
     <div
-        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#0f172a] relative overflow-hidden flex-col justify-between p-12 text-white">
+        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#01345B] relative overflow-hidden flex-col justify-between p-12 text-white">
 
         {{-- Background Pattern/Effect --}}
         <div class="absolute inset-0 opacity-10"
@@ -54,7 +54,7 @@
 
         {{-- Content --}}
         <div class="relative z-10">
-            <img src="{{ asset('images/1000ppi/logo-white.png') }}" alt="Inspire College"
+            <img src="https://inspirecollege.co.uk/images/Inspire%20College_logo.png" alt="Inspire College"
                 class="h-10 mb-8">
 
             <h1 class="text-4xl font-bold leading-tight mb-4">
@@ -78,7 +78,7 @@
 
             {{-- Mobile Logo (Visible only on mobile) --}}
             <div class="md:hidden text-center mb-8">
-                <img src="{{ asset('images/1000ppi/logo.png') }}" alt="Inspire College"
+                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College"
                     class="h-10 mx-auto">
             </div>
 
@@ -91,14 +91,23 @@
             </div>
 
             {{-- Alerts / Errors --}}
-            @if($errors->any())
+            @if($errors->any() || session('error'))
                 <div class="rounded-xl bg-red-50 border border-red-100 p-4 flex items-start gap-3">
                     <svg class="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div class="text-sm text-red-700 font-medium">
-                        {{ $errors->first() }}
+                        {{ session('error') ?? $errors->first() }}
+                    </div>
+                </div>
+            @endif
+
+            @if(session('info'))
+                <div class="rounded-xl bg-blue-50 border border-blue-100 p-4 flex items-start gap-3">
+                    <svg class="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div class="text-sm text-blue-700 font-medium">
+                        {{ session('info') }}
                     </div>
                 </div>
             @endif
@@ -123,7 +132,7 @@
                             Password
                         </label>
                         {{-- Forgot Password Link --}}
-                        <a href="#" class="text-sm font-semibold text-[#0f172a] hover:text-[#A91A6A] transition-colors">
+                        <a href="#" class="text-sm font-semibold text-[#01345B] hover:text-[#A91A6A] transition-colors">
                             Forgot password?
                         </a>
                     </div>

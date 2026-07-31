@@ -43,6 +43,7 @@ class PartnerLearner extends Model
         'dob' => 'date',
     ];
 
+    // Compatibility with User model views
     public function getSurNameAttribute()
     {
         return $this->last_name;
@@ -60,6 +61,6 @@ class PartnerLearner extends Model
 
     public function enrolments()
     {
-        return $this->hasMany(Enrolment::class, 'partner_learner_id');
+        return $this->hasMany(\App\Models\Crm\Enrolment::class, 'partner_learner_id');
     }
 }

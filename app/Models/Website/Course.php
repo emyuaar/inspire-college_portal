@@ -30,6 +30,24 @@ class Course extends Model
         'qualification_id',
         'course_category_id',
         'status',
+        'completion_mode',
+        'uses_credit_based_completion',
+        'total_required_credits',
+        'mandatory_credits_required',
+        'optional_credits_required',
+        'minimum_optional_units',
+        'maximum_optional_units',
+        'completion_rule_type',
+        'credit_setup_status',
+    ];
+
+    protected $casts = [
+        'uses_credit_based_completion' => 'boolean',
+        'total_required_credits' => 'decimal:2',
+        'mandatory_credits_required' => 'decimal:2',
+        'optional_credits_required' => 'decimal:2',
+        'minimum_optional_units' => 'integer',
+        'maximum_optional_units' => 'integer',
     ];
 
     protected $dates = [
@@ -51,6 +69,23 @@ class Course extends Model
     public function promotions()
     {
         return $this->hasMany(CoursePromotion::class, 'course_id');
+    }
+
+    public function qualification()
+    {
+        return $this->belongsTo(Qualification::class, 'qualification_id');
+    }
+
+    public function usesCreditBasedCompletion(): bool
+    {
+        return $this->completion_mode === 'credit_based'
+            && (bool) $this->uses_credit_based_completion;
+    }
+
+    public function hasConfiguredCreditSetup(): bool
+    {
+        return $this->usesCreditBasedCompletion()
+            && $this->credit_setup_status === 'configured';
     }
 
     // pivot row (deposit/months/monthly)

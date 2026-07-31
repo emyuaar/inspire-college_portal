@@ -16,7 +16,7 @@
                     <h1 class="text-xl md:text-2xl font-bold text-ds-navy leading-tight">{{ $course?->title }}</h1>
                     <div class="flex flex-wrap items-center gap-3 mt-1 text-xs">
                         <span class="text-slate-500">SID: <strong
-                                class="text-slate-700">ICOL{{ $user->id }}</strong></span>
+                                class="text-slate-700">DS{{ $user->id }}</strong></span>
                         @if ((int) $enrolment->status_id === 2)
                             <x-ui.badge variant="success" size="sm">Approved</x-ui.badge>
                         @elseif((int) $enrolment->status_id === 3)
@@ -35,6 +35,81 @@
             </div>
         </div>
 
+        @if($creditBased)
+            <x-ui.card class="mb-6 overflow-hidden" padding="p-0">
+                <div class="p-5 border-b border-slate-200 bg-slate-50">
+                    <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-ds-navy">Credit-Based Course Plan</h2>
+                            <p class="text-sm text-slate-600 mt-1">Mandatory units are selected automatically. Choose optional units until all course and group rules are met.</p>
+                        </div>
+                        <span class="inline-flex self-start px-3 py-1 rounded-full text-xs font-bold {{ ($creditSummary['remaining_credits'] ?? 1) <= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                            {{ ($creditSummary['remaining_credits'] ?? 1) <= 0 ? 'Credit target reached' : 'Selection required' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <dl class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                        @foreach([
+                            'Required Credits' => $creditSummary['required_credits'],
+                            'Mandatory Credits' => $creditSummary['mandatory_credits'],
+                            'Selected Optional' => $creditSummary['optional_credits'],
+                            'Total Selected' => $creditSummary['total_selected_credits'],
+                            'Remaining Credits' => $creditSummary['remaining_credits'],
+                        ] as $label => $value)
+                            <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                <dt class="text-[11px] font-bold uppercase tracking-wide text-slate-500">{{ $label }}</dt>
+                                <dd class="text-xl font-bold text-ds-navy mt-1">{{ $value === null ? '—' : rtrim(rtrim(number_format((float)$value, 2), '0'), '.') }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        @foreach($modules->where('section_type', 'unit')->where('unit_type', 'optional')->where('included_in_completion', true) as $optionalUnit)
+                            @php $selection = $unitSelections->get($optionalUnit->id); @endphp
+                            <div class="rounded-xl border {{ $selection ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white' }} p-4">
+                                <div class="flex justify-between gap-3">
+                                    <div>
+                                        <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $optionalUnit->unit_code ?: 'Optional Unit' }}</div>
+                                        <h3 class="font-bold text-slate-800 mt-1">{{ $optionalUnit->unit_title ?: $optionalUnit->title }}</h3>
+                                        <div class="text-xs text-slate-600 mt-2">
+                                            @if($optionalUnit->credits !== null)<span>{{ rtrim(rtrim(number_format((float)$optionalUnit->credits, 2), '0'), '.') }} credits</span>@endif
+                                            @if($optionalUnit->optionalGroup)<span> · {{ $optionalUnit->optionalGroup->name }}</span>@endif
+                                        </div>
+                                    </div>
+                                    @if($selection)<span class="text-emerald-700 text-xs font-bold">Selected</span>@endif
+                                </div>
+                                <div class="mt-4">
+                                    @if(!$selection)
+                                        <form method="POST" action="{{ route('portal.learner.course.units.select', [$enrolment, $optionalUnit]) }}">@csrf
+                                            <button class="h-10 px-4 rounded-lg bg-ds-navy text-white text-sm font-bold hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-pink transition-colors">Select Unit</button>
+                                        </form>
+                                    @elseif(!$selection->is_locked)
+                                        <form method="POST" action="{{ route('portal.learner.course.units.remove', [$enrolment, $optionalUnit]) }}">@csrf @method('DELETE')
+                                            <button class="h-10 px-4 rounded-lg border border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-colors">Remove Unit</button>
+                                        </form>
+                                    @else
+                                        <span class="inline-flex items-center h-10 px-3 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">Locked after work submission</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if($completionReport && $completionReport['missing_requirements'])
+                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <strong>Requirements still to complete</strong>
+                            <ul class="list-disc ml-5 mt-2 space-y-1">@foreach($completionReport['missing_requirements'] as $requirement)<li>{{ $requirement }}</li>@endforeach</ul>
+                        </div>
+                    @endif
+
+                    <form class="mt-5" method="POST" action="{{ route('portal.learner.course.units.finalise', $enrolment) }}">@csrf
+                        <button class="h-10 px-4 rounded-lg bg-ds-pink text-white text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-navy transition-opacity">Validate My Unit Selection</button>
+                    </form>
+                </div>
+            </x-ui.card>
+        @endif
+
         @if ($modules->count())
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
@@ -46,7 +121,10 @@
                             <p class="text-xs text-slate-500">Select a unit to view content</p>
                         </div>
                         <div class="max-h-[calc(100vh-200px)] overflow-y-auto p-2 space-y-1">
+                            @php $navigationUnitNumber = 0; @endphp
                             @foreach ($modules as $i => $m)
+                                @continue($creditBased && $m->isUnit() && $m->unit_type === 'optional' && !$unitSelections->has($m->id))
+                                @php if (!$creditBased || $m->isUnit()) $navigationUnitNumber++; @endphp
                                 <button type="button" onclick="scrollToUnit({{ $m->id }})"
                                     class="w-full text-left p-3 rounded-lg hover:bg-slate-50 transition-colors group focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ds-navy"
                                     data-nav-unit="{{ $m->id }}">
@@ -54,7 +132,7 @@
                                         <div>
                                             <div
                                                 class="text-sm font-semibold text-slate-700 group-hover:text-ds-navy transition-colors">
-                                                Unit {{ $i + 1 }}: {{ $m->title }}
+                                                {{ $creditBased && !$m->isUnit() ? $m->section_type_label : 'Unit ' . $navigationUnitNumber }}: {{ $m->title }}
                                             </div>
                                             <div class="text-[10px] text-slate-400 mt-0.5">
                                                 {{ $m->lessons->count() }} Notes • {{ $m->assignments->count() }} Tasks
@@ -74,7 +152,10 @@
 
                 {{-- RIGHT CONTENT (Units) --}}
                 <div class="lg:col-span-9 space-y-6">
+                    @php $contentUnitNumber = 0; @endphp
                     @foreach ($modules as $index => $module)
+                        @continue($creditBased && $module->isUnit() && $module->unit_type === 'optional' && !$unitSelections->has($module->id))
+                        @php if (!$creditBased || $module->isUnit()) $contentUnitNumber++; @endphp
                         @php
                             $isEmpty = $module->lessons->count() + $module->assignments->count() === 0;
                         @endphp
@@ -88,10 +169,21 @@
                                     <div class="flex items-center gap-3">
                                         <span
                                             class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
-                                            {{ $index + 1 }}
+                                            {{ !$creditBased || $module->isUnit() ? $contentUnitNumber : 'R' }}
                                         </span>
                                         <div>
                                             <h2 class="text-lg font-bold text-ds-navy">{{ $module->title }}</h2>
+                                            @if($creditBased && $module->isUnit())
+                                                <div class="flex flex-wrap gap-2 mt-1">
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide {{ $module->unit_type === 'optional' ? 'bg-cyan-100 text-cyan-800' : 'bg-indigo-100 text-indigo-800' }}">{{ ucfirst($module->unit_type) }}</span>
+                                                    @if($module->credits !== null)<span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">{{ rtrim(rtrim(number_format((float)$module->credits, 2), '0'), '.') }} credits</span>@endif
+                                                </div>
+                                            @elseif($creditBased)
+                                                <div class="flex flex-wrap gap-2 mt-1">
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-200 text-slate-700">{{ $module->section_type_label }}</span>
+                                                    <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-white text-slate-600 border border-slate-200">Not part of credit completion</span>
+                                                </div>
+                                            @endif
                                             @if($isEmpty)
                                                 <span
                                                     class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wide">Empty
@@ -134,7 +226,7 @@
                                                         $isUrl = !blank($lesson->video_url);
                                                         $isSecureDoc = ($lesson->resource_type === 'secure_document');
                                                         $isFileResource = !blank($lesson->file_path) && blank($lesson->content) && blank($lesson->video_url) && !$isSecureDoc;
-
+                                                        
                                                         if ($isSecureDoc) {
                                                             $primaryUrl = route('portal.learner.secure_doc.view', $lesson->id);
                                                             $primaryTarget = null;
@@ -150,7 +242,7 @@
                                                             $btnIcon = 'download';
                                                             $typeIcon = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>';
                                                         } else {
-                                                            $primaryUrl = $isUrl ? ($lesson->safe_video_url ?? $lesson->video_url) : route('portal.learner.lessons.show', $lesson->id);
+                                                            $primaryUrl = $isUrl ? $lesson->video_url : route('portal.learner.lessons.show', $lesson->id);
                                                             $primaryTarget = $isUrl ? '_blank' : null;
                                                             $typeLabel = $isUrl ? 'External Link' : 'Reading Material';
                                                             $actionLabel = 'Open Lesson';
@@ -170,8 +262,7 @@
                                                                 </svg>
                                                             </div>
                                                             <div>
-                                                                <a href="{{ $primaryUrl }}" @if($primaryTarget)
-                                                                target="{{ $primaryTarget }}" @endif
+                                                                <a href="{{ $primaryUrl }}" @if($primaryTarget) target="{{ $primaryTarget }}" @endif
                                                                     class="font-bold text-slate-800 group-hover:text-ds-navy transition-colors block">
                                                                     {{ $lesson->title }}
                                                                 </a>
@@ -223,6 +314,21 @@
                                                         $res = $latestGrade ? strtolower($latestGrade->result) : null;
                                                         $isRefer = $res === 'refer';
                                                         $isPass = $res === 'pass';
+                                                        $isFail = $res === 'fail';
+
+                                                        $submissionStatusName = null;
+                                                        if ($submission) {
+                                                            $submissionStatusName = $submissionStatusNameById[$submission->status_id] ?? null;
+                                                        }
+
+                                                        // Attempt limits: standard 2 + any assessor-granted overrides (do not reset history)
+                                                        $standardMaxAttempts = 2;
+                                                        $extraAttemptsGranted = 0;
+                                                        if (!empty($hasExtraAttemptTable) && $hasExtraAttemptTable) {
+                                                            $extraAttemptsGranted = (int) $assignment->extraAttemptGrants->sum('additional_attempts');
+                                                        }
+                                                        $maxAllowedAttempts = $standardMaxAttempts + $extraAttemptsGranted;
+                                                        $nextAttemptNo = $attemptCount + 1;
 
                                                         // Check for Active Reset
                                                         // A reset is "active" if it was created AFTER the latest submission
@@ -254,23 +360,53 @@
                                                             $badgeText = 'Submitted';
                                                             $allowUpload = false;
                                                         } elseif ($isPass) {
-                                                            $badgeVariant = 'success';
-                                                            $badgeText = 'Passed';
-                                                            $allowUpload = false;
-                                                        } elseif ($isRefer) {
-                                                            $badgeVariant = 'warning';
-                                                            $badgeText = 'Referred'; // Strict text
+                                                            // Learners must not see Pass until IQA verification is actually completed.
+                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            if ($isVerified) {
+                                                                $badgeVariant = 'success';
+                                                                $badgeText = 'Passed';
+                                                                $allowUpload = false;
+                                                            } else {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                                $bannerType = 'pending_verification';
+                                                                $allowUpload = false;
+                                                            }
+                                                        } elseif ($isFail && !$isActiveReset) {
+                                                            // Learners must not see Fail until IQA verification is actually completed,
+                                                            // unless a resubmission has been granted (then they are in resubmit flow).
+                                                            $isVerified = $submissionStatusName === 'iqa_approved';
+                                                            if ($isVerified) {
+                                                                $badgeVariant = 'error';
+                                                                $badgeText = 'Failed';
+                                                                $allowUpload = false;
+                                                            } else {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                                $bannerType = 'pending_verification';
+                                                                $allowUpload = false;
+                                                            }
+                                                        } elseif ($isRefer || $isFail) {
+                                                            // If a resubmission has been granted, the learner is in "try again" flow.
+                                                            // Avoid showing Fail as a final outcome before verification.
+                                                            if ($isActiveReset) {
+                                                                $badgeVariant = 'neutral';
+                                                                $badgeText = 'Pending';
+                                                            } else {
+                                                                $badgeVariant = $isFail ? 'error' : 'warning';
+                                                                $badgeText = $isFail ? 'Failed' : 'Referred';
+                                                            }
 
-                                                            if ($attemptCount >= 2) {
-                                                                // Max attempts used
+                                                            if ($attemptCount >= $maxAllowedAttempts) {
+                                                                // Max attempts used (including any granted overrides)
                                                                 $bannerType = 'max_attempts';
                                                                 $allowUpload = false;
                                                             } elseif ($isActiveReset) {
-                                                                // Reset active + Attempts < 2
+                                                                // Reset active + Attempts within limit
                                                                 $bannerType = 'reattempt_allowed';
                                                                 $allowUpload = true;
                                                             } else {
-                                                                // Referred, no reset yet
+                                                                // No reset yet
                                                                 $bannerType = 'wait_approval';
                                                                 $allowUpload = false;
                                                             }
@@ -285,15 +421,33 @@
                                                             $badgeText = 'Pending';
                                                             $allowUpload = true;
                                                         }
+
+                                                        // Learner-facing result theme (tint the whole assignment block for quick scanning).
+                                                        // Only apply the strong theme for final outcomes shown to the learner.
+                                                        $resultVariant = match (strtolower((string) $badgeText)) {
+                                                            'passed' => 'success',
+                                                            'failed' => 'error',
+                                                            'referred' => 'warning',
+                                                            default => 'neutral',
+                                                        };
+                                                        $assignmentTheme = \App\Services\Ui\UiVariants::assignmentCard($resultVariant);
+
+                                                        $resultMessage = match (strtolower((string) $badgeText)) {
+                                                            'passed' => 'Your submission has been successfully completed.',
+                                                            'failed' => 'Your submission was not successful and has been reviewed.',
+                                                            'referred' => 'Your submission needs improvement. Please review feedback and resubmit if allowed.',
+                                                            default => null,
+                                                        };
                                                     @endphp
 
-                                                    <div class="bg-white rounded-xl border border-ds-pink/20 shadow-sm overflow-hidden">
+                                                    <div
+                                                        class="rounded-xl border shadow-sm overflow-hidden {{ $assignmentTheme['card'] }} {{ $assignmentTheme['accentBorder'] }}">
                                                         {{-- Assignment Header --}}
                                                         <div
-                                                            class="bg-ds-pink/5 p-4 flex items-center justify-between gap-3 border-b border-ds-pink/10">
+                                                            class="p-4 flex items-center justify-between gap-3 border-b {{ $assignmentTheme['header'] }}">
                                                             <div class="flex items-center gap-3">
                                                                 <div
-                                                                    class="w-8 h-8 rounded-lg bg-ds-pink/10 text-ds-pink flex items-center justify-center">
+                                                                    class="w-8 h-8 rounded-lg {{ $assignmentTheme['icon'] }} flex items-center justify-center">
                                                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                                         stroke="currentColor">
                                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -309,19 +463,67 @@
                                                             </div>
 
                                                             {{-- STATUS BADGE --}}
-                                                            <x-ui.badge variant="{{ $badgeVariant }}" size="sm" rounded="full">
+                                                            <x-ui.badge variant="{{ $badgeVariant }}"
+                                                                size="{{ $resultVariant !== 'neutral' ? 'md' : 'sm' }}" rounded="full">
                                                                 {{ $badgeText }}
                                                             </x-ui.badge>
                                                         </div>
 
+                                                        {{-- RESULT SUMMARY STRIP (dominant learner-facing outcome) --}}
+                                                        @if ($resultVariant !== 'neutral' && $resultMessage)
+                                                            <div class="px-4 py-3 {{ $assignmentTheme['resultStrip'] }}">
+                                                                <div class="flex items-start gap-3">
+                                                                    <div
+                                                                        class="w-10 h-10 rounded-xl flex items-center justify-center {{ $assignmentTheme['resultIconBg'] }}">
+                                                                        @if($resultVariant === 'success')
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                            </svg>
+                                                                        @elseif($resultVariant === 'warning')
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                            </svg>
+                                                                        @else
+                                                                            <svg class="w-5 h-5 {{ $assignmentTheme['resultIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                    stroke-width="2"
+                                                                                    d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728" />
+                                                                            </svg>
+                                                                        @endif
+                                                                    </div>
+                                                                    <div class="min-w-0">
+                                                                        <div
+                                                                            class="text-[10px] font-black tracking-[0.18em] uppercase {{ $assignmentTheme['resultKicker'] }}">
+                                                                            Result
+                                                                        </div>
+                                                                        <div
+                                                                            class="text-lg font-extrabold leading-tight {{ $assignmentTheme['resultTitle'] }}">
+                                                                            {{ strtoupper($badgeText) }}
+                                                                        </div>
+                                                                        <div
+                                                                            class="text-xs leading-relaxed {{ $assignmentTheme['resultBodyText'] }}">
+                                                                            {{ $resultMessage }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @endif
+
                                                         <div class="p-4 bg-white space-y-4">
                                                             {{-- Assignment Brief (Always Visible) --}}
                                                             @if ($brief)
-                                                                <a href="{{ route('portal.learner.assignment.brief.download', $brief->id) }}" target="_blank"
-                                                                    class="flex items-center justify-between p-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 hover:bg-white hover:border-ds-pink/30 hover:shadow-md transition-all group">
+                                                                <a href="{{ $brief->file_path }}" target="_blank"
+                                                                    class="flex items-center justify-between p-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 hover:bg-white {{ $assignmentTheme['uploadInputBorderHover'] }} hover:shadow-md transition-all group">
                                                                     <div class="flex items-center gap-3">
                                                                         <div
-                                                                            class="w-10 h-10 rounded-lg bg-white border border-slate-100 text-ds-pink flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                                                            class="w-10 h-10 rounded-lg bg-white border border-slate-100 {{ $assignmentTheme['accentText'] }} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                                                                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                                                                                 stroke="currentColor">
                                                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -331,13 +533,14 @@
                                                                         </div>
                                                                         <div>
                                                                             <div
-                                                                                class="font-bold text-slate-800 text-sm group-hover:text-ds-pink transition-colors">
+                                                                                class="font-bold text-slate-800 text-sm transition-colors {{ $assignmentTheme['accentHoverText'] }}">
                                                                                 Assignment Brief</div>
                                                                             <div class="text-xs text-slate-500 font-medium">Click to view
                                                                                 instructions & requirements</div>
                                                                         </div>
                                                                     </div>
-                                                                    <div class="text-slate-300 group-hover:text-ds-pink transition-colors">
+                                                                    <div
+                                                                        class="text-slate-300 transition-colors {{ $assignmentTheme['accentHoverText'] }}">
                                                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                                                                             stroke="currentColor">
                                                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -350,13 +553,13 @@
                                                             {{-- FEEDBACK SECTION (Visible if Graded) --}}
                                                             @if ($latestGrade)
                                                                 <details
-                                                                    class="group border border-slate-200 rounded-lg bg-slate-50 overflow-hidden open:ring-2 open:ring-ds-navy/10">
+                                                                    class="group border rounded-lg overflow-hidden open:ring-2 open:ring-ds-navy/10 {{ $assignmentTheme['panel'] }}">
                                                                     <summary
                                                                         class="w-full flex items-center justify-between p-3 bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer list-none select-none">
                                                                         <span
                                                                             class="text-sm font-bold text-ds-navy flex items-center gap-2">
-                                                                            <svg class="w-4 h-4 text-emerald-500" fill="none"
-                                                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <svg class="w-4 h-4 {{ $assignmentTheme['summaryIcon'] }}"
+                                                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                                 <path stroke-linecap="round" stroke-linejoin="round"
                                                                                     stroke-width="2"
                                                                                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -371,7 +574,8 @@
                                                                             </svg>
                                                                         </span>
                                                                     </summary>
-                                                                    <div class="p-4 space-y-4 text-sm text-slate-600 bg-slate-50/50">
+                                                                    <div
+                                                                        class="p-4 space-y-4 text-sm text-slate-600 {{ $assignmentTheme['panelBody'] }}">
                                                                         <div
                                                                             class="flex items-center gap-4 text-xs text-slate-400 pb-2 border-b border-slate-200">
                                                                             <span>graded: <strong
@@ -393,8 +597,16 @@
                                                                         @if($latestGrade->marking_sheet_path || $latestGrade->feedback_file_path)
                                                                             <div class="flex flex-wrap gap-2 pt-2">
                                                                                 @php
-                                                                                    $msHref = route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'marking_sheet']);
-                                                                                    $fbHref = route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'feedback_file']);
+                                                                                    // Use direct URL if valid (SharePoint), else route
+                                                                                    // Marking Sheet
+                                                                                    $msRaw = $latestGrade->marking_sheet_path;
+                                                                                    $msIsUrl = filter_var($msRaw, FILTER_VALIDATE_URL);
+                                                                                    $msHref = $msIsUrl ? $msRaw : route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'marking_sheet']);
+
+                                                                                    // Feedback File
+                                                                                    $fbRaw = $latestGrade->feedback_file_path;
+                                                                                    $fbIsUrl = filter_var($fbRaw, FILTER_VALIDATE_URL);
+                                                                                    $fbHref = $fbIsUrl ? $fbRaw : route('portal.learner.assignment.grading.download', ['assignment' => $assignment->id, 'type' => 'feedback_file']);
                                                                                 @endphp
 
                                                                                 @if($latestGrade->marking_sheet_path)
@@ -431,29 +643,59 @@
                                                             {{-- PREVIOUS SUBMISSION LINK --}}
                                                             @if ($submission)
                                                                 <div
-                                                                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-amber-50 rounded border border-amber-100 text-sm">
-                                                                    <div class="text-amber-800">
-                                                                        <span class="block font-bold text-xs uppercase">Your
-                                                                            Submission</span>
-                                                                        <span class="text-xs">Uploaded:
-                                                                            {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                    class="flex flex-col gap-2 p-3 rounded text-sm {{ $assignmentTheme['submissionBox'] }}">
+                                                                    <div class="flex items-center justify-between gap-3">
+                                                                        <div>
+                                                                            <span class="block font-bold text-xs uppercase">Your
+                                                                                Submission</span>
+                                                                            @if(($submission->submitted_by_type ?? 'learner') === 'writer')
+                                                                                <span class="text-xs">Uploaded by Writer:
+                                                                                    <strong>{{ $submission->submitted_by_name ?? 'Internal Team' }}</strong></span>
+                                                                            @else
+                                                                                <span class="text-xs">Uploaded:
+                                                                                    {{ $submission->created_at->format('d M Y, H:i') }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                        <div class="flex items-center gap-2">
+                                                                            <span class="px-2 py-0.5 bg-white/50 border border-slate-200 rounded text-[10px] font-bold text-slate-600 uppercase">
+                                                                                Attempt #{{ $submission->attempt_no }}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
-                                                                    @php $submissionFiles = $submission->files ?? collect(); @endphp
-                                                                    <div class="flex flex-wrap gap-2">
-                                                                        @if($submissionFiles->isNotEmpty())
-                                                                            @foreach($submissionFiles as $submissionFile)
-                                                                                <x-ui.button
-                                                                                    href="{{ route('portal.learner.submission_file.view', $submissionFile->id) }}"
-                                                                                    target="_blank" size="xs" variant="ghost">
-                                                                                    {{ Str::limit($submissionFile->file_name ?? 'Download', 28) }}
-                                                                                </x-ui.button>
+
+                                                                    <div class="space-y-1.5 mt-1">
+                                                                        @php $subFiles = $submission->files; @endphp
+                                                                        @if($subFiles && $subFiles->isNotEmpty())
+                                                                            @foreach($subFiles as $subFile)
+                                                                                <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50 hover:border-ds-navy/20 transition-colors">
+                                                                                    <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                                                                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                                        </svg>
+                                                                                        <span class="truncate text-xs font-medium text-slate-700" title="{{ $subFile->file_name }}">{{ $subFile->file_name }}</span>
+                                                                                    </div>
+                                                                                    <a href="{{ route('portal.learner.submission_file.view', $subFile->id) }}" 
+                                                                                        target="_blank" 
+                                                                                        class="text-[10px] font-black uppercase tracking-wider text-ds-navy hover:text-ds-navy-dark px-2 py-1 bg-white rounded border border-ds-navy/10 hover:border-ds-navy transition-all shadow-sm">
+                                                                                        View
+                                                                                    </a>
+                                                                                </div>
                                                                             @endforeach
                                                                         @else
-                                                                            <x-ui.button
-                                                                                href="{{ route('portal.learner.submission.view', $submission->id) }}"
-                                                                                target="_blank" size="xs" variant="ghost">
-                                                                                Download
-                                                                            </x-ui.button>
+                                                                            {{-- Legacy single file support --}}
+                                                                            <div class="flex items-center justify-between bg-white/60 p-2 px-3 rounded-lg border border-slate-200/50">
+                                                                                <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                                                                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                                    </svg>
+                                                                                    <span class="truncate text-xs font-medium text-slate-700" title="{{ $submission->file_name }}">{{ $submission->file_name }}</span>
+                                                                                </div>
+                                                                                <a href="{{ route('portal.learner.submission.view', $submission->id) }}" 
+                                                                                    target="_blank" 
+                                                                                    class="text-[10px] font-black uppercase tracking-wider text-ds-navy hover:text-ds-navy-dark px-2 py-1 bg-white rounded border border-ds-navy/10 hover:border-ds-navy transition-all shadow-sm">
+                                                                                    View
+                                                                                </a>
+                                                                            </div>
                                                                         @endif
                                                                     </div>
                                                                 </div>
@@ -473,9 +715,9 @@
                                                                     </div>
                                                                     <div class="text-xs text-blue-900">
                                                                         <strong class="block font-bold">Please Wait for Approval</strong>
-                                                                        Your submission was referred. Please review the feedback. If you are
-                                                                        eligible for a second attempt, you will see an option here once
-                                                                        approved by an assessor.
+                                                                        Your submission was {{ $isFail ? 'failed' : 'referred' }}. Please
+                                                                        review the feedback. If you are eligible for another attempt, you
+                                                                        will see an option here once approved by an assessor.
                                                                     </div>
                                                                 </div>
                                                             @elseif ($bannerType === 'reattempt_allowed')
@@ -490,8 +732,9 @@
                                                                         </svg>
                                                                     </div>
                                                                     <div class="text-xs text-amber-900">
-                                                                        <strong class="block font-bold">Second Attempt Available</strong>
-                                                                        You have been granted a second attempt. Please upload your revised
+                                                                        <strong class="block font-bold">Attempt {{ $nextAttemptNo }}
+                                                                            Available</strong>
+                                                                        You have been granted another attempt. Please upload your revised
                                                                         work below.
                                                                     </div>
                                                                 </div>
@@ -508,8 +751,27 @@
                                                                     </div>
                                                                     <div class="text-xs text-red-900">
                                                                         <strong class="block font-bold">Maximum Attempts Reached</strong>
-                                                                        Your second attempt was referred. You have used both attempts.
+                                                                        Your latest attempt was {{ $isFail ? 'failed' : 'referred' }}. You
+                                                                        have used all available attempts ({{ $maxAllowedAttempts }}).
                                                                         Please contact support for further guidance.
+                                                                    </div>
+                                                                </div>
+                                                            @elseif ($bannerType === 'pending_verification')
+                                                                <div
+                                                                    class="p-3 bg-slate-50 border border-slate-100 rounded-lg flex items-start gap-3">
+                                                                    <div class="mt-0.5 text-slate-500">
+                                                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                                            stroke="currentColor">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                                stroke-width="2"
+                                                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div class="text-xs text-slate-900">
+                                                                        <strong class="block font-bold">Result Pending</strong>
+                                                                        Your result is being verified. You will see the final outcome once
+                                                                        it
+                                                                        has been completed.
                                                                     </div>
                                                                 </div>
                                                             @endif
@@ -521,17 +783,26 @@
                                                                     method="POST" enctype="multipart/form-data"
                                                                     class="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 pt-4 border-t border-slate-100">
                                                                     @csrf
-                                                                    <div class="flex-1 w-full">
+                                                                    <div class="flex-1 min-w-0">
                                                                         <label class="block text-xs font-bold text-slate-700 mb-1.5">
-                                                                            {{ $isActiveReset ? 'Upload Attempt 2' : 'Upload Submission' }}
+                                                                            {{ $attemptCount > 0 ? 'Upload Attempt ' . $nextAttemptNo : 'Upload Submission' }}
                                                                         </label>
-                                                                        <input type="file" name="submission_files[]" multiple required
-                                                                            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-ds-pink file:text-white hover:file:bg-pink-700 border border-slate-200 rounded-lg bg-slate-50">
-                                                                        <p class="text-[10px] text-slate-400 mt-1">Accepts PDF, DOCX. Max
-                                                                            20MB per file.</p>
+                                                                        <input type="file" name="submission_files[]" required multiple
+                                                                            id="submission_files_{{ $assignment->id }}"
+                                                                            onchange="updateFileList({{ $assignment->id }})"
+                                                                            class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:text-white border border-slate-200 rounded-lg bg-slate-50 {{ $assignmentTheme['uploadFileButton'] }} {{ $assignmentTheme['uploadFileHoverButton'] }} {{ $assignmentTheme['uploadInputBorderHover'] }}">
+                                                                        
+                                                                        <div id="file-list-{{ $assignment->id }}" class="mt-3 space-y-2 hidden">
+                                                                            <div class="text-[10px] uppercase tracking-widest font-black text-slate-400">Selected Files</div>
+                                                                            <div class="file-items space-y-1"></div>
+                                                                        </div>
+
+                                                                        <p class="text-[10px] text-slate-400 mt-2">
+                                                                            <span class="font-bold text-ds-navy">Multi-file support enabled.</span> You can select multiple documents at once. Accepts PDF, DOCX. Max 20MB per file.
+                                                                        </p>
                                                                     </div>
-                                                                    <x-ui.button type="submit" variant="primary" size="sm">
-                                                                        {{ $isActiveReset ? 'Submit Attempt 2' : 'Submit Assignment' }}
+                                                                    <x-ui.button type="submit" variant="primary" size="sm" class="shrink-0">
+                                                                        {{ $attemptCount > 0 ? 'Submit Attempt ' . $nextAttemptNo : 'Submit Assignment' }}
                                                                     </x-ui.button>
                                                                 </form>
                                                             @endif
@@ -573,12 +844,41 @@
         }
 
         // Auto-select first unit on load if desktop
-        document.addEventListener('DOMCon            tentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', () => {
             const firstBtn = document.querySelector('[data-nav-unit]');
             if (firstBtn && window.innerWidth >= 1024) {
                 firstBtn.classList.add('bg-slate-100', 'ring-2', 'ring-ds-navy');
             }
         });
+
+        function updateFileList(assignmentId) {
+            const input = document.getElementById('submission_files_' + assignmentId);
+            const container = document.getElementById('file-list-' + assignmentId);
+            const itemsDiv = container.querySelector('.file-items');
+            
+            itemsDiv.innerHTML = '';
+            
+            if (input.files.length > 0) {
+                container.classList.remove('hidden');
+                Array.from(input.files).forEach(file => {
+                    const size = (file.size / 1024).toFixed(1);
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between gap-3 p-2 px-3 bg-white border border-slate-100 rounded-lg shadow-sm animation-fade-in';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                            <svg class="w-3.5 h-3.5 text-ds-navy shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="truncate text-[11px] font-bold text-slate-600" title="${file.name}">${file.name}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-medium shrink-0">${size} KB</span>
+                    `;
+                    itemsDiv.appendChild(item);
+                });
+            } else {
+                container.classList.add('hidden');
+            }
+        }
     </script>
 
 </x-app-layout>

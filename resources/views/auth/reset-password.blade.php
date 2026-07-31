@@ -83,7 +83,7 @@
         {{-- Logo --}}
         <div class="text-center mb-8">
             <div class="mb-4">
-                <img src="{{ asset('images/logo.webp') }}" alt="Inspire College" class="h-10 mx-auto">
+                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College" class="h-10 mx-auto">
             </div>
             <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }}</h1>
             <p class="text-slate-500 mt-2">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Create a secure password to access your course.' : 'Choose a new secure password for your account.' }}</p>
@@ -155,12 +155,12 @@
             </div>
             
             <div class="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
-                <p class="text-xs text-slate-400 font-medium">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Secure Account Activation' : 'Secure Password Reset' }} - Inspire College Portal</p>
+                <p class="text-xs text-slate-400 font-medium">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Secure Account Activation' : 'Secure Password Reset' }} • Inspire College Portal</p>
             </div>
         </div>
         
         <p class="text-center mt-8 text-slate-400 text-sm">
-            Need help? Contact <a href="mailto:support@inspirecollegeoflearning.com" class="text-slate-600 font-bold hover:underline">Support</a>
+            Need help? Contact <a href="mailto:support@inspirecollege.co.uk" class="text-slate-600 font-bold hover:underline">Support</a>
         </p>
     </div>
 

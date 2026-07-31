@@ -12,18 +12,28 @@ use Illuminate\Support\Facades\Auth;
 use Stripe\Stripe;
 use Stripe\Checkout\Session;
 use Illuminate\Support\Facades\Log;
+use App\Models\Crm\PartnerLearner;
+use App\Services\PartnerCoursePricingService;
 
 class CheckoutController extends Controller
 {
-    public function createCheckoutSession(Request $request, $learnerId)
+    public function createCheckoutSession(Request $request, $learnerId, PartnerCoursePricingService $partnerPricing)
     {
         $partner = Auth::user();
 
-        // 1. Find Learner & Validate Ownership
-        $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+        $learner = null;
+        $partnerLearner = null;
+        $isPending = false;
 
-        if (!$learner->crm_approved) {
-            return back()->with('error', 'Learner is not approved for payment yet.');
+        if (str_starts_with($learnerId, 'pending-')) {
+            $realId = str_replace('pending-', '', $learnerId);
+            $partnerLearner = PartnerLearner::where('partner_id', $partner->id)->findOrFail($realId);
+            $isPending = true;
+        } else {
+            $learner = User::myLearners($partner->id)->findOrFail($learnerId);
+            if (!$learner->crm_approved) {
+                return back()->with('error', 'Learner is not approved for payment yet.');
+            }
         }
 
         // 2. Validate Request (Enrolment ID)
@@ -31,18 +41,37 @@ class CheckoutController extends Controller
             'enrolment_id' => 'required|integer'
         ]);
 
-        $enrolment = Enrolment::where('learner_id', $learner->id)
+        $enrolmentQuery = Enrolment::query();
+        if ($isPending) {
+            $enrolmentQuery->where('partner_learner_id', $partnerLearner->id);
+        } else {
+            $enrolmentQuery->where('learner_id', $learner->id);
+        }
+        $enrolment = $enrolmentQuery
+            ->where('partner_id', $partner->id)
             ->findOrFail($request->enrolment_id);
+
+        $latestOrder = Order::where('enrolment_id', $enrolment->id)
+            ->latest('id')->first();
+        if ($latestOrder && (int) $latestOrder->status_id === 1) {
+            return back()->with(
+                'error',
+                'This order is already paid. No new Stripe checkout was created.'
+            );
+        }
 
         Log::info("PayNow: Checking for pending order", [
             'enrolment_id' => $enrolment->id,
-            'learner_id' => $learner->id
+            'learner_id' => $isPending ? null : $learner->id,
+            'partner_learner_id' => $isPending ? $partnerLearner->id : null
         ]);
 
         // 3. Find Pending Order
         $order = Order::where('enrolment_id', $enrolment->id)
             ->where(function ($q) {
-                $q->whereNull('status_id')->orWhere('status_id', 0);
+                $q->whereNull('status_id')
+                  ->orWhere('status_id', 0)
+                  ->orWhere('status_id', 3); // 3 = Pending in CRM
             })
             ->orderBy('id', 'desc')
             ->first();
@@ -50,7 +79,8 @@ class CheckoutController extends Controller
         if (!$order) {
             Log::warning("PayNow: No pending order found", [
                 'enrolment_id' => $enrolment->id,
-                'learner_id' => $learner->id
+                'learner_id' => $isPending ? null : $learner->id,
+                'partner_learner_id' => $isPending ? $partnerLearner->id : null
             ]);
             // Check if already paid?
             // For now, assume if no pending order, nothing to pay.
@@ -63,8 +93,10 @@ class CheckoutController extends Controller
         // FIX: Always pay the Order amount (which is Deposit or Full Price).
         // Since the Order is "Pending" (checked above), this IS the initial transaction.
         // Do not look at installments yet (they are for future).
-        $amountToPay = $order->amount;
-        $description = "Course Purchase: {$enrolment->course->title}";
+        $amountToPay = ($order->payment_mode === 'installment' && $order->plan_deposit_amount > 0) 
+            ? $order->plan_deposit_amount 
+            : $order->amount;
+        $description = "Course Purchase: {$enrolment->course->title}" . ($order->payment_mode === 'installment' ? " (Deposit)" : "");
         $installmentId = null;
 
         // REMOVED: Loop looking for first pending installment.
@@ -74,12 +106,16 @@ class CheckoutController extends Controller
         // 5. Create Stripe Session
         Stripe::setApiKey(env('STRIPE_SECRET'));
 
-        // ENSURE STRIPE CUSTOMER EXISTS
-        if (empty($learner->stripe_customer_id)) {
+        // STRIPE CUSTOMER LOGIC
+        $stripeCustomerId = $isPending ? null : $learner->stripe_customer_id;
+        $emailForStripe = $isPending ? $partnerLearner->personal_email : $learner->email_address;
+        $nameForStripe = $isPending ? "{$partnerLearner->first_name} {$partnerLearner->last_name}" : "{$learner->first_name} {$learner->sur_name}";
+
+        if (!$isPending && empty($stripeCustomerId)) {
             try {
                 $customer = \Stripe\Customer::create([
-                    'email' => $learner->email_address, // Use Portal email (ICOL...) or Personal? Ideally Personal if we have it, but Portal Email is safer as unique key.
-                    'name' => "{$learner->first_name} {$learner->sur_name}",
+                    'email' => $emailForStripe,
+                    'name' => $nameForStripe,
                     'metadata' => [
                         'learner_id' => $learner->id,
                         'partner_id' => $partner->id
@@ -88,6 +124,7 @@ class CheckoutController extends Controller
 
                 $learner->stripe_customer_id = $customer->id;
                 $learner->save();
+                $stripeCustomerId = $customer->id;
             } catch (\Exception $e) {
                 return back()->with('error', 'Failed to create Stripe Customer: ' . $e->getMessage());
             }
@@ -126,20 +163,20 @@ class CheckoutController extends Controller
 
         try {
             $sessionPayload = [
-                'customer' => $learner->stripe_customer_id, // Link to persistent customer
+                'customer' => $stripeCustomerId, // May be null for pending
+                'customer_email' => $stripeCustomerId ? null : $emailForStripe,
                 'payment_method_types' => ['card'],
                 'line_items' => [
                     [
                         'price_data' => [
                             'currency' => 'gbp',
-                            // Stripe expects pence/cents
-                            'unit_amount' => (int) round($amountToPay * 100),
+                            'unit_amount' => $partnerPricing->toMinorUnits((string) $amountToPay),
                             'product_data' => [
                                 'name' => 'Inspire College Course Payment',
                                 'description' => $description,
                                 'metadata' => [
                                     'course_name' => $enrolment->course->title ?? 'Course',
-                                    'learner_name' => "{$learner->first_name} {$learner->sur_name}"
+                                    'learner_name' => $nameForStripe
                                 ]
                             ],
                         ],
@@ -147,11 +184,12 @@ class CheckoutController extends Controller
                     ]
                 ],
                 'mode' => 'payment',
-                'success_url' => route('partner.learners.show', $learner->id) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('partner.learners.show', $learner->id) . '?payment=cancelled',
+                'success_url' => route('partner.learners.show', $learnerId) . '?payment=success&session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('partner.learners.show', $learnerId) . '?payment=cancelled',
                 'metadata' => [
                     'partner_id' => $partner->id,
-                    'learner_id' => $learner->id,
+                    'learner_id' => $isPending ? null : $learner->id,
+                    'partner_learner_id' => $isPending ? $partnerLearner->id : null,
                     'enrolment_id' => $enrolment->id,
                     'order_id' => $order->id,
                     'installment_id' => $installmentId, // Nullable

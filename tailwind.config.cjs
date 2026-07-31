@@ -4,6 +4,8 @@ module.exports = {
         "resources/**/*.blade.php",
         "resources/**/*.js",
         "resources/**/*.vue",
+        // UI class maps live here; keep them included in Tailwind's scan to avoid purging.
+        "app/Services/Ui/**/*.php",
     ],
     theme: {
         extend: {
@@ -15,5 +17,7 @@ module.exports = {
             }
         },
     },
-    plugins: [],
+    plugins: [
+        require('@tailwindcss/typography'),
+    ],
 };

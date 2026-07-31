@@ -10,50 +10,33 @@ use App\Models\Lesson;
 use App\Models\Assignment;
 use App\Models\AssignmentFile;
 use App\Models\AssignmentSubmission;
-use App\Models\AssignmentSubmissionFile;
 use App\Models\Crm\GradeSheetCell; // Added CRM Grade Model
 use App\Services\SharePointService;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use App\Services\LearnerLogger;
+use App\Models\LearnerCourseUnitSelection;
+use App\Services\Lms\UnitSelectionService;
+use App\Services\Lms\CreditCompletionService;
 
 class LearnerCourseController extends Controller
 {
+    protected $accessService;
+
+    public function __construct(SharePointService $sp, \App\Services\EnrolmentAccessService $accessService)
+    {
+        $this->accessService = $accessService;
+    }
+
     /**
-     * Strict check for enrolment status (User Requirements + CRM Approval).
-     * Payment is NOT a blocker for access (Content Gate).
+     * Strict check for enrolment status (User Requirements + Admissions Approval + Payment).
      */
     private function checkAccess($enrolment)
     {
-        // 1. Requirements Check
-        $user = Auth::user();
-
-        // STRICT GATE: Use the consolidated verification check
-        if (!$user->isVerified()) {
-            return false;
-        }
-
-        // 2. Enrolment Status Hard Block & Payment Gate
-        // Policy A (Strict): Must be Active/Paid/Approved. Unpaid logic returns false.
-
-        $allowedStatuses = ['active', 'paid', 'approved'];
-        $statusStr = strtolower($enrolment->status->status ?? '');
-
-        // Block if Denied/Archived
-        if ($statusStr === 'denied' || $statusStr === 'archived') {
-            return false;
-        }
-
-        // Strict Payment/Status Check
-        // If it's NOT in allowed statuses, check if Order is Paid (ID 1)
-        if (!in_array($statusStr, $allowedStatuses)) {
-            $enrolment->load('latestOrder');
-            if (!$enrolment->latestOrder || (int) $enrolment->latestOrder->status_id !== 1) {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->accessService->canAccessLearning($enrolment, Auth::user());
     }
 
-    public function show(Enrolment $enrolment)
+    public function show(Enrolment $enrolment, UnitSelectionService $selectionService, CreditCompletionService $completionService)
     {
         $user = Auth::user();
 
@@ -67,6 +50,11 @@ class LearnerCourseController extends Controller
         }
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.course.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Course access blocked: Enrolment not active.')
+                ->save();
 
             // Optional: better messages
             if (($enrolment->status->status ?? '') === 'denied') {
@@ -80,10 +68,21 @@ class LearnerCourseController extends Controller
                 ->with('error', 'Your enrolment is awaiting approval or payment.');
         }
 
+        LearnerLogger::log('learner.course.viewed', 'activity')
+            ->humanMessage('Learner viewed course: ' . ($enrolment->course?->title ?? 'Untitled'))
+            ->save();
+
         $enrolment->load('course');
         $course = $enrolment->course;
+        $creditBased = $course->hasConfiguredCreditSetup();
+        if ($creditBased) {
+            $selectionService->ensureMandatorySelections($user->id, $course);
+            $selectionService->refreshLocks($user->id, $course->id);
+        }
 
-        $modules = CourseModule::with([
+        $hasExtraAttemptTable = Schema::connection('mysql_crm')->hasTable('grade_extra_attempts');
+
+        $with = [
             'lessons' => function ($q) {
                 $q->where('is_published', true)
                     ->orderBy('sort_order');
@@ -91,17 +90,34 @@ class LearnerCourseController extends Controller
             'assignments.files',
             'assignments.submissions' => function ($q) use ($user) {
                 $q->where('learner_id', $user->id)
-                    ->with('files')
                     ->latest();
             },
             'assignments.gradeResets' => function ($q) use ($user) {
                 $q->where('learner_id', $user->id)
                     ->latest('reset_at');
             },
-        ])
+        ];
+
+        if ($hasExtraAttemptTable) {
+            $with['assignments.extraAttemptGrants'] = function ($q) use ($user) {
+                $q->where('learner_id', $user->id)
+                    ->latest('granted_at');
+            };
+        }
+
+        $with[] = 'optionalGroup';
+        $modules = CourseModule::with($with)
             ->where('course_id', $course->id)
+            ->when($creditBased, fn ($query) => $query->where('status', 'active'))
             ->orderBy('sort_order')
             ->get();
+        if ($creditBased) {
+            $modules = $modules->sortBy(fn (CourseModule $module) => [
+                $module->isUnit() ? 1 : 0,
+                $module->sort_order,
+                $module->id,
+            ])->values();
+        }
 
         // ------------------------------------------------------------------
         // NEW: Fetch CRM Grading Data (Cross-DB)
@@ -136,11 +152,35 @@ class LearnerCourseController extends Controller
         }
         // ------------------------------------------------------------------
 
+        $submissionStatusNameById = [];
+        if (Schema::connection('mysql_portal')->hasTable('assignment_submission_statuses')) {
+            $submissionStatusNameById = DB::connection('mysql_portal')
+                ->table('assignment_submission_statuses')
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+        
+        $unitSelections = collect();
+        $creditSummary = null;
+        $completionReport = null;
+        if ($creditBased) {
+            $unitSelections = LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $course->id)->get()->keyBy('module_id');
+            $creditSummary = $selectionService->summary($course, $unitSelections);
+            $completionReport = $completionService->evaluate($user->id, $course);
+        }
+
         return view('learner.courses.show', [
             'user' => $user,
             'enrolment' => $enrolment,
             'course' => $course,
             'modules' => $modules,
+            'hasExtraAttemptTable' => $hasExtraAttemptTable,
+            'submissionStatusNameById' => $submissionStatusNameById,
+            'creditBased' => $creditBased,
+            'unitSelections' => $unitSelections,
+            'creditSummary' => $creditSummary,
+            'completionReport' => $completionReport,
         ]);
     }
 
@@ -155,55 +195,79 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.assignment.upload.blocked', 'upload')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Upload blocked: Enrolment not active or payment pending.')
+                ->save();
             return back()->with('error', 'Your enrolment is not active or payment is pending.');
         }
 
         $request->validate([
-            'submission_files' => 'required_without:submission_file|array|min:1',
+            'submission_files' => 'required|array|min:1',
             'submission_files.*' => 'file|max:20480',
-            'submission_file' => 'required_without:submission_files|file|max:20480',
         ]);
 
-        $files = $request->file('submission_files') ?: [$request->file('submission_file')];
+        $files = $request->file('submission_files');
+        $uploadedFiles = [];
+        
+        $totalSize = 0;
+        foreach($files as $file) {
+            $totalSize += $file->getSize();
+        }
 
-        // load relations (must exist on Assignment model)
-        $assignment->load(['module', 'course']); // if assignment->course relation exists
+        $logger = LearnerLogger::log('learner.assignment.upload.started', 'upload')
+            ->humanMessage('Learner started multi-file assignment upload logic: ' . count($files) . ' files.')
+            ->save();
+
+        // load relations
+        $assignment->load(['module', 'course']);
+
+        if ($enrolment->course?->hasConfiguredCreditSetup()
+            && $assignment->module?->isUnit()
+            && $assignment->module?->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $assignment->course_id)
+                ->where('module_id', $assignment->module_id)
+                ->exists()) {
+            return back()->with('error', 'Select this optional unit before submitting work.');
+        }
 
         $courseTitle = $assignment->course?->title ?? ($enrolment->course?->title ?? 'Course');
         $moduleTitle = $assignment->module?->title ?? 'Module';
 
         // folder names
-        $courseFolder = $sp->safeName($courseTitle);                          // Course_Name
-        $learnerFolder = 'ICOL_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);   // ICOL_ID_00001
-        $modFolder = $sp->safeName($moduleTitle);                          // Module_1
-        $assFolder = $sp->safeName($assignment->title);                    // Assignment_1
+        $courseFolder = $sp->safeName($courseTitle);
+        $dsFolder = 'DS_ID_' . str_pad($user->id, 5, '0', STR_PAD_LEFT);
+        $modFolder = $sp->safeName($moduleTitle);
+        $assFolder = $sp->safeName($assignment->title);
 
         // create folder structure
         $path1 = $sp->ensureFolder('', $courseFolder);
-        $path2 = $sp->ensureFolder($path1, $learnerFolder);
+        $path2 = $sp->ensureFolder($path1, $dsFolder);
         $path3 = $sp->ensureFolder($path2, $modFolder);
         $path4 = $sp->ensureFolder($path3, $assFolder);
 
         // Calculate Attempt No
-        $attemptNo = AssignmentSubmission::where('assignment_id', $assignment->id)
+        $attemptNo = (int) (AssignmentSubmission::where('assignment_id', $assignment->id)
             ->where('learner_id', $user->id)
-            ->max('attempt_no') ?? 0;
-
-        if ($attemptNo == 0) {
-            $count = AssignmentSubmission::where('assignment_id', $assignment->id)
-                ->where('learner_id', $user->id)
-                ->count();
-            $attemptNo = $count;
-        }
+            ->max('attempt_no') ?? 0);
 
         // --- ENFORCE RESUBMISSION RULES ---
-        if ($attemptNo >= 2) {
+        $standardMaxAttempts = 2;
+        $extraAttemptsGranted = 0;
+        if (Schema::connection('mysql_crm')->hasTable('grade_extra_attempts')) {
+            $extraAttemptsGranted = (int) \App\Models\Crm\GradeExtraAttempt::where('portal_assignment_id', $assignment->id)
+                ->where('learner_id', $user->id)
+                ->sum('additional_attempts');
+        }
+        $maxAllowedAttempts = $standardMaxAttempts + $extraAttemptsGranted;
+
+        if ($attemptNo >= $maxAllowedAttempts) {
             return back()->with('error', 'Maximum attempts reached for this assignment.');
         }
 
         if ($attemptNo > 0) {
-            // This is a re-submission. Check if authorized.
-            // We need a GradeReset that is newer than the last submission.
             $lastSubmission = AssignmentSubmission::where('assignment_id', $assignment->id)
                 ->where('learner_id', $user->id)
                 ->latest()
@@ -215,67 +279,113 @@ class LearnerCourseController extends Controller
                 ->exists();
 
             if (!$hasReset) {
-                // Determine if the last grade was actually "Pass" (which shouldn't happen here usually)
-                // But if it was "Refer", we strictly need a reset.
                 return back()->with('error', 'Re-submission is not yet approved by the assessor.');
             }
         }
         // ----------------------------------
 
-        $uploadedFiles = [];
-
+        // Process uploads
         foreach ($files as $file) {
             $originalName = $file->getClientOriginalName();
             $baseName = pathinfo($originalName, PATHINFO_FILENAME);
             $ext = strtolower($file->getClientOriginalExtension());
             $fileName = $sp->safeName($baseName) . '_' . time() . '_' . \Illuminate\Support\Str::random(4) . '.' . $ext;
-            $uploaded = $sp->uploadFile($path4, $fileName, $file->getRealPath());
+            
+            $size = $file->getSize();
+
+            if ($size <= 3.5 * 1024 * 1024) {
+                $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
+            } else {
+                $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+            }
 
             $uploadedFiles[] = [
-                'original_name' => $originalName,
-                'stored_name' => $fileName,
-                'path' => $courseFolder . '/' . $learnerFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
+                'name' => $originalName,
+                'path' => $courseFolder . '/' . $dsFolder . '/' . $modFolder . '/' . $assFolder . '/' . $fileName,
                 'item_id' => $uploaded['id'] ?? null,
                 'url' => $uploaded['webUrl'] ?? null,
-                'drive_id' => $uploaded['parentReference']['driveId'] ?? $sp->driveId(),
-                'size' => $file->getSize(),
-                'mime' => $file->getClientMimeType(),
+                'size' => $size,
+                'mime' => $file->getClientMimeType()
             ];
         }
 
         $primaryFile = $uploadedFiles[0];
 
+        // DB save submission header
         $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
-            'file_name' => $primaryFile['original_name'],
-            'stored_file_name' => $primaryFile['stored_name'],
-            'status_id' => 1,  // Status ID for 'submitted'
+            'file_name' => $primaryFile['name'],
+            'status_id' => 1, // Submitted
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $primaryFile['item_id'],
             'sharepoint_path' => $primaryFile['path'],
             'sharepoint_url' => $primaryFile['url'],
-            'drive_id' => $primaryFile['drive_id'],
-            'file_size' => $primaryFile['size'],
-            'mime_type' => $primaryFile['mime'],
         ]);
 
-        foreach ($uploadedFiles as $uploadedFile) {
-            AssignmentSubmissionFile::create([
+        if ($assignment->module?->isUnit() && $assignment->module?->unit_type === 'optional') {
+            $selection = LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $assignment->course_id)
+                ->where('module_id', $assignment->module_id)
+                ->first();
+            if ($selection && !$selection->is_locked) {
+                $old = $selection->toArray();
+                $selection->update(['is_locked' => true, 'locked_at' => now()]);
+                \App\Models\LearnerCourseUnitSelectionHistory::create([
+                    'learner_id' => $user->id,
+                    'course_id' => $assignment->course_id,
+                    'module_id' => $assignment->module_id,
+                    'action' => 'locked',
+                    'old_value' => $old,
+                    'new_value' => $selection->fresh()->toArray(),
+                    'reason' => 'Assignment submission created for the optional unit.',
+                    'created_at' => now(),
+                ]);
+            }
+        }
+
+        // DB save all files
+        foreach ($uploadedFiles as $uFile) {
+            \App\Models\AssignmentSubmissionFile::create([
                 'assignment_submission_id' => $submission->id,
-                'file_name' => $uploadedFile['original_name'],
-                'stored_file_name' => $uploadedFile['stored_name'],
-                'sharepoint_item_id' => $uploadedFile['item_id'],
-                'sharepoint_path' => $uploadedFile['path'],
-                'sharepoint_url' => $uploadedFile['url'],
-                'drive_id' => $uploadedFile['drive_id'],
-                'file_size' => $uploadedFile['size'],
-                'mime_type' => $uploadedFile['mime'],
+                'file_name' => $uFile['name'],
+                'sharepoint_item_id' => $uFile['item_id'],
+                'sharepoint_path' => $uFile['path'],
+                'sharepoint_url' => $uFile['url'],
+                'file_size' => $uFile['size'],
+                'mime_type' => $uFile['mime'],
             ]);
         }
 
-        return back()->with('success', count($uploadedFiles) . ' assignment file(s) submitted successfully.');
+        \Illuminate\Support\Facades\Log::info('Assignment submission saved successfully', [
+            'submission_id' => $submission->id ?? null,
+            'learner_id' => $submission->learner_id ?? null,
+            'assignment_id' => $submission->assignment_id ?? null,
+            'file_name' => $submission->file_name ?? null,
+        ]);
+        
+        LearnerLogger::log('learner.assignment.submission.completed', 'upload')
+            ->courseId($assignment->course_id)
+            ->assignmentId($assignment->id)
+            ->humanMessage('Assignment submitted successfully with ' . count($uploadedFiles) . ' files')
+            ->save();
+
+        try {
+            \App\Jobs\SendAssignmentSubmissionNotifications::dispatch($submission->id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Assignment submission email job dispatch failed', [
+                'submission_id' => $submission->id ?? null,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
+
+        return back()->with('success', 'Your assignment files have been submitted');
     }
 
     public function viewSubmission(AssignmentSubmission $submission, SharePointService $sp)
@@ -284,6 +394,10 @@ class LearnerCourseController extends Controller
 
         if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
+        }
+        $submission->loadMissing('assignment');
+        if ($submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
         }
 
         if (!$submission->sharepoint_item_id) {
@@ -296,40 +410,33 @@ class LearnerCourseController extends Controller
         return $sp->streamByItemId(
             $submission->sharepoint_item_id,
             $submission->file_name ?? 'submission',
-            $inline,
-            $submission->drive_id
+            $inline
         );
     }
 
-    public function viewSubmissionFile(AssignmentSubmissionFile $file, SharePointService $sp)
+    public function viewSubmissionFile(\App\Models\AssignmentSubmissionFile $file, SharePointService $sp)
     {
         $user = Auth::user();
-        $submission = $file->submission;
 
-        if (!$submission || (int) $submission->learner_id !== (int) $user->id) {
+        // Check if the user owns the submission through the relationship
+        if (!$file->submission || (int) $file->submission->learner_id !== (int) $user->id) {
             abort(403);
+        }
+        $file->submission->loadMissing('assignment');
+        if ($file->submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $file->submission->assignment->course_id, $file->submission->assignment->module_id);
         }
 
         if (!$file->sharepoint_item_id) {
             return back()->with('error', 'File not found on SharePoint.');
         }
 
-        $assignment = $submission->assignment;
-        if ($assignment) {
-            $enrolment = Enrolment::where('learner_id', $user->id)
-                ->where('course_id', $assignment->course_id)
-                ->firstOrFail();
-
-            if (!$this->checkAccess($enrolment)) {
-                abort(403);
-            }
-        }
+        $inline = request()->boolean('inline', true);
 
         return $sp->streamByItemId(
             $file->sharepoint_item_id,
-            $file->file_name ?? 'submission_file',
-            true,
-            $file->drive_id
+            $file->file_name ?? 'submission',
+            $inline
         );
     }
 
@@ -340,17 +447,18 @@ class LearnerCourseController extends Controller
         if ((int) $submission->learner_id !== (int) $user->id) {
             abort(403);
         }
+        $submission->loadMissing('assignment');
+        if ($submission->assignment) {
+            $this->assertModuleContentAccessible($user->id, $submission->assignment->course_id, $submission->assignment->module_id);
+        }
 
         if (!$submission->sharepoint_item_id) {
             return back()->with('error', 'File not found on SharePoint.');
         }
 
-        return $sp->streamByItemId(
-            $submission->sharepoint_item_id,
-            $submission->file_name ?? 'submission',
-            false,
-            $submission->drive_id
-        );
+        $url = $sp->temporaryDownloadUrlByItemId($submission->sharepoint_item_id);
+
+        return redirect()->away($url);
     }
 
     public function viewLesson(Lesson $lesson)
@@ -369,6 +477,17 @@ class LearnerCourseController extends Controller
             return redirect()
                 ->route('portal.learner.dashboard')
                 ->with('error', 'Your enrolment is not active or payment is pending.');
+        }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
+
+        $enrolment->loadMissing('course');
+        if ($enrolment->course?->hasConfiguredCreditSetup()
+            && $module->isUnit()
+            && $module->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $user->id)
+                ->where('course_id', $lesson->course_id)
+                ->where('module_id', $module->id)->exists()) {
+            abort(403, 'Select this optional unit before opening its learning content.');
         }
 
         // published only
@@ -392,6 +511,13 @@ class LearnerCourseController extends Controller
             ->where('sort_order', '>', $lesson->sort_order)
             ->orderBy('sort_order', 'asc')
             ->first();
+            
+        LearnerLogger::log('learner.lesson.view.opened')
+            ->courseId($lesson->course_id)
+            ->moduleId($lesson->module_id)
+            ->lessonId($lesson->id)
+            ->humanMessage('Learner accessed a lesson view')
+            ->save();
 
         return view('learner.lessons.show', [
             'lesson' => $lesson,
@@ -412,98 +538,52 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.lesson.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Lesson access blocked: Enrolment not active.')
+                ->save();
             abort(403);
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
         if ($lesson->resource_type === 'secure_document') {
             abort(403, 'Direct download is disabled for secure documents.');
         }
 
+        LearnerLogger::log('learner.lesson.viewed', 'activity')
+            ->humanMessage('Learner viewed lesson/downloaded file')
+            ->save();
+
         if (!blank($lesson->sharepoint_item_id)) {
             $inline = request()->routeIs('portal.learner.lesson.file.inline');
             $name = $lesson->file_name ?? $lesson->title . '.pdf';
-
-            return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline, $lesson->drive_id);
-        }
-
-        if (!blank($lesson->file_path) && filter_var($lesson->file_path, FILTER_VALIDATE_URL)) {
-            try {
-                $inline = request()->routeIs('portal.learner.lesson.file.inline');
-                return $sp->streamByShareUrl($lesson->file_path, $lesson->file_name ?: ($lesson->title . '.pdf'), $inline);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Lesson file SharePoint URL fallback failed', [
-                    'lesson_id' => $lesson->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            return $sp->streamByItemId($lesson->sharepoint_item_id, $name, $inline);
         }
 
         if (!blank($lesson->file_path)) {
-            $fullPath = $this->resolveLessonFilePath($lesson->file_path);
+            if (\Storage::disk('public')->exists($lesson->file_path)) {
+                return response()->download(\Storage::disk('public')->path($lesson->file_path), $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
+            }
 
-            if ($fullPath) {
-                $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
-                $downloadName = $lesson->title . ($extension ? '.' . $extension : '');
+            // 2. Try CRM storage root
+            $crmRoot = config('services.crm.storage_root');
+            if ($crmRoot) {
+                $crmRootReal = realpath($crmRoot);
+                if ($crmRootReal) {
+                    // LMS resources are on 'public' disk in CRM, so storage/app/public/{file_path}
+                    $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $lesson->file_path), '\\/');
+                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $relative;
 
-                return response()->download($fullPath, $downloadName);
+                    $fullReal = realpath($fullPath);
+                    if ($fullReal && is_file($fullReal) && strpos($fullReal, $crmRootReal) === 0) {
+                        return response()->download($fullReal, $lesson->title . '.' . pathinfo($fullReal, PATHINFO_EXTENSION));
+                    }
+                }
             }
         }
 
-        return back()->with('error', 'Lesson file not available.');
-    }
-
-    private function assignmentBriefDownloadName(AssignmentFile $brief, string $fallback = 'brief', ?string $extraSource = null): string
-    {
-        $rawName = trim((string) ($brief->file_name ?: ''));
-        $name = $rawName !== '' ? $rawName : $this->basenameFromFilenameLike($extraSource ?: $brief->file_path);
-        $name = $name ?: $fallback;
-        $name = $this->safeDownloadFilename($name);
-
-        if ($this->extensionFromFilenameLike($name)) {
-            return $name;
-        }
-
-        $extension = $this->extensionFromFilenameLike($brief->file_path)
-            ?: $this->extensionFromFilenameLike($brief->sharepoint_path ?? null)
-            ?: $this->extensionFromFilenameLike($brief->sharepoint_url ?? null)
-            ?: $this->extensionFromFilenameLike($extraSource)
-            ?: $this->extensionFromFilenameLike($fallback);
-
-        return $extension ? $name . '.' . $extension : $name;
-    }
-
-    private function basenameFromFilenameLike(?string $value): ?string
-    {
-        if (blank($value)) {
-            return null;
-        }
-
-        $path = parse_url((string) $value, PHP_URL_PATH) ?: (string) $value;
-        $path = rawurldecode($path);
-        $base = basename(str_replace('\\', '/', $path));
-
-        return $base !== '' && $base !== '.' ? $base : null;
-    }
-
-    private function extensionFromFilenameLike(?string $value): ?string
-    {
-        $base = $this->basenameFromFilenameLike($value);
-        if (!$base) {
-            return null;
-        }
-
-        $extension = strtolower((string) pathinfo($base, PATHINFO_EXTENSION));
-
-        return preg_match('/^[a-z0-9]{1,10}$/', $extension) ? $extension : null;
-    }
-
-    private function safeDownloadFilename(string $name): string
-    {
-        $name = rawurldecode($name);
-        $name = preg_replace('~[\\/:*?"<>|]+~', ' ', $name) ?: 'brief';
-        $name = preg_replace('/\s+/', ' ', $name) ?: 'brief';
-
-        return trim($name) ?: 'brief';
+        return back()->with('error', 'File not available.');
     }
 
     public function downloadAssignmentBrief(AssignmentFile $brief, SharePointService $sp)
@@ -519,32 +599,25 @@ class LearnerCourseController extends Controller
             ->firstOrFail();
 
         if (!$this->checkAccess($enrolment)) {
+            LearnerLogger::log('learner.assignment.brief.access_denied', 'activity')
+                ->status('blocked')
+                ->severity('warning')
+                ->humanMessage('Assignment brief access blocked: Enrolment not active.')
+                ->save();
             abort(403);
+        }
+        $this->assertModuleContentAccessible($user->id, $assignment->course_id, $assignment->module_id);
+
+        LearnerLogger::log('learner.assignment.brief.viewed', 'activity')
+            ->humanMessage('Learner viewed assignment brief')
+            ->save();
+
+        if (blank($brief->sharepoint_item_id)) {
+            return back()->with('error', 'Brief not available on SharePoint.');
         }
 
         $inline = request()->routeIs('portal.learner.assignment.brief.inline');
-        $downloadName = $this->assignmentBriefDownloadName($brief);
-
-        if (!blank($brief->sharepoint_item_id)) {
-            return $sp->streamByItemId($brief->sharepoint_item_id, $downloadName, $inline, $brief->drive_id);
-        }
-
-        if (!blank($brief->file_path) && !filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
-            return $this->downloadAssignmentBriefLocal($brief);
-        }
-
-        if (!blank($brief->file_path) && filter_var($brief->file_path, FILTER_VALIDATE_URL)) {
-            try {
-                return $sp->streamByShareUrl($brief->file_path, $downloadName, $inline);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Assignment brief SharePoint URL fallback failed', [
-                    'brief_id' => $brief->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        return back()->with('error', 'Brief not available on SharePoint.');
+        return $sp->streamByItemId($brief->sharepoint_item_id, $brief->file_name ?? 'brief', $inline);
     }
 
     public function downloadAssignmentBriefLocal(AssignmentFile $brief)
@@ -564,6 +637,7 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403);
         }
+        $this->assertModuleContentAccessible($user->id, $assignment->course_id, $assignment->module_id);
 
         $crmRoot = config('services.crm.storage_root');
         if (!$crmRoot) {
@@ -591,12 +665,12 @@ class LearnerCourseController extends Controller
             abort(403);
         }
 
-        $downloadName = $this->assignmentBriefDownloadName($brief, basename($fullReal), $fullReal);
+        $downloadName = $brief->file_name ?: basename($fullReal);
 
         return response()->download($fullReal, $downloadName);
     }
 
-    public function downloadGradingFile(Request $request, Assignment $assignment, SharePointService $sp)
+    public function downloadGradingFile(Request $request, Assignment $assignment)
     {
         $user = Auth::user();
         $type = $request->query('type'); // 'marking_sheet' or 'feedback_file'
@@ -627,32 +701,21 @@ class LearnerCourseController extends Controller
             abort(404, 'No attempt found.');
         }
 
-        $attachment = $attempt->attachments->where('type', $type)->first();
-        $path = $attachment?->file_path;
+        // 3. Determine Path
+        $path = null;
+        if ($type === 'marking_sheet') {
+            $path = $attempt->marking_sheet_path;
+        } elseif ($type === 'feedback_file') {
+            $path = $attempt->feedback_file_path;
+        }
 
         if (blank($path)) {
             return back()->with('error', 'File not available.');
         }
 
-        if (!blank($attachment->sharepoint_item_id)) {
-            return $sp->streamByItemId(
-                $attachment->sharepoint_item_id,
-                $attachment->original_name ?: ($type . '_file'),
-                false,
-                $attachment->drive_id
-            );
-        }
-
+        // 4. Download Logic
         if (filter_var($path, FILTER_VALIDATE_URL)) {
-            try {
-                return $sp->streamByShareUrl($path, $attachment->original_name ?: ($type . '_file'));
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Grading attachment SharePoint URL fallback failed', [
-                    'attachment_id' => $attachment?->id,
-                    'error' => $e->getMessage(),
-                ]);
-                return back()->with('error', 'Secure SharePoint metadata is missing for this grading file.');
-            }
+            return redirect()->away($path);
         }
 
         // Local Storage via CRM Root
@@ -692,8 +755,12 @@ class LearnerCourseController extends Controller
     {
         $user = Auth::user();
 
-        if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
-            abort(404, 'Secure document not found.');
+        if (!(int) $lesson->is_published) {
+            abort(404);
+        }
+
+        if ($lesson->resource_type !== 'secure_document') {
+            abort(400, 'This resource is not a secure document.');
         }
 
         $enrolment = Enrolment::where('learner_id', $user->id)
@@ -705,6 +772,13 @@ class LearnerCourseController extends Controller
                 ->route('portal.learner.dashboard')
                 ->with('error', 'Your enrolment is not active or payment is pending.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
+
+        LearnerLogger::log('learner.secure_doc.view')
+            ->courseId($lesson->course_id)
+            ->lessonId($lesson->id)
+            ->humanMessage('Learner accessed secure document viewer')
+            ->save();
 
         return view('learner.lessons.secure_viewer', [
             'lesson' => $lesson,
@@ -713,9 +787,20 @@ class LearnerCourseController extends Controller
         ]);
     }
 
-    public function streamSecureDocument(Lesson $lesson, SharePointService $sp)
+    public function streamSecureDocument(Lesson $lesson)
     {
         $user = Auth::user();
+
+        // Add debug logging
+        \Log::info('Secure stream requested', [
+            'lesson_id' => $lesson->id,
+            'user_id' => auth()->id(),
+            'type' => $lesson->resource_type ?? null,
+            'file_path' => $lesson->file_path ?? null,
+            'file_url' => $lesson->file_url ?? null,
+            'sharepoint_url' => $lesson->sharepoint_item_id ?? null,
+            'mime_type' => 'application/pdf',
+        ]);
 
         if (!(int) $lesson->is_published || $lesson->resource_type !== 'secure_document') {
             abort(404, 'Secure document not found.');
@@ -728,35 +813,56 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403, 'Unauthorized access.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
-        if (!blank($lesson->sharepoint_item_id)) {
-            return $sp->streamByItemId(
-                $lesson->sharepoint_item_id,
-                $lesson->file_name ?: ($lesson->title . '.pdf'),
-                true,
-                $lesson->drive_id
-            );
+        $filePath = $lesson->file_path;
+        if (blank($filePath)) {
+            \Log::error('Secure stream failed: no file path found', [
+                'lesson_id' => $lesson->id,
+            ]);
+            abort(404, 'Document file path missing.');
         }
 
-        $fullPath = $this->resolveLessonFilePath($lesson->file_path);
-        if (!$fullPath) {
-            abort(404, 'File not found.');
+        $fullReal = $this->resolveLessonFilePath($filePath);
+
+        \Log::info('Secure PDF stream debug', [
+            'lesson_id' => $lesson->id,
+            'file_path' => $filePath,
+            'absolute_path' => $fullReal ?? null,
+            'exists' => $fullReal ? file_exists($fullReal) : false,
+            'size' => ($fullReal && file_exists($fullReal)) ? filesize($fullReal) : null,
+        ]);
+
+        if (!$fullReal || !is_file($fullReal)) {
+            \Log::error('PDF missing', [
+                'lesson_id' => $lesson->id,
+                'file_path' => $filePath,
+                'configured_crm_root' => config('services.crm.storage_root'),
+            ]);
+            abort(404, 'File not found');
         }
 
-        $binary = file_get_contents($fullPath);
-        $mime = mime_content_type($fullPath) ?: 'application/pdf';
+        $absolutePath = $fullReal;
+        $binary = file_get_contents($absolutePath);
+
+        \Log::info('FORCED PDF RESPONSE RETURNING', [
+            'lesson_id' => $lesson->id,
+            'status' => 200,
+            'bytes' => strlen($binary),
+            'first_bytes' => substr($binary, 0, 5),
+        ]);
 
         return response($binary, 200)
-            ->header('Content-Type', $mime)
+            ->header('Content-Type', 'application/pdf')
             ->header('Content-Length', strlen($binary))
-            ->header('Content-Disposition', 'inline; filename="' . basename($fullPath) . '"')
+            ->header('Content-Disposition', 'inline; filename="' . basename($absolutePath) . '"')
             ->header('Accept-Ranges', 'bytes')
             ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache')
             ->header('X-Content-Type-Options', 'nosniff');
     }
 
-    public function securePdfData(Lesson $lesson, SharePointService $sp)
+    public function securePdfData(Lesson $lesson)
     {
         $user = Auth::user();
 
@@ -771,41 +877,34 @@ class LearnerCourseController extends Controller
         if (!$this->checkAccess($enrolment)) {
             abort(403, 'Unauthorized access.');
         }
+        $this->assertModuleContentAccessible($user->id, $lesson->course_id, $lesson->module_id);
 
-        $driveId = $lesson->drive_id ?: config('services.sharepoint.drive_id');
-        $itemId = blank($lesson->sharepoint_item_id) ? null : $lesson->sharepoint_item_id;
-        $path = blank($lesson->sharepoint_path) ? ($lesson->file_path ?: null) : $lesson->sharepoint_path;
+        $filePath = $lesson->file_path;
+        if (blank($filePath)) {
+            abort(404, 'Document file path missing.');
+        }
 
-        if (app()->environment('local')) {
-            \Log::info('Secure PDF viewer request', [
+        $fullReal = $this->resolveLessonFilePath($filePath);
+
+        if (!$fullReal || !is_file($fullReal)) {
+            \Log::error('Secure PDF data file missing', [
                 'lesson_id' => $lesson->id,
-                'secure_pdf_id' => $lesson->id,
-                'drive_id' => $driveId,
-                'sharepoint_item_id' => $itemId,
-                'sharepoint_path' => $path,
+                'file_path' => $filePath,
+                'configured_crm_root' => config('services.crm.storage_root'),
             ]);
+            abort(404, 'File not found');
         }
 
-        try {
-            $binary = $sp->downloadFileContent($driveId, $itemId, $path);
-        } catch (\RuntimeException $e) {
-            $message = $e->getMessage();
-
-            if (str_contains($message, 'Secure PDF SharePoint metadata is missing') || str_contains($message, 'SharePoint drive ID is missing')) {
-                abort(404, 'Secure PDF SharePoint metadata is missing.');
-            }
-
-            abort(404, 'File not found.');
+        if (filesize($fullReal) > 50 * 1024 * 1024) {
+            abort(413, 'PDF too large for inline secure viewer');
         }
 
-        if (strlen($binary) > 50 * 1024 * 1024) {
-            abort(413, 'PDF too large for inline secure viewer.');
-        }
+        $binary = file_get_contents($fullReal);
 
         return response()->json([
             'success' => true,
-            'filename' => $lesson->file_name ?: basename((string) ($lesson->sharepoint_path ?: $lesson->file_path)),
-            'mime' => $lesson->mime_type ?: 'application/pdf',
+            'filename' => basename($fullReal),
+            'mime' => 'application/pdf',
             'data' => base64_encode($binary),
         ], 200, [
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
@@ -813,53 +912,115 @@ class LearnerCourseController extends Controller
         ]);
     }
 
+    /**
+     * Resolve lesson files from the CRM storage root without assuming whether
+     * the database path already contains the public/ prefix.
+     */
     private function resolveLessonFilePath(?string $filePath): ?string
     {
-        if (blank($filePath) || filter_var($filePath, FILTER_VALIDATE_URL)) {
+        $rawPath = trim((string) $filePath);
+        if ($rawPath === '' || filter_var($rawPath, FILTER_VALIDATE_URL)) {
             return null;
         }
 
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($filePath)) {
-            $path = \Illuminate\Support\Facades\Storage::disk('public')->path($filePath);
-            $realPath = realpath($path);
+        $normalised = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rawPath);
+        $relative = ltrim($normalised, '\\/');
+        $withoutPublic = preg_replace('/^public[\\\\\/]+/i', '', $relative) ?: $relative;
 
-            if ($realPath && is_file($realPath)) {
-                return $realPath;
+        $roots = array_values(array_unique(array_filter([
+            config('services.crm.storage_root'),
+            base_path('../Inspire-College_Crm/storage/app'),
+        ])));
+
+        $absolutePath = preg_match('/^(?:[A-Za-z]:[\\\\\/]|[\\\\\/])/', $normalised)
+            ? $normalised
+            : null;
+
+        foreach ($roots as $root) {
+            $rootReal = realpath($root);
+            if (!$rootReal) {
+                continue;
             }
-        }
 
-        $crmRoot = config('services.crm.storage_root');
-        if ($crmRoot) {
-            $crmRootReal = realpath($crmRoot);
+            $candidates = array_filter([
+                $absolutePath,
+                $rootReal . DIRECTORY_SEPARATOR . $relative,
+                $rootReal . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . $withoutPublic,
+                $rootReal . DIRECTORY_SEPARATOR . $withoutPublic,
+            ]);
 
-            if ($crmRootReal) {
-                $relative = ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath), '\\/');
-                $candidates = [
-                    'public' . DIRECTORY_SEPARATOR . $relative,
-                    $relative,
-                ];
-
-                foreach ($candidates as $candidate) {
-                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $candidate;
-                    $fullReal = realpath($fullPath);
-
-                    $rootPrefix = rtrim($crmRootReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-                    if ($fullReal && is_file($fullReal) && str_starts_with($fullReal, $rootPrefix)) {
-                        return $fullReal;
-                    }
+            foreach (array_unique($candidates) as $candidate) {
+                $realPath = realpath($candidate);
+                if ($realPath && is_file($realPath) && $this->isPathInside($realPath, $rootReal)) {
+                    return $realPath;
                 }
             }
         }
 
-        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($filePath)) {
-            $path = \Illuminate\Support\Facades\Storage::disk('local')->path($filePath);
-            $realPath = realpath($path);
-
-            if ($realPath && is_file($realPath)) {
-                return $realPath;
+        foreach (['public', 'local'] as $disk) {
+            try {
+                $storage = \Storage::disk($disk);
+                foreach (array_unique([$relative, $withoutPublic]) as $storagePath) {
+                    if ($storage->exists($storagePath)) {
+                        $resolved = realpath($storage->path($storagePath));
+                        if ($resolved && is_file($resolved)) {
+                            return $resolved;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // A missing optional disk should not prevent CRM resolution.
             }
         }
 
         return null;
+    }
+
+    private function isPathInside(string $path, string $root): bool
+    {
+        $path = rtrim($path, '\\/');
+        $root = rtrim($root, '\\/');
+
+        return $path === $root || str_starts_with($path, $root . DIRECTORY_SEPARATOR);
+    }
+
+    public function selectUnit(Request $request, Enrolment $enrolment, CourseModule $module, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->selectOptional(Auth::id(), $enrolment->course, $module);
+        return back()->with('success', 'Optional unit selected.');
+    }
+
+    public function removeUnit(Request $request, Enrolment $enrolment, CourseModule $module, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->removeOptional(Auth::id(), $enrolment->course, $module);
+        return back()->with('success', 'Optional unit removed.');
+    }
+
+    public function finaliseUnitSelection(Enrolment $enrolment, UnitSelectionService $service)
+    {
+        $this->assertOwnedActiveEnrolment($enrolment);
+        $service->finalise(Auth::id(), $enrolment->course);
+        return back()->with('success', 'Your optional unit selection meets the course rules.');
+    }
+
+    private function assertOwnedActiveEnrolment(Enrolment $enrolment): void
+    {
+        if ((int) $enrolment->learner_id !== (int) Auth::id()) abort(403);
+        $enrolment->loadMissing(['course', 'status']);
+        if (!$this->checkAccess($enrolment) || !$enrolment->course?->hasConfiguredCreditSetup()) abort(403);
+    }
+
+    private function assertModuleContentAccessible(int $learnerId, int $courseId, int $moduleId): void
+    {
+        $course = \App\Models\Website\Course::find($courseId);
+        if (!$course?->hasConfiguredCreditSetup()) return;
+        $module = CourseModule::find($moduleId);
+        if ($module?->isUnit() && $module?->unit_type === 'optional'
+            && !LearnerCourseUnitSelection::where('learner_id', $learnerId)
+                ->where('course_id', $courseId)->where('module_id', $moduleId)->exists()) {
+            abort(403, 'Select this optional unit before accessing its content.');
+        }
     }
 }

@@ -16,6 +16,7 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::post('/logout', [AuthController::class, 'logout'])
     ->name('portal.logout');
 
+// Learner Activation / Password Setup Routes
 Route::get('/activate/{token}', [\App\Http\Controllers\Auth\LearnerPasswordSetupController::class, 'show'])
     ->middleware(['guest', 'throttle:10,1'])
     ->name('learner.activate');
@@ -28,7 +29,7 @@ Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\LearnerPasswor
     ->middleware(['guest', 'throttle:10,1'])
     ->name('password.reset');
 
-Route::get('/reset-password', function () {
+Route::get('/reset-password', function() {
     return redirect()->route('portal.login')->with('info', 'Please use the secure link sent to your email to set your password.');
 })->middleware('guest')->name('password.request');
 
@@ -52,21 +53,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('portal.dashboard');
 
-    // Learner specific
-    Route::get('/learner/dashboard', [DashboardController::class, 'learner'])
-        ->name('portal.learner.dashboard');
-
-    Route::post('/learner/security-event', [\App\Http\Controllers\LearnerDiagnosticController::class, 'logSecurity'])
-        ->name('portal.learner.security.store');
-
-    // Organization specific
-    // Route::get('/organization/dashboard', [DashboardController::class, 'organization'])
-    //     ->name('portal.organization.dashboard');
-
     // PARTNER / ORGANIZATION ROUTES
-    Route::prefix('partner')->name('partner.')->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
-            ->name('learners.index'); // Treating this as the main dashboard
+    Route::prefix('partner')->name('partner.')->middleware('role:partner')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Partner\DashboardController::class, 'index'])
+            ->name('dashboard');
+
+        Route::get('/enrolments/pending-plans', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'pendingPlans'])
+            ->name('enrolments.pending_plans');
+
+        Route::get('/learners', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'index'])
+            ->name('learners.index');
 
         Route::get('/learners/create', [\App\Http\Controllers\Partner\PartnerLearnerController::class, 'create'])
             ->name('learners.create');
@@ -84,20 +80,40 @@ Route::middleware('auth')->group(function () {
         Route::get('/learners/{learner}/courses/create', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'create'])
             ->name('courses.create');
 
+        // Redirect GET requests for /courses back to the learner show page to avoid 404s
+        Route::get('/learners/{learner}/courses', function($learner) {
+            return redirect()->route('partner.learners.show', $learner);
+        });
+
         Route::post('/learners/{learner}/courses', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'store'])
             ->name('courses.store');
 
-        // Course Plan Selection
+        Route::get('/learners/{learner}/enrol/{course}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlanForCourse'])
+            ->name('enrolments.choose_plan_new');
+
+        Route::post('/learners/{learner}/enrol/{course}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'storeEnrolmentWithPlan'])
+            ->name('enrolments.store_with_plan');
+
+        // Course Plan Selection (Legacy/Draft Review)
         Route::get('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'choosePlan'])
             ->name('enrolments.choose_plan');
 
         Route::post('/enrolments/{enrolment}/plan', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'updatePlan'])
             ->name('enrolments.update_plan');
 
+        Route::post('/enrolments/{enrolment}/submit-proof', [\App\Http\Controllers\Partner\CoursePurchaseController::class, 'submitProof'])
+            ->name('enrolments.submit_proof');
+
         Route::post('/learners/{learner}/pay', [\App\Http\Controllers\Payment\CheckoutController::class, 'createCheckoutSession'])
             ->name('checkout');
 
         // Manual Installment Payment
+        Route::get('/installments', [\App\Http\Controllers\Partner\InstallmentController::class, 'index'])
+            ->name('installments.index');
+
+        Route::get('/installments/{enrolment}/details', [\App\Http\Controllers\Partner\InstallmentController::class, 'show'])
+            ->name('installments.show');
+
         Route::get('/installments/{installment}/checkout', [\App\Http\Controllers\Partner\InstallmentController::class, 'createCheckoutSession'])
             ->name('installments.checkout');
 
@@ -107,94 +123,174 @@ Route::middleware('auth')->group(function () {
         // Coupon Validation
         Route::post('/coupon/validate', [\App\Http\Controllers\Api\CouponValidationController::class, 'validateCoupon'])
             ->name('coupon.validate');
+
+        Route::get('/transactions', [\App\Http\Controllers\Partner\TransactionController::class, 'index'])
+            ->name('transactions.index');
+
+        // Partner Profile
+        Route::get('/profile', [\App\Http\Controllers\Partner\PartnerProfileController::class, 'edit'])
+            ->name('profile.edit');
+        Route::post('/profile', [\App\Http\Controllers\Partner\PartnerProfileController::class, 'update'])
+            ->name('profile.update');
+
+        // Support Tickets
+        Route::get('/support', [\App\Http\Controllers\Partner\SupportTicketController::class, 'index'])
+            ->name('support.index');
+        Route::get('/support/create', [\App\Http\Controllers\Partner\SupportTicketController::class, 'create'])
+            ->name('support.create');
+        Route::post('/support', [\App\Http\Controllers\Partner\SupportTicketController::class, 'store'])
+            ->name('support.store');
+        Route::get('/support/{ticket}', [\App\Http\Controllers\Partner\SupportTicketController::class, 'show'])
+            ->name('support.show');
+        Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Partner\SupportTicketController::class, 'reply'])
+            ->name('support.reply');
+
+        // Partner Notifications
+        Route::get('/notifications', [\App\Http\Controllers\Partner\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::get('/notifications/dropdown', [\App\Http\Controllers\Partner\NotificationController::class, 'dropdown'])
+            ->name('notifications.dropdown');
+        Route::get('/notifications/{notification}/read', [\App\Http\Controllers\Partner\NotificationController::class, 'markRead'])
+            ->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Partner\NotificationController::class, 'markAllRead'])
+            ->name('notifications.read_all');
     });
 
-    // Learner all courses
-    Route::get('/learner/courses', [DashboardController::class, 'allCourses'])
-        ->name('portal.learner.courses.all');
+    // LEARNER SPECIFIC ROUTES
+    Route::middleware('role:learner')->group(function () {
+        // Learner Dashboard
+        Route::get('/learner/dashboard', [DashboardController::class, 'learner'])
+            ->name('portal.learner.dashboard');
 
-    // Account Settings (Profile + Password)
-    Route::get('/settings/profile', [App\Http\Controllers\ProfileController::class, 'editAccount'])
-        ->name('portal.settings.profile');
+        // Frontend Diagnostic Logging
+        Route::post('/learner/diagnostic-logs', [\App\Http\Controllers\LearnerDiagnosticController::class, 'store'])
+            ->name('portal.learner.diagnostic.store');
 
-    Route::post('/settings/profile', [App\Http\Controllers\ProfileController::class, 'updateAccount'])
-        ->name('portal.settings.profile.update');
+        Route::post('/learner/security-event', [\App\Http\Controllers\LearnerDiagnosticController::class, 'logSecurity'])
+            ->name('portal.learner.security.store');
 
-    // Personal Information
-    Route::get('/profile/personal', [App\Http\Controllers\ProfileController::class, 'editPersonal'])
-        ->name('portal.profile.personal');
-    Route::post('/profile/personal', [App\Http\Controllers\ProfileController::class, 'updatePersonal'])
-        ->name('portal.profile.personal.update');
+        // Learner all courses
+        Route::get('/learner/courses', [DashboardController::class, 'allCourses'])
+            ->name('portal.learner.courses.all');
 
-    // RPL Information
-    Route::get('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'editRpl'])
-        ->name('portal.profile.rpl');
-    Route::post('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'updateRpl'])
-        ->name('portal.profile.rpl.update');
+        // Account Settings (Profile + Password)
+        Route::get('/settings/profile', [App\Http\Controllers\ProfileController::class, 'editAccount'])
+            ->name('portal.settings.profile');
 
-    // Disability Information
-    Route::get('/profile/disability', [App\Http\Controllers\ProfileController::class, 'editDisability'])
-        ->name('portal.profile.disability');
-    Route::post('/profile/disability', [App\Http\Controllers\ProfileController::class, 'updateDisability'])
-        ->name('portal.profile.disability.update');
+        Route::post('/settings/profile', [App\Http\Controllers\ProfileController::class, 'updateAccount'])
+            ->name('portal.settings.profile.update');
 
-    // Learner Courses
-    Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
-        ->middleware('installment.access')
-        ->name('portal.learner.course.show');
+        // Personal Information
+        Route::get('/profile/personal', [App\Http\Controllers\ProfileController::class, 'editPersonal'])
+            ->name('portal.profile.personal');
+        Route::post('/profile/personal', [App\Http\Controllers\ProfileController::class, 'updatePersonal'])
+            ->name('portal.profile.personal.update');
 
-    // assignment submission
-    Route::post('/learner/assignment/{assignment}/submit', [LearnerCourseController::class, 'submitAssignment'])
-        ->name('portal.learner.assignment.submit');
+        // RPL Information
+        Route::get('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'editRpl'])
+            ->name('portal.profile.rpl');
+        Route::post('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'updateRpl'])
+            ->name('portal.profile.rpl.update');
 
-    // Route::get('/learner/submissions/{submission}/view', [LearnerCourseController::class, 'viewSubmission'])
-    //     ->name('portal.learner.submission.view');
+        // Disability Information
+        Route::get('/profile/disability', [App\Http\Controllers\ProfileController::class, 'editDisability'])
+            ->name('portal.profile.disability');
+        Route::post('/profile/disability', [App\Http\Controllers\ProfileController::class, 'updateDisability'])
+            ->name('portal.profile.disability.update');
 
-    Route::get('/learner/submissions/{submission}/download', [LearnerCourseController::class, 'viewSubmission'])
-        ->name('portal.learner.submission.view');
+        // Learner Courses
+        Route::get('/learner/course/{enrolment}', [LearnerCourseController::class, 'show'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.show');
+        Route::post('/learner/course/{enrolment}/units/{module}/select', [LearnerCourseController::class, 'selectUnit'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.select');
+        Route::delete('/learner/course/{enrolment}/units/{module}/select', [LearnerCourseController::class, 'removeUnit'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.remove');
+        Route::post('/learner/course/{enrolment}/units/finalise', [LearnerCourseController::class, 'finaliseUnitSelection'])
+            ->middleware('installment.access')
+            ->name('portal.learner.course.units.finalise');
 
-    Route::get('/learner/submissions/{submission}/inline', [LearnerCourseController::class, 'viewSubmission'])
-        ->name('portal.learner.submission.inline');
+        // assignment submission
+        Route::post('/learner/assignment/{assignment}/submit', [LearnerCourseController::class, 'submitAssignment'])
+            ->name('portal.learner.assignment.submit');
 
-    Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
-        ->name('portal.learner.submission.direct');
+        Route::get('/learner/submissions/{submission}/download', [LearnerCourseController::class, 'viewSubmission'])
+            ->name('portal.learner.submission.view');
 
-    Route::get('/learner/submission-file/{file}/view', [LearnerCourseController::class, 'viewSubmissionFile'])
-        ->name('portal.learner.submission_file.view');
+        Route::get('/learner/submissions/{submission}/inline', [LearnerCourseController::class, 'viewSubmission'])
+            ->name('portal.learner.submission.inline');
 
-    Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
-        ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
-        ->name('portal.learner.lessons.show');
+        Route::get('/learner/submissions/{submission}/direct', [LearnerCourseController::class, 'submissionDirectLink'])
+            ->name('portal.learner.submission.direct');
 
-    Route::get('/learner/lessons/{lesson}/secure-viewer', [LearnerCourseController::class, 'viewSecureDocument'])
-        ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
-        ->name('portal.learner.secure_doc.view');
+        Route::get('/learner/submission-file/{file}/view', [LearnerCourseController::class, 'viewSubmissionFile'])
+            ->name('portal.learner.submission_file.view');
 
-    Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])
-        ->name('portal.learner.secure_doc.stream');
+        Route::get('/learner/lessons/{lesson}', [LearnerCourseController::class, 'viewLesson'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
+            ->name('portal.learner.lessons.show');
 
-    Route::get('/learner/lessons/{lesson}/secure-pdf-data', [LearnerCourseController::class, 'securePdfData'])
-        ->name('learner.lessons.secure-pdf-data');
+        Route::get('/learner/lessons/{lesson}/secure-viewer', [LearnerCourseController::class, 'viewSecureDocument'])
+            ->middleware([\App\Http\Middleware\ProtectedLessonHeaders::class])
+            ->name('portal.learner.secure_doc.view');
 
-    // Lesson file (SharePoint proxy)
-    Route::get('/learner/lessons/{lesson}/file/download', [LearnerCourseController::class, 'downloadLessonFile'])
-        ->name('portal.learner.lesson.file.download');
+        Route::get('/learner/lessons/{lesson}/secure-stream', [LearnerCourseController::class, 'streamSecureDocument'])
+            ->name('portal.learner.secure_doc.stream');
 
-    Route::get('/learner/lessons/{lesson}/file/inline', [LearnerCourseController::class, 'downloadLessonFile'])
-        ->name('portal.learner.lesson.file.inline');
+        Route::get('/learner/lessons/{lesson}/secure-pdf-data', [LearnerCourseController::class, 'securePdfData'])
+            ->name('learner.lessons.secure-pdf-data');
 
-    // Assignment brief file (SharePoint proxy)
-    // NOTE: $brief here is an AssignmentFile (or whatever model your $assignment->files uses)
-    Route::get('/learner/assignment-brief/{brief}/download', [LearnerCourseController::class, 'downloadAssignmentBrief'])
-        ->name('portal.learner.assignment.brief.download');
+        // Lesson file (SharePoint proxy)
+        Route::get('/learner/lessons/{lesson}/file/download', [LearnerCourseController::class, 'downloadLessonFile'])
+            ->name('portal.learner.lesson.file.download');
 
-    Route::get('/learner/assignment-brief/{brief}/inline', [LearnerCourseController::class, 'downloadAssignmentBrief'])
-        ->name('portal.learner.assignment.brief.inline');
+        Route::get('/learner/lessons/{lesson}/file/inline', [LearnerCourseController::class, 'downloadLessonFile'])
+            ->name('portal.learner.lesson.file.inline');
 
-    Route::get('/learner/assignment-brief/{brief}/local', [LearnerCourseController::class, 'downloadAssignmentBriefLocal'])
-        ->name('portal.learner.assignment.brief.local');
+        // Assignment brief file (SharePoint proxy)
+        Route::get('/learner/assignment-brief/{brief}/download', [LearnerCourseController::class, 'downloadAssignmentBrief'])
+            ->name('portal.learner.assignment.brief.download');
 
-    // CRM Grading - File Download
-    Route::get('/learner/assignment/{assignment}/grade-file', [LearnerCourseController::class, 'downloadGradingFile'])
-        ->name('portal.learner.assignment.grading.download');
+        Route::get('/learner/assignment-brief/{brief}/inline', [LearnerCourseController::class, 'downloadAssignmentBrief'])
+            ->name('portal.learner.assignment.brief.inline');
+
+        Route::get('/learner/assignment-brief/{brief}/local', [LearnerCourseController::class, 'downloadAssignmentBriefLocal'])
+            ->name('portal.learner.assignment.brief.local');
+
+        // CRM Grading - File Download
+        Route::get('/learner/assignment/{assignment}/grade-file', [LearnerCourseController::class, 'downloadGradingFile'])
+            ->name('portal.learner.assignment.grading.download');
+    });
 });
+
+Route::get('/debug-pdf-test', function () {
+    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College_Crm/storage/app')), '/\\')
+        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
+
+    if (!file_exists($path)) {
+        abort(404, 'File not found on CRM path.');
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="test.pdf"',
+        'Cache-Control' => 'no-store',
+    ]);
+});
+
+Route::get('/debug-pdf-secure-test', function () {
+    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College_Crm/storage/app')), '/\\')
+        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
+
+    if (!file_exists($path)) {
+        abort(404, 'File not found on CRM path.');
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="test.pdf"',
+        'Cache-Control' => 'no-store',
+    ]);
+})->middleware(['web', 'auth']);

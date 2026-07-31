@@ -14,7 +14,7 @@
            ========================= */
 
         :root {
-            --ds-navy: #0f172a;
+            --ds-navy: #01345b;
             --ds-pink: #a91a6a;
 
             --pwa-bg: #f1f5f9;
@@ -407,7 +407,7 @@
             {{-- Left: Logo + Main Nav --}}
             <div class="flex items-center gap-6">
                 <a href="{{ route('portal.learner.dashboard') }}" class="flex items-center gap-2">
-                    <img src="{{ asset('images/1000ppi/logo.png') }}" class="h-7" alt="Inspire College">
+                    <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" class="h-7" alt="Inspire College">
                     <span class="text-sm text-slate-600 font-medium">
                         Learner Portal
                     </span>
@@ -476,6 +476,19 @@
 
     {{-- ================= MAIN CONTENT WRAPPER ================ --}}
     <main class="w-full px-6 py-6 pwa-main">
+        <div class="max-w-7xl mx-auto space-y-6">
+            @if(session('success'))
+                <x-ui.alert variant="success" dismissible title="Success">
+                    {{ session('success') }}
+                </x-ui.alert>
+            @endif
+
+            @if(session('error'))
+                <x-ui.alert variant="error" dismissible title="Error">
+                    {{ session('error') }}
+                </x-ui.alert>
+            @endif
+        </div>
 
         @hasSection('page-title')
             <h1 class="text-xl font-semibold text-slate-800 mb-4">
@@ -527,6 +540,132 @@
         });
     </script>
 
+    <script>
+        window.LearnerLogger = {
+            // Core context to be populated by Blade
+            pageContext: {
+                url: window.location.href,
+                referrer: document.referrer,
+                course_id: @json($course->id ?? $enrolment->course_id ?? null),
+                module_id: @json($module->id ?? null),
+                lesson_id: @json($lesson->id ?? null),
+                assignment_id: @json($assignment->id ?? null),
+                correlation_id: '{{ app()->bound("learner_request_correlation_id") ? app("learner_request_correlation_id") : "" }}'
+            },
+            
+            log: function(event_type, event_category = 'frontend', extra = {}) {
+                let payload = {
+                    event_type: event_type,
+                    event_category: event_category,
+                    _token: '{{ csrf_token() }}',
+                    // Auto-include page context
+                    ...this.pageContext,
+                    // Additional specific data
+                    device_type: window.innerWidth < 768 ? 'mobile' : 'desktop',
+                    network_state: navigator.onLine ? 'online' : 'offline',
+                    ...extra
+                };
+                
+                fetch('{{ route("portal.learner.diagnostic.store") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Correlation-ID': this.pageContext.correlation_id
+                    },
+                    body: JSON.stringify(payload)
+                }).catch(e => console.error('LearnerLogger push failed', e));
+            },
+            
+            error: function(msg, stack = null, extra = {}) {
+                this.log('learner.frontend.js_error', 'error', {
+                    message_human: 'Frontend Javascript Error',
+                    message_technical: msg,
+                    frontend_error_stack: stack,
+                    severity: 'error',
+                    action_status: 'failed',
+                    ...extra
+                });
+            },
+
+            interaction: function(action, category = 'navigation', extra = {}) {
+                this.log('learner.interaction.' + action, category, {
+                    action_attempted: action,
+                    ...extra
+                });
+            }
+        };
+
+        // Track external lesson links
+        document.addEventListener('click', function(e) {
+            const lessonLink = e.target.closest('a[data-log-click]');
+            if (lessonLink) {
+                const action = lessonLink.dataset.logAction || 'click';
+                const label = lessonLink.dataset.logLabel || lessonLink.innerText.trim();
+                window.LearnerLogger.interaction(action, 'interaction', {
+                    message_human: 'Learner clicked: ' + label,
+                    technical_details: lessonLink.href
+                });
+            }
+        });
+
+        // Window error tracking
+        window.addEventListener('error', function(event) {
+            window.LearnerLogger.error(event.message || 'Unknown error', event.error ? event.error.stack : null, { 
+                file_name: event.filename,
+                line_number: event.lineno,
+                column_number: event.colno
+            });
+        });
+
+        window.addEventListener('unhandledrejection', function(event) {
+            let msg = event.reason ? (event.reason.message || event.reason) : 'Promise rejection';
+            let stack = event.reason && event.reason.stack ? event.reason.stack : null;
+            window.LearnerLogger.error(msg, stack, { message_human: 'Unhandled Promise Rejection' });
+        });
+
+        // Intercept fetch errors globally
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            try {
+                const response = await originalFetch.apply(this, args);
+                if (!response.ok && !args[0].toString().includes('/learner/diagnostic-logs')) {
+                    window.LearnerLogger.log('learner.ajax.request.failed', 'error', {
+                        message_human: 'Fetch request failed (' + response.status + ')',
+                        message_technical: 'URL: ' + args[0],
+                        severity: response.status >= 500 ? 'error' : 'warning',
+                        action_status: 'failed',
+                        response_status_code: response.status
+                    });
+                }
+                return response;
+            } catch (err) {
+                if (!args[0].toString().includes('/learner/diagnostic-logs')) {
+                    window.LearnerLogger.error('Network/CORS error: ' + err.message, err.stack, { 
+                        message_human: 'Fetch failed to execute', 
+                        url: args[0],
+                        event_category: 'network'
+                    });
+                }
+                throw err;
+            }
+        };
+
+        // jQuery AJAX error tracking
+        if (typeof jQuery !== 'undefined') {
+            jQuery(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+                if (settings.url && !settings.url.includes('/learner/diagnostic-logs')) {
+                    window.LearnerLogger.log('learner.ajax.request.failed', 'error', {
+                        message_human: 'AJAX request failed',
+                        message_technical: 'URL: ' + settings.url + ' | Error: ' + thrownError,
+                        severity: jqxhr.status >= 500 ? 'error' : 'warning',
+                        action_status: 'failed',
+                        response_status_code: jqxhr.status
+                    });
+                }
+            });
+        }
+    </script>
 </body>
 
 </html>

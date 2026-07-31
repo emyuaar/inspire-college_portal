@@ -18,6 +18,8 @@
     </style>
 
     <div class="max-w-5xl mx-auto space-y-6">
+
+        {{-- Top Bar / Back Link --}}
         <div class="flex items-center justify-between">
             <a href="{{ route('portal.learner.course.show', $enrolment->id) }}"
                 class="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-ds-navy transition-colors">
@@ -33,12 +35,16 @@
             </div>
         </div>
 
-        <x-protected-content-guard
-            :learner-name="$user->name"
-            :learner-email="$user->email"
+        {{-- Viewer Card --}}
+        <x-protected-content-guard 
+            :learner-name="$user->name" 
+            :learner-email="$user->email" 
+            :course-name="$lesson->course->title ?? ''"
             :course-id="$lesson->course_id ?? null"
             :lesson-id="$lesson->id ?? null">
             <x-ui.card padding="p-0" class="overflow-hidden">
+
+                {{-- Header --}}
                 <div class="bg-slate-50 border-b border-slate-100 p-4 md:p-6 flex items-center justify-between">
                     <div>
                         <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
@@ -49,6 +55,7 @@
                         </h1>
                     </div>
 
+                    {{-- Toolbar --}}
                     <div class="flex items-center gap-4">
                         <div class="flex items-center gap-2 bg-slate-200/60 p-1 rounded-lg">
                             <button id="prev-page" class="p-1.5 rounded bg-white shadow-sm hover:bg-slate-50 disabled:opacity-50 viewer-control" disabled>
@@ -74,12 +81,16 @@
                     </div>
                 </div>
 
-                <div class="relative bg-slate-800 p-4 min-h-[600px] flex justify-center items-start overflow-auto select-none"
+                {{-- Document Container --}}
+                <div class="relative bg-slate-800 p-4 min-h-[600px] flex justify-center items-start overflow-auto select-none" 
                      id="viewer-wrapper">
+
+                    {{-- PDF Page Wrapper --}}
                     <div class="pdf-page-wrapper">
                         <canvas id="pdf-canvas"></canvas>
                     </div>
 
+                    {{-- Loading Spinner --}}
                     <div id="loading-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-800/80 z-20">
                         <div class="flex flex-col items-center gap-3">
                             <div class="w-10 h-10 border-4 border-slate-300 border-t-indigo-500 rounded-full animate-spin"></div>
@@ -87,14 +98,17 @@
                         </div>
                     </div>
                 </div>
+
             </x-ui.card>
         </x-protected-content-guard>
     </div>
 
+    {{-- PDF.js Library via CDN --}}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+        const url = "{{ route('portal.learner.secure_doc.stream', $lesson->id) }}";
         let pdfDoc = null;
         let pageNum = 1;
         let pageRendering = false;
@@ -131,11 +145,13 @@
             pageRendering = true;
             document.getElementById('loading-spinner').style.display = 'flex';
 
+            // Get page
             pdfDoc.getPage(num).then(function(page) {
                 const viewport = page.getViewport({ scale: scale });
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
 
+                // Render PDF page into canvas context
                 const renderContext = {
                     canvasContext: ctx,
                     viewport: viewport
@@ -165,14 +181,30 @@
         }
 
         function onPrevPage() {
-            if (!pdfDoc || !isDocumentLoaded || pageNum <= 1) return;
+            if (!pdfDoc || !isDocumentLoaded) {
+                console.warn('PDF is not loaded yet.');
+                return;
+            }
+
+            if (pageNum <= 1) {
+                return;
+            }
+
             pageNum--;
             queueRenderPage(pageNum);
         }
         document.getElementById('prev-page').addEventListener('click', onPrevPage);
 
         function onNextPage() {
-            if (!pdfDoc || !isDocumentLoaded || pageNum >= pdfDoc.numPages) return;
+            if (!pdfDoc || !isDocumentLoaded) {
+                console.warn('PDF is not loaded yet.');
+                return;
+            }
+
+            if (pageNum >= pdfDoc.numPages) {
+                return;
+            }
+
             pageNum++;
             queueRenderPage(pageNum);
         }
@@ -186,7 +218,8 @@
         }
 
         function zoomOut() {
-            if (!pdfDoc || !isDocumentLoaded || scale <= 0.5) return;
+            if (!pdfDoc || !isDocumentLoaded) return;
+            if (scale <= 0.5) return;
             scale -= 0.1;
             document.getElementById('zoom-percent').textContent = Math.round(scale * 100) + '%';
             queueRenderPage(pageNum);
@@ -210,6 +243,8 @@
         async function loadSecurePdf() {
             const pdfDataUrl = "{{ route('learner.lessons.secure-pdf-data', $lesson->id) }}" + "?t=" + Date.now();
 
+            console.log('Loading secure PDF data:', pdfDataUrl);
+
             try {
                 const res = await fetch(pdfDataUrl, {
                     method: 'GET',
@@ -220,6 +255,8 @@
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
+
+                console.log('PDF JSON status:', res.status);
 
                 if (!res.ok) {
                     throw new Error('PDF data fetch failed: ' + res.status);
@@ -250,8 +287,11 @@
                 pageNum = 1;
 
                 document.getElementById('page-count').textContent = pdfDoc.numPages;
+
                 enableViewerControls();
+
                 renderPage(pageNum);
+
             } catch (error) {
                 console.error('PDF load failed:', error);
                 pdfDoc = null;
@@ -261,6 +301,7 @@
             }
         }
 
+        // Security restrictions
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
         });
@@ -277,5 +318,6 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 'u') e.preventDefault();
             if (e.key === 'F12') e.preventDefault();
         });
+
     </script>
 </x-app-layout>

@@ -14,7 +14,6 @@ class User extends Authenticatable
     protected $table = 'users';
 
     protected $fillable = [
-        'role_id',
         'org_id',
         'stripe_customer_id',
         'first_name',
@@ -87,6 +86,11 @@ class User extends Authenticatable
     public function isOrgLearner(): bool
     {
         return $this->org_id > 0 && $this->org_id !== $this->id;
+    }
+
+    public function isLearner(): bool
+    {
+        return $this->org_id !== $this->id;
     }
 
     // Scopes

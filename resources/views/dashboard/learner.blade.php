@@ -28,7 +28,7 @@
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50">
                         <span class="opacity-70 mr-2">Student ID:</span>
-                        <span class="font-bold text-white">ICOL{{ $user->id }}</span>
+                        <span class="font-bold text-white">DS{{ $user->id }}</span>
                     </div>
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50 overflow-x-auto">
@@ -84,21 +84,21 @@
                 </x-slot>
 
                 <dl class="space-y-4 text-sm">
-                    <div class="flex justify-between gap-4 border-b border-slate-50 pb-2">
-                        <dt class="text-slate-500 shrink-0">Full Name</dt>
-                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-words">{{ $user->first_name }} {{ $user->sur_name }}
+                    <div class="flex justify-between border-b border-slate-50 pb-2">
+                        <dt class="text-slate-500">Full Name</dt>
+                        <dd class="font-bold text-slate-800 text-right">{{ $user->first_name }} {{ $user->sur_name }}
                         </dd>
                     </div>
-                    <div class="flex justify-between gap-4 border-b border-slate-50 pb-2">
-                        <dt class="text-slate-500 shrink-0">Email Address</dt>
-                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-all leading-5"
+                    <div class="flex justify-between border-b border-slate-50 pb-2">
+                        <dt class="text-slate-500">Email Address</dt>
+                        <dd class="font-bold text-slate-800 text-right max-w-[180px]"
                             title="{{ $user->email_address }}">
                             {{ $user->email_address }}
                         </dd>
                     </div>
-                    <div class="flex justify-between gap-4 pt-1">
-                        <dt class="text-slate-500 shrink-0">Student ID</dt>
-                        <dd class="min-w-0 flex-1 font-bold text-slate-800 text-right break-words">ICOL{{ $user->id }}</dd>
+                    <div class="flex justify-between pt-1">
+                        <dt class="text-slate-500">Student ID</dt>
+                        <dd class="font-bold text-slate-800 text-right">DS{{ $user->id }}</dd>
                     </div>
                 </dl>
             </x-ui.card>
@@ -184,38 +184,16 @@
                     <div class="space-y-4">
                         @foreach ($enrolments->take(3) as $enrolment)
                             @php
-                                $showContinue = false; // Safe default
                                 $course = $enrolment->course ?? null;
+                                $state = $enrolment->access_state;
 
-                                $status = strtolower($enrolment->status->status ?? '');
-                                $requirementsMet = $user->areRequirementsMet();
-                                $isVerified = $user->isVerified();
-
-                                $latestOrder = $enrolment->latestOrder;
-                                $isOrderPaid = $latestOrder && (int) $latestOrder->status_id === 1;
-
-                                $statusStr = strtolower($enrolment->status->status ?? '');
-                                $isPaid = $latestOrder ? $isOrderPaid : in_array($statusStr, ['active', 'paid', 'approved']);
-
-                                if ($latestOrder && !$isOrderPaid) {
-                                    $statusStr = 'pending-payment';
-                                }
-
-                                $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved']);
-                                $showContinue = $isVerified && $isActiveOrPaid;
-
-                                $denied = $statusStr === 'denied';
-
-                                // Installment Access Logic (Unified Status)
-                                $accessStatus = $enrolment->installment_access_status;
-                                $blockReason = null;
-                                $dueInfo = null;
-
-                                if (!$accessStatus->allowed) {
-                                    $showContinue = false;
-                                    $blockReason = $accessStatus->reason;
-                                    $dueInfo = $accessStatus->due_info;
-                                }
+                                $showContinue = $state->can_access;
+                                $blockReason = $state->block_reason;
+                                $graceActive = $state->grace_active;
+                                $graceUntil = $state->grace_until;
+                                $requirementsMet = $state->requirements_met;
+                                $isVerified = $state->is_verified;
+                                $denied = $state->is_denied;
                             @endphp
 
                             {{-- ✅ ITEM WRAPPER --}}
@@ -223,27 +201,12 @@
                                 <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                     <div class="flex-1">
                                         <div class="flex flex-wrap items-center gap-2 mb-2">
-                                            @if(!$requirementsMet)
-                                                <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                            @elseif(!$isVerified)
-                                                <x-ui.badge variant="neutral" size="sm">Under Review (CRM)</x-ui.badge>
-                                            @elseif($blockReason)
-                                                <x-ui.badge variant="error" size="sm">PAYMENT OVERDUE</x-ui.badge>
-                                            @elseif($isPaid || in_array($statusStr, ['active', 'paid', 'approved']))
-                                                <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
-                                                @php $showContinue = true; @endphp
-                                            @elseif($latestOrder && !$isOrderPaid)
-                                                <x-ui.badge variant="warning" size="sm">Payment Pending</x-ui.badge>
-                                            @else
-                                                <x-ui.badge variant="neutral" size="sm">Pending</x-ui.badge>
-                                            @endif
+                                             <x-ui.badge :variant="$state->status_variant" size="sm">
+                                                 {{ $state->status_label }}
+                                             </x-ui.badge>
 
-                                            @if($denied)
-                                                <x-ui.badge variant="error" size="sm">Denied</x-ui.badge>
-                                            @endif
-
-                                            <span class="text-[10px] text-slate-400 font-medium">#{{ $enrolment->id }}</span>
-                                        </div>
+                                             <span class="text-[10px] text-slate-400 font-medium">#{{ $enrolment->id }}</span>
+                                         </div>
 
                                         <h3 class="font-bold text-slate-800 text-sm md:text-base mb-1">
                                             @if ($showContinue && $course)
@@ -256,44 +219,62 @@
                                             @endif
                                         </h3>
 
-                                        <p class="text-xs text-slate-500">Student ID: ICOL{{ $user->id }}</p>
+                                        <p class="text-xs text-slate-500">Student ID: DS{{ $user->id }}</p>
                                     </div>
 
                                     <div class="shrink-0 self-end sm:self-center">
                                         @if ($showContinue)
-                                            <x-ui.button size="sm" href="{{ route('portal.learner.course.show', $enrolment->id) }}">
-                                                Continue Learning
-                                            </x-ui.button>
-                                        @elseif ($blockReason)
-                                            {{-- Blocked with no UI elements in the action area (Minimalist 2.0) --}}
-                                                        {{-- Status badge is visible near course title --}}
-                                        @elseif ($latestOrder && !$isOrderPaid)
-                                                    <span class="text-xs font-semibold text-amber-600">Please contact Partner</span>
-                                                @elseif (!$requirementsMet)
-                                                    <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
-                                                        Complete Requirements
+                                            <div class="flex flex-col items-end gap-1">
+                                                <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
+                                                    <x-ui.button fullWidth size="sm">
+                                                        Continue Learning
                                                     </x-ui.button>
-                                                @elseif (!$isVerified)
-                                                    <span class="text-xs font-semibold text-slate-500 italic">Awaiting Admin Approval</span>
-                                                @elseif ($denied)
-                                                    <x-ui.button size="sm" variant="outline" href="{{ route('portal.settings.profile') }}"
-                                                        class="text-red-600 border-red-200 hover:bg-red-50">
-                                                        Update Details
-                                                    </x-ui.button>
+                                                </a>
+                                                @if ($graceActive)
+                                                    <span class="text-[10px] text-amber-600 font-medium">
+                                                        Grace ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
+                                                    </span>
                                                 @endif
                                             </div>
-                                        </div>
+                                        @elseif ($blockReason)
+                                            <div class="flex flex-col items-end gap-1">
+                                                <x-ui.button size="sm" variant="outline" class="text-red-600 border-red-200 cursor-not-allowed opacity-70" disabled>
+                                                    Access Blocked
+                                                </x-ui.button>
+                                                <span class="text-[10px] text-slate-500">Resolve payment to continue</span>
+                                            </div>
+                                        @elseif ($state->status_label === 'Payment Pending')
+                                            <div class="flex flex-col items-end gap-1">
+                                                <span class="text-xs font-semibold text-amber-600">Payment Pending</span>
+                                                <span class="text-[10px] text-slate-500 italic">Contact partner for access</span>
+                                            </div>
+                                        @elseif (!$requirementsMet)
+                                            <x-ui.button size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
+                                                Complete Requirements
+                                            </x-ui.button>
+                                        @elseif (!$isVerified)
+                                            <span class="text-xs font-semibold text-slate-500 italic">Awaiting Approval</span>
+                                        @elseif ($denied)
+                                            <x-ui.button size="sm" variant="outline" href="{{ route('portal.settings.profile') }}"
+                                                class="text-red-600 border-red-200 hover:bg-red-50">
+                                                Update Details
+                                            </x-ui.button>
+                                        @else
+                                            <span class="text-xs font-semibold text-slate-400 italic">Awaiting Status</span>
+                                        @endif
                                     </div>
-                        @endforeach
-                        </div>
-
-                        @if ($enrolments->count() > 3)
-                            <div class="mt-4 text-center">
-                                <x-ui.button variant="ghost" size="sm" href="{{ route('portal.learner.courses.all') }}">
-                                    View All Courses
-                                </x-ui.button>
+                                </div>
                             </div>
-                        @endif
+                        @endforeach
+                    </div>
+
+                    @if ($enrolments->count() > 3)
+                        <div class="mt-4 text-center">
+                            <x-ui.button variant="ghost" size="sm" href="{{ route('portal.learner.courses.all') }}">
+                                View All Courses
+                            </x-ui.button>
+                        </div>
+                    @endif
                 @else
                     <div class="text-center py-8">
                         <div class="mx-auto w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">

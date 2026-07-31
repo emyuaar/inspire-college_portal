@@ -1,6 +1,7 @@
 @props(['learnerName' => '', 'learnerEmail' => '', 'courseName' => '', 'courseId' => null, 'lessonId' => null])
 
 <style>
+/* 1. Disable Text Selection */
 .protected-content,
 .protected-content * {
     -webkit-user-select: none !important;
@@ -9,12 +10,14 @@
     user-select: none !important;
 }
 
+/* Disable dragging */
 .protected-content img,
 .protected-content * {
     -webkit-user-drag: none;
     user-drag: none;
 }
 
+/* 5. Disable Print */
 @media print {
     body * {
         display: none !important;
@@ -31,6 +34,7 @@
     }
 }
 
+/* 6. Protected Watermark Overlay */
 .protected-watermark-text {
     pointer-events: none;
     position: absolute;
@@ -56,6 +60,7 @@
     z-index: 2;
 }
 
+/* 9. Small Fixed Security Badge */
 .protected-security-badge {
     position: fixed;
     right: 18px;
@@ -70,6 +75,7 @@
     box-shadow: 0 8px 24px rgba(1, 52, 91, 0.18);
 }
 
+/* 7. Blur on Tab Inactive */
 body.protected-blur .protected-content {
     filter: blur(14px);
     opacity: 0.25;
@@ -97,6 +103,7 @@ body.protected-blur .blur-warning {
     display: block;
 }
 
+/* 8. DevTools Detection */
 body.devtools-detected .protected-content {
     filter: blur(15px);
     pointer-events: none;
@@ -147,7 +154,8 @@ body.devtools-detected .devtools-warning {
         }).catch(function() {});
     };
 
-    document.addEventListener('contextmenu', function(e) {
+    // 2. Disable Right Click
+    document.addEventListener('contextmenu', function (e) {
         if (e.target.closest('.protected-content')) {
             e.preventDefault();
             window.logProtectedEvent('right_click_attempt');
@@ -155,6 +163,7 @@ body.devtools-detected .devtools-warning {
         }
     });
 
+    // 3. Disable Copy / Cut / Paste / Select All / Drag
     ['copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach(function(eventName) {
         document.addEventListener(eventName, function(e) {
             if (e.target.closest('.protected-content')) {
@@ -167,8 +176,10 @@ body.devtools-detected .devtools-warning {
         });
     });
 
-    document.addEventListener('keydown', function(e) {
+    // 4. Block Keyboard Shortcuts
+    document.addEventListener('keydown', function (e) {
         const key = (e.key || '').toLowerCase();
+        
         const isScreenshotKey = e.key === 'PrintScreen' || key === 'printscreen' || (e.ctrlKey && e.shiftKey && key === 's') || (e.metaKey && e.shiftKey && key === 's');
         const isSavePrintCopy = (e.ctrlKey && ['s', 'p', 'u', 'c', 'x', 'a'].includes(key)) || (e.metaKey && ['s', 'p', 'u', 'c', 'x', 'a'].includes(key));
         const isDevTools = e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(key)) || (e.metaKey && e.altKey && ['i', 'j', 'c'].includes(key));
@@ -176,7 +187,7 @@ body.devtools-detected .devtools-warning {
         if (isScreenshotKey || isSavePrintCopy || isDevTools) {
             e.preventDefault();
             e.stopPropagation();
-
+            
             let eventType = 'blocked_shortcut_' + key;
             if (isScreenshotKey) eventType = 'screenshot_key_attempt';
             else if (isDevTools) eventType = 'devtools_detected';
@@ -189,56 +200,61 @@ body.devtools-detected .devtools-warning {
         }
     }, true);
 
-    document.addEventListener('keyup', function(e) {
+    // Specific Handling for PrintScreen Keyup
+    document.addEventListener('keyup', function (e) {
         if (e.key === 'PrintScreen' || (e.key || '').toLowerCase() === 'printscreen') {
             document.body.classList.add('protected-blur');
 
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText('Screenshot is disabled for protected Inspire College content.').catch(function() {});
+                navigator.clipboard.writeText('Screenshot is disabled for protected Inspire College content.').catch(function () {});
             }
 
             window.logProtectedEvent('screenshot_key_attempt');
 
-            setTimeout(function() {
+            setTimeout(function () {
                 document.body.classList.remove('protected-blur');
             }, 2500);
         }
     });
 
-    window.addEventListener('beforeprint', function() {
+    // 5. Disable print via JS
+    window.addEventListener('beforeprint', function(e) {
         document.body.classList.add('protected-blur');
         window.logProtectedEvent('print_attempt');
     });
-
-    window.addEventListener('afterprint', function() {
+    window.addEventListener('afterprint', function(e) {
         document.body.classList.remove('protected-blur');
     });
 
-    window.addEventListener('blur', function() {
+    // 7. Add Blur/Hide Content When Tab Is Inactive
+    window.addEventListener('blur', function () {
         document.body.classList.add('protected-blur');
         window.logProtectedEvent('window_blur_protected');
     });
 
-    window.addEventListener('focus', function() {
-        setTimeout(function() {
+    window.addEventListener('focus', function () {
+        setTimeout(function () {
             document.body.classList.remove('protected-blur');
         }, 500);
     });
 
-    document.addEventListener('visibilitychange', function() {
+    document.addEventListener('visibilitychange', function () {
         if (document.hidden) {
             document.body.classList.add('protected-blur');
             window.logProtectedEvent('visibility_hidden_protected');
         } else {
-            setTimeout(function() {
+            setTimeout(function () {
                 document.body.classList.remove('protected-blur');
             }, 500);
         }
     });
 
-    setInterval(function() {
+    // 8. Basic DevTools Detection
+    setInterval(function () {
         const threshold = 160;
-        const devtoolsOpen = window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold;
+        const devtoolsOpen = 
+            window.outerWidth - window.innerWidth > threshold ||
+            window.outerHeight - window.innerHeight > threshold;
 
         if (devtoolsOpen) {
             document.body.classList.add('devtools-detected');
@@ -250,32 +266,40 @@ body.devtools-detected .devtools-warning {
 })();
 </script>
 
+<!-- Content wrapper to apply positioning for watermarks -->
 <div style="position: relative; overflow: hidden; width: 100%; background: #ffffff;" class="protected-content-wrapper">
+    
+    <!-- Watermark Elements (Subtle text only) -->
     <div class="protected-watermark-text">
         @for ($i = 0; $i < 40; $i++)
-            <span>{{ $learnerEmail }} - Inspire College</span>
+            <span>{{ $learnerEmail }} • Inspire College</span>
         @endfor
     </div>
 
+    <!-- Fixed Bottom Right Badge -->
     <div class="protected-security-badge">
-        Protected content - {{ $learnerEmail }}
+        Protected content • {{ $learnerEmail }}
     </div>
 
+    <!-- Warnings overlays -->
     <div class="blur-warning">Protected content is hidden while this window is inactive.</div>
     <div class="devtools-warning">
         Protected course content is hidden while developer tools are open.<br>
         Please close developer tools to continue viewing this lesson.
     </div>
 
+    <!-- 14. Screenshot Deterrent Message (Top) -->
     <div class="text-xs text-center text-slate-400 font-medium py-2 mb-4 border-b border-slate-100 uppercase tracking-wider relative z-10">
         This content is protected and watermarked for your account. Screenshots, copying, printing, recording, OCR extraction, and redistribution are not permitted.
     </div>
 
+    <!-- Actual Slot Content (Wrapped in protected-content) -->
     <div class="protected-content relative z-10">
         {{ $slot }}
     </div>
 
+    <!-- 14. Screenshot Deterrent Message (Bottom) -->
     <div class="text-xs text-center text-slate-400 font-medium py-2 mt-8 border-t border-slate-100 uppercase tracking-wider relative z-10">
-        Protected for {{ $learnerName }} - {{ $learnerEmail }}
+        Protected for {{ $learnerName }} — {{ $learnerEmail }}
     </div>
 </div>

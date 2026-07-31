@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use App\Models\Crm\Enrolment;
+use App\Models\Crm\PartnerLearner;
+use App\Models\Crm\Order;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LearnerAccountActivatedMail;
+
+class LearnerActivationService
+{
+    public function __construct(private readonly PaymentActivationEligibilityService $eligibility)
+    {
+    }
+
+    public function isPaymentRequirementSatisfied(Enrolment $enrolment): bool
+    {
+        return $this->eligibility->forEnrolment($enrolment)['eligible'];
+    }
+
+    /**
+     * Activate a learner account after payment confirmation.
+     */
+    public function activate($enrolment)
+    {
+        Log::info('ACTIVATION_START', [
+            'enrolment_id' => $enrolment->id,
+            'payment_status' => $enrolment->payment_status,
+        ]);
+        return DB::connection('mysql_crm')->transaction(function () use ($enrolment) {
+            $enrolment = Enrolment::query()->lockForUpdate()->findOrFail($enrolment->id);
+
+            $alreadyActivated = $enrolment->activation_status === 'active';
+            if (! $alreadyActivated && ! $this->isPaymentRequirementSatisfied($enrolment)) {
+                throw new \DomainException('Cannot activate learner before the payment required by its saved plan is confirmed.');
+            }
+
+            // Get learner details from partner_learner
+            $partnerLearner = $enrolment->partnerLearner;
+            
+            if (!$partnerLearner) {
+                // Fallback for existing enrolments
+                if ($enrolment->learner_id) {
+                    $user = User::find($enrolment->learner_id);
+                    if ($user) {
+                        $user->status_id = 2;
+                        $user->crm_approved = 1;
+                        $user->crm_approved_at = now();
+                        $user->save();
+                        
+                        $enrolment->update([
+                            'activation_status' => 'active',
+                            'enrolment_status' => 'active',
+                            'activated_at' => now(),
+                        ]);
+                        return $enrolment;
+                    }
+                }
+                throw new \Exception('Learner record not found for this enrolment.');
+            }
+
+            // Check if user already exists
+            $portalUser = User::where('email_address', $partnerLearner->personal_email)
+                ->orWhere('email_address', $partnerLearner->email)
+                ->first();
+
+            DB::connection('mysql_portal')->beginTransaction();
+            try {
+                if (!$portalUser) {
+                    // Create new learner user
+                    $portalUser = User::create([
+                        'org_id' => $partnerLearner->partner_id,
+                        'first_name' => $partnerLearner->first_name,
+                        'middle_name' => $partnerLearner->middle_name ?? '',
+                        'sur_name' => $partnerLearner->last_name,
+                        'email_address' => $partnerLearner->email ?? $partnerLearner->personal_email,
+                        'password' => Hash::make(Str::random(40)),
+                        'status_id' => 2, // Active
+                        'crm_approved' => 1,
+                        'crm_approved_at' => now(),
+                    ]);
+
+                    // If the email was not set (generated), update it now
+                    if (!$partnerLearner->email) {
+                        $dsEmail = "DS" . $portalUser->id . "@inspirecollege.co.uk";
+                        $portalUser->update(['email_address' => $dsEmail]);
+                        $partnerLearner->update(['email' => $dsEmail]);
+                    }
+                } else {
+                    $portalUser->status_id = 2; // Active
+                    $portalUser->crm_approved = 1;
+                    $portalUser->crm_approved_at = now();
+                    $portalUser->save();
+                }
+
+                DB::connection('mysql_portal')->commit();
+            } catch (\Exception $e) {
+                DB::connection('mysql_portal')->rollBack();
+                throw $e;
+            }
+
+            // Link learner record with user account
+            $partnerLearner->user_id = $portalUser->id;
+            $partnerLearner->account_status = 'active';
+            $partnerLearner->activation_status = 'active';
+            $partnerLearner->save();
+
+            // Update enrolment
+            $enrolment->learner_id = $portalUser->id;
+            $enrolment->activation_status = 'active';
+            $enrolment->enrolment_status = 'active';
+            $enrolment->activated_at = now();
+            $enrolment->save();
+
+            // Update linked order if exists
+            Order::where('enrolment_id', $enrolment->id)
+                ->where('partner_learner_id', $partnerLearner->id)
+                ->update(['learner_id' => $portalUser->id]);
+
+            if ($enrolment->welcome_email_sent_at) {
+                return $enrolment;
+            }
+
+            // Use config or env for portal URL
+            $setupToken = app(AccountSetupTokenService::class)->issueForUser($portalUser);
+
+            if (($setupToken['status'] ?? null) !== AccountSetupTokenService::STATUS_CREATED) {
+                Log::info('Activation email skipped because setup token was not created.', [
+                    'status' => $setupToken['status'] ?? null,
+                    'learner_id' => $portalUser->id,
+                ]);
+
+                return $enrolment;
+            }
+
+            $setupUrl = app(AccountSetupTokenService::class)->setupUrl($setupToken['token']);
+
+            // Send activation email
+            try {
+                Mail::to($partnerLearner->personal_email ?? $portalUser->email_address)->send(
+                    new LearnerAccountActivatedMail($partnerLearner ?? $portalUser, $enrolment, $setupUrl)
+                );
+                
+                $enrolment->welcome_email_sent_at = now();
+                $enrolment->save();
+                Log::info("Activation email sent to {$portalUser->email_address}");
+            } catch (\Exception $e) {
+                Log::error('Failed to send activation email: ' . $e->getMessage());
+            }
+
+            Log::info("Learner Activated: {$portalUser->email_address}. Password setup token generated.");
+
+            return $enrolment;
+        });
+    }
+}

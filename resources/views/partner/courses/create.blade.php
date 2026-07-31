@@ -41,9 +41,9 @@
                                     <div>
                                         <h4 class="text-sm font-bold text-slate-900">{{ $course->title }}</h4>
                                         <div class="mt-1 flex gap-2">
-                                            @if($course->is_promo)
+                                            @if($course->has_partner_discount)
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                                    {{ $course->promo_name }} (-{{ $course->discount_percent }}%)
+                                                    Partner {{ $course->discount_label }}
                                                 </span>
                                             @endif
                                             
@@ -55,9 +55,9 @@
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        @if($course->is_promo)
+                                        @if($course->has_partner_discount)
                                             <div class="text-sm font-bold text-slate-900">£{{ $course->final_full_price }}</div>
-                                            <div class="text-xs text-slate-400 line-through">£{{ $course->regular_price }}</div>
+                                            <div class="text-xs text-slate-400 line-through">£{{ $course->base_price }}</div>
                                         @else
                                             <div class="text-sm font-bold text-slate-900">£{{ $course->final_full_price }}</div>
                                         @endif

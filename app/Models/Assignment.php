@@ -35,4 +35,9 @@ class Assignment extends Model
     {
         return $this->setConnection('mysql_crm')->hasMany(\App\Models\Crm\GradeReset::class, 'portal_assignment_id');
     }
+
+    public function extraAttemptGrants()
+    {
+        return $this->setConnection('mysql_crm')->hasMany(\App\Models\Crm\GradeExtraAttempt::class, 'portal_assignment_id');
+    }
 }

@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->redirectGuestsTo(fn () => route('portal.login'));
         $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
             'installment.access' => \App\Http\Middleware\CheckInstallmentAccess::class,
         ]);
     })

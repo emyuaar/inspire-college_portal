@@ -3,10 +3,13 @@
 namespace App\Models\Crm;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use App\Models\Website\Course;
 
 class Enrolment extends Model
 {
+    use SoftDeletes;
     protected $connection = 'mysql_crm';
     protected $table = 'enrolments';
 
@@ -16,11 +19,6 @@ class Enrolment extends Model
         'partner_learner_id',
         'partner_id',
         'status_id',
-        'payment_status',
-        'activation_status',
-        'enrolment_status',
-        'activated_at',
-        'welcome_email_sent_at',
     ];
 
     public function course()
@@ -31,11 +29,6 @@ class Enrolment extends Model
     public function learner()
     {
         return $this->belongsTo(\App\Models\User::class, 'learner_id');
-    }
-
-    public function partnerLearner()
-    {
-        return $this->belongsTo(PartnerLearner::class, 'partner_learner_id');
     }
 
     public function partner()
@@ -50,12 +43,17 @@ class Enrolment extends Model
 
     public function latestOrder()
     {
-        return $this->hasOne(Order::class, 'enrolment_id')->latestOfMany();
+        return $this->hasOne(Order::class, 'enrolment_id')->orderBy('created_at', 'desc');
     }
 
     public function orders()
     {
         return $this->hasMany(Order::class, 'enrolment_id');
+    }
+
+    public function partnerLearner()
+    {
+        return $this->belongsTo(PartnerLearner::class, 'partner_learner_id');
     }
 
     public function partnerInstallments()
@@ -76,6 +74,14 @@ class Enrolment extends Model
         // Fallback: If no enrolment_id link, check via order_id if possible (but trusted link is enrolment_id)
 
         if ($partnerInstallments->isNotEmpty()) {
+            // Check if any installment is awaiting approval
+            if ($partnerInstallments->whereIn('status', ['awaiting_approval', 'proof_submitted'])->isNotEmpty()) {
+                return [
+                    'status' => 'awaiting_approval',
+                    'label' => 'Proof Submitted',
+                    'color' => 'blue',
+                ];
+            }
 
             // USE NEW LOGIC: Status depends on Access Allowed logic
             if ($this->installment_access_allowed) {
@@ -121,18 +127,20 @@ class Enrolment extends Model
             ];
         }
 
-        // 2. Order is Paid (status_id = 1) OR Installment Plan
-        // We assume status_id 1 is Paid/Active.
-        if ($order->status_id == 1) {
+        // 2. Order is Paid (status_id = 1) OR Installment Plan (status_id = 3 but active)
+        if ($order->status_id == 1 || $order->payment_mode === 'installment') {
 
             // Check if it's an installment order
             if ($order->payment_mode === 'installment') {
                 // Check if access is allowed (gating logic)
                 if (!$this->installment_access_allowed) {
+                     // Determine if it's due to deposit or an installment
+                    $isDepositPending = ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount);
+
                     return [
                         'status' => 'pending_payment',
-                        'label' => 'Payment Overdue',
-                        'color' => 'red',
+                        'label' => $isDepositPending ? 'Deposit Pending' : 'Payment Overdue',
+                        'color' => $isDepositPending ? 'amber' : 'red',
                     ];
                 }
 
@@ -142,27 +150,39 @@ class Enrolment extends Model
                     $total = $installments->count();
                     $paid = $installments->where('payment_status', 'paid')->count();
 
-                    if ($paid >= $total) {
-                        return [
-                            'status' => 'paid',
-                            'label' => 'Paid in Full',
-                            'color' => 'emerald',
-                        ];
-                    } else {
+                    if ($paid >= $total && $order->deposit_paid_amount >= $order->plan_deposit_amount) {
+                         if ($order->status_id != 1) { // Failsafe visual until sync happens
+                              return [
+                                  'status' => 'paid',
+                                  'label' => 'Paid in Full',
+                                  'color' => 'emerald',
+                              ];
+                         }
+                    }
+
+                    if ($order->plan_deposit_amount > 0 && $paid == 0) {
                         return [
                             'status' => 'installments_active',
-                            'label' => "Installment {$paid}/{$total} Paid",
+                            'label' => 'Deposit Paid',
                             'color' => 'blue',
                         ];
                     }
+
+                    return [
+                        'status' => 'installments_active',
+                        'label' => "Installment {$paid}/{$total} Paid",
+                        'color' => 'blue',
+                    ];
                 }
             }
 
-            return [
-                'status' => 'paid',
-                'label' => 'Paid',
-                'color' => 'emerald',
-            ];
+            if ($order->status_id == 1) {
+                return [
+                    'status' => 'paid',
+                    'label' => 'Paid',
+                    'color' => 'emerald',
+                ];
+            }
         }
 
         // 3. Order Exists but not Paid (Pending)
@@ -208,7 +228,7 @@ class Enrolment extends Model
             $currentMonth = $partnerInstallments->filter(function ($inst) {
                 return $inst->status !== 'paid' &&
                     $inst->due_date &&
-                    $inst->due_date->isCurrentMonth();
+                    Carbon::parse($inst->due_date)->isSameMonth(now());
             });
             if ($currentMonth->isNotEmpty())
                 return false;
@@ -222,6 +242,17 @@ class Enrolment extends Model
         $order = $this->latestOrder;
 
         if ($order && $order->payment_mode === 'installment') {
+
+            // DEPOSIT CHECK: Has required deposit been paid?
+            if ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount) {
+                // If deposit grace period exists and is valid, allow access
+                $now = now();
+                if ($order->deposit_grace_until && Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
+                    // within grace
+                } else {
+                    return false; // Deposit unpaid and out of grace
+                }
+            }
 
             // Fetch installments that are NOT paid
             $unpaidInstallments = $order->installments()
@@ -246,12 +277,7 @@ class Enrolment extends Model
                     return false; // Block access
                 }
 
-                // Strict "Current Month" blocking? 
-                // If due_date is this month, block until paid?
-                // User said: "If payment_status is 'partial' or 'pending', CHECK GRACE PERIOD. If grace derived > now, allow. Else block."
-                // This implies that assuming due_date has passed or is "now".
                 // If due_date is in FUTURE, we shouldn't block.
-
                 if ($inst->due_date && $inst->due_date > $now) {
                     continue; // Future due date, don't block
                 }
@@ -285,7 +311,7 @@ class Enrolment extends Model
             }
 
             $currentMonth = $partnerInstallments->filter(function ($inst) {
-                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isCurrentMonth();
+                return $inst->status !== 'paid' && $inst->due_date && Carbon::parse($inst->due_date)->isSameMonth(now());
             });
             if ($currentMonth->isNotEmpty()) {
                 $first = $currentMonth->sortBy('due_date')->first();
@@ -300,23 +326,24 @@ class Enrolment extends Model
         // ------------------------------------
         $order = $this->latestOrder;
         if ($order && $order->payment_mode === 'installment') {
-            $planMonths = $order->plan_months ?? 0;
-            if ($planMonths < 1)
-                return null;
+            
+            // Deposit Check First
+            if ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount) {
+                return "Your required deposit of £" . number_format($order->plan_deposit_amount, 2) . " is unpaid.";
+            }
 
-            $paidCount = $order->installments()->where('payment_status', 'paid')->count();
+            $unpaidInstallments = $order->installments()
+                ->where('payment_status', '!=', 'paid')
+                ->get();
+            
             $now = now()->startOfDay();
-            $orderDate = $order->created_at->startOfDay();
 
-            for ($i = 1; $i <= $planMonths; $i++) {
-                $dueDate = $orderDate->copy()->addMonths($i);
-
-                if ($dueDate <= $now || $dueDate->isCurrentMonth()) {
-                    if ($paidCount < $i) {
-                        // Blocked
-                        $status = ($dueDate < $now) ? "is overdue" : "is unpaid";
-                        return "Your installment for Month {$i} due on " . $dueDate->format('d M Y') . " {$status}.";
+            foreach ($unpaidInstallments as $inst) {
+                if ($inst->payment_status === 'overdue' || ($inst->due_date && $inst->due_date < $now)) {
+                    if ($inst->grace_until && $inst->grace_until >= $now) {
+                        return null; // In grace
                     }
+                    return "Your installment for Month {$inst->installment_no} due on " . $inst->due_date->format('d M Y') . " is overdue.";
                 }
             }
         }
@@ -347,18 +374,22 @@ class Enrolment extends Model
         // Website
         $order = $this->latestOrder;
         if ($order && $order->payment_mode === 'installment') {
-            $planMonths = $order->plan_months ?? 0;
-            $paidCount = $order->installments()->where('payment_status', 'paid')->count();
-            $orderDate = $order->created_at->startOfDay();
-
-            // Next due is paidCount + 1
-            $nextIndex = $paidCount + 1;
-            if ($nextIndex <= $planMonths) {
-                $dueDate = $orderDate->copy()->addMonths($nextIndex);
+            
+            // Deposit Pending
+            if ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount) {
                 return [
-                    'date' => $dueDate,
-                    'amount' => $order->plan_monthly_amount,
-                    'label' => "Month {$nextIndex}",
+                    'date' => $order->created_at, // Or whenever deposit was due
+                    'amount' => max(0, $order->plan_deposit_amount - $order->deposit_paid_amount),
+                    'label' => "Deposit",
+                ];
+            }
+
+            $unpaid = $order->installments()->where('payment_status', '!=', 'paid')->orderBy('installment_no')->first();
+            if ($unpaid) {
+                 return [
+                    'date' => $unpaid->due_date,
+                    'amount' => $unpaid->amount - ($unpaid->amount_paid ?? 0),
+                    'label' => "Month {$unpaid->installment_no}",
                 ];
             }
         }
@@ -398,7 +429,7 @@ class Enrolment extends Model
 
             // Current Due (Due in Current Month) - Strict Rule: "If due in current month, must be paid to continue"
             $currentDue = $partnerInstallments->filter(function ($inst) {
-                return $inst->status !== 'paid' && $inst->due_date && $inst->due_date->isCurrentMonth();
+                return $inst->status !== 'paid' && $inst->due_date && Carbon::parse($inst->due_date)->isSameMonth(now());
             })->reject(function ($inst) use ($overdue) {
                 return $overdue->contains('id', $inst->id); // Avoid duplicates in priority logic
             });
@@ -438,30 +469,54 @@ class Enrolment extends Model
         $order = $this->latestOrder;
         if ($order && $order->payment_mode === 'installment') {
             $status->has_plan = true;
-            $planMonths = $order->plan_months ?? 0;
-            if ($planMonths < 1)
-                return $status;
 
-            $paidCount = $order->installments()->where('payment_status', 'paid')->count();
+            // Check Deposit Check First
+            if ($order->plan_deposit_amount > 0 && $order->deposit_paid_amount < $order->plan_deposit_amount) {
+                $status->allowed = false;
+                $status->reason = "Deposit Pending";
+                $status->due_info = [
+                    'date' => $order->created_at,
+                    'amount' => max(0, $order->plan_deposit_amount - $order->deposit_paid_amount),
+                    'label' => "Deposit"
+                ];
+
+                $now = now();
+                if ($order->deposit_grace_until && Carbon::parse($order->deposit_grace_until) >= $now->startOfDay()) {
+                    $status->allowed = true; // In grace
+                    $status->grace_active = true;
+                    $status->grace_until = Carbon::parse($order->deposit_grace_until);
+                }
+                
+                if (!$status->allowed) return $status;
+            }
+
+            // Fetch pending installments
+            $unpaidInstallments = $order->installments()
+                ->where('payment_status', '!=', 'paid')
+                ->get();
+
             $now = now()->startOfDay();
-            $orderDate = $order->created_at->startOfDay();
 
-            // Check months 1..N
-            for ($i = 1; $i <= $planMonths; $i++) {
-                $dueDate = $orderDate->copy()->addMonths($i);
-
-                // If Due (Past or Current Month)
-                if ($dueDate <= $now || $dueDate->isCurrentMonth()) {
-                    // Check payment
-                    if ($paidCount < $i) {
-                        // Blocked
-                        $status->allowed = false;
-                        $type = ($dueDate < $now) ? "Overdue" : "Due Now";
-                        $status->reason = "{$type}: Month {$i}";
+            foreach ($unpaidInstallments as $inst) {
+                if ($inst->due_date && $inst->due_date < $now) {
+                    if ($inst->grace_until && $inst->grace_until >= $now) {
+                        // Wait, overdue but within grace -> GRACE ACTIVE
+                        $status->grace_active = true;
+                        $status->grace_until = $inst->grace_until;
                         $status->due_info = [
-                            'date' => $dueDate,
-                            'amount' => $order->plan_monthly_amount,
-                            'label' => "Month {$i}"
+                            'date' => $inst->due_date,
+                            'amount' => $inst->amount - ($inst->amount_paid ?? 0),
+                            'label' => "Month {$inst->installment_no}"
+                        ];
+                    } else {
+                        // Grace expired or missing -> BLOCKED
+                        $status->allowed = false;
+                        $status->grace_active = false;
+                        $status->reason = "Overdue: Month {$inst->installment_no}";
+                        $status->due_info = [
+                            'date' => $inst->due_date,
+                            'amount' => $inst->amount - ($inst->amount_paid ?? 0),
+                            'label' => $inst->installment_no == 0 ? "Deposit" : "Month {$inst->installment_no}"
                         ];
                         return $status;
                     }

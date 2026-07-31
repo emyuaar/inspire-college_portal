@@ -8,6 +8,7 @@ class AssignmentSubmissionFile extends Model
 {
     protected $connection = 'mysql_portal';
     protected $table = 'assignment_submission_files';
+
     protected $guarded = [];
 
     public function submission()

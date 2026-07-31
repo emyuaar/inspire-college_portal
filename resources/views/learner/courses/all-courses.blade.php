@@ -23,37 +23,16 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ($enrolments as $enrolment)
                     @php
-                        $showContinue = false;
                         $course = $enrolment->course ?? null;
+                        $state = $enrolment->access_state; // From Controller
 
-                        $requirementsMet = Auth::user()->areRequirementsMet();
-                        $isVerified = Auth::user()->isVerified();
-                        $statusStr = strtolower($enrolment->status->status ?? '');
-                        $denied = in_array($statusStr, ['denied', 'archived']);
-
-                        $latestOrder = $enrolment->latestOrder;
-                        $isOrderPaid = $latestOrder && (int) $latestOrder->status_id === 1;
-                        $isPaid = $latestOrder ? $isOrderPaid : in_array($statusStr, ['active', 'paid', 'approved']);
-
-                        if ($latestOrder && !$isOrderPaid) {
-                            $statusStr = 'pending-payment';
-                        }
-
-                        $accessStatus = $enrolment->installment_access_status;
-                        $accessAllowed = $accessStatus->allowed;
-                        $blockReason = null;
-
-                        if (!$accessAllowed) {
-                            $statusStr = 'pending-payment';
-                            $blockReason = $accessStatus->reason;
-                        }
-
-                        $isActiveOrPaid = $isPaid || in_array($statusStr, ['active', 'paid', 'approved', 'installments_active']);
-                        $showContinue = $isVerified && !$denied && $isActiveOrPaid && $accessAllowed;
-
-                        $isPaymentPending = $statusStr === 'pending-payment';
-                        $isUnderReview = $requirementsMet && !$isVerified;
-                        $isPaidPending = $isPaid && $isUnderReview;
+                        $showContinue = $state->can_access;
+                        $requirementsMet = $state->requirements_met;
+                        $isVerified = $state->is_verified;
+                        $blockReason = $state->block_reason;
+                        $graceActive = $state->grace_active;
+                        $graceUntil = $state->grace_until;
+                        $denied = $state->is_denied;
                     @endphp
 
                     <x-ui.card class="h-full flex flex-col hover:shadow-md transition-shadow duration-200" padding="p-0">
@@ -69,25 +48,9 @@
                                     <span></span>
                                 @endif
 
-                                @if($showContinue)
-                                    <x-ui.badge variant="success" size="sm">Active</x-ui.badge>
-                                @elseif($isPaymentPending)
-                                    <x-ui.badge variant="warning" size="sm">Payment Pending</x-ui.badge>
-                                @elseif($isPaidPending)
-                                    @if(!$requirementsMet)
-                                        <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                    @elseif(!$isVerified)
-                                        <x-ui.badge variant="neutral" size="sm">Under Review</x-ui.badge>
-                                    @endif
-                                @elseif($denied)
-                                    <x-ui.badge variant="error" size="sm">Denied</x-ui.badge>
-                                @else
-                                    @if(!$requirementsMet)
-                                        <x-ui.badge variant="brand" size="sm">Requirements Pending</x-ui.badge>
-                                    @else
-                                        <x-ui.badge variant="neutral" size="sm">{{ ucfirst($statusStr) }}</x-ui.badge>
-                                    @endif
-                                @endif
+                                <x-ui.badge :variant="$state->status_variant" size="sm">
+                                    {{ $state->status_label }}
+                                </x-ui.badge>
                             </div>
 
                             <h3 class="font-bold text-lg text-slate-900 mb-2 line-clamp-2 leading-tight">
@@ -102,27 +65,37 @@
                         </div>
 
                         <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
-                            @if ($showContinue && $course)
-                                <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
-                                    <x-ui.button fullWidth size="sm">
-                                        Continue Learning
-                                        <x-slot name="icon"><svg class="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                            </svg></x-slot>
+                            @if ($showContinue)
+                                <div class="flex flex-col items-center w-full gap-1">
+                                    <a href="{{ route('portal.learner.course.show', $enrolment->id) }}" class="w-full">
+                                        <x-ui.button fullWidth size="sm">
+                                            Continue Learning
+                                        </x-ui.button>
+                                    </a>
+                                    @if ($graceActive)
+                                        <span class="text-[10px] text-amber-600 font-medium">
+                                            Grace period ends {{ \Carbon\Carbon::parse($graceUntil)->format('d M Y') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @elseif ($blockReason)
+                                <div class="flex flex-col items-center w-full gap-1">
+                                    <x-ui.button fullWidth size="sm" variant="outline" class="text-red-600 border-red-200 cursor-not-allowed opacity-70" disabled>
+                                        Access Blocked
                                     </x-ui.button>
-                                </a>
-                            @elseif ($isPaymentPending)
-                                <span class="text-xs font-semibold text-amber-600 w-full text-center">Contact Partner for
-                                    Payment</span>
-                            @elseif ($isPaidPending && !$requirementsMet)
+                                    <span class="text-[10px] text-slate-500">Resolve payment to continue</span>
+                                </div>
+                            @elseif ($state->status_label === 'Payment Pending')
+                                <div class="flex flex-col items-center w-full gap-1 text-center">
+                                    <span class="text-xs font-semibold text-amber-600">Payment Pending</span>
+                                    <span class="text-[10px] text-slate-500 italic">Contact partner for access</span>
+                                </div>
+                            @elseif (!$requirementsMet)
                                 <x-ui.button fullWidth size="sm" variant="outline" href="{{ route('portal.profile.personal') }}">
                                     Complete Requirements
                                 </x-ui.button>
-                            @elseif ($isPaidPending && !$isVerified)
-                                <span class="text-xs font-semibold text-slate-500 italic w-full text-center">Awaiting Admin
-                                    Approval</span>
+                            @elseif (!$isVerified)
+                                <span class="text-xs font-semibold text-slate-500 italic w-full text-center">Awaiting Approval</span>
                             @elseif ($denied)
                                 <x-ui.button variant="outline" fullWidth size="sm" class="opacity-50 cursor-not-allowed">
                                     Access Denied

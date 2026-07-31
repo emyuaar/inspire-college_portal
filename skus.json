@@ -2,7 +2,7 @@
     "@odata.context": "https:\/\/graph.microsoft.com\/v1.0\/$metadata#subscribedSkus",
     "value": [
         {
-            "accountName": "directskills",
+            "accountName": "inspirecollege",
             "accountId": "db210861-bdb9-4095-8fd4-7e0f46da60b1",
             "appliesTo": "User",
             "capabilityStatus": "Enabled",
@@ -296,7 +296,7 @@
             ]
         },
         {
-            "accountName": "directskills",
+            "accountName": "inspirecollege",
             "accountId": "db210861-bdb9-4095-8fd4-7e0f46da60b1",
             "appliesTo": "User",
             "capabilityStatus": "Enabled",
@@ -513,7 +513,7 @@
             ]
         },
         {
-            "accountName": "directskills",
+            "accountName": "inspirecollege",
             "accountId": "db210861-bdb9-4095-8fd4-7e0f46da60b1",
             "appliesTo": "User",
             "capabilityStatus": "LockedOut",
@@ -569,7 +569,7 @@
             ]
         },
         {
-            "accountName": "directskills",
+            "accountName": "inspirecollege",
             "accountId": "db210861-bdb9-4095-8fd4-7e0f46da60b1",
             "appliesTo": "User",
             "capabilityStatus": "Enabled",

@@ -10,7 +10,7 @@
     <header class="bg-white border-b border-slate-200">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <img src="{{ asset('images/1000ppi/logo.png') }}"
+                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png"
                      class="h-7" alt="Inspire College">
                 <span class="text-sm text-slate-500 hidden sm:inline">
                     Organization Portal
@@ -47,7 +47,7 @@
                 <h2 class="text-sm font-semibold text-slate-800 mb-2">Overview</h2>
                 <p class="text-xs text-slate-500">
                     This section can later show number of linked learners, active courses, and other KPIs
-                    based on CRM/Portal integration.
+                    based on system integration.
                 </p>
             </section>
         </div>
