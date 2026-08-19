@@ -14,7 +14,7 @@
                     <!-- Header -->
                     <tr>
                         <td align="center" style="background-color: #01345B; padding: 30px 20px; border-bottom: 4px solid #d63384;">
-                            <img src="https://inspirecollege.co.uk/images/Inspire%20College_logo.png" alt="Inspire College Logo" width="220" style="display: block; max-width: 220px; height: auto;">
+                            <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp" alt="Inspire College Logo" width="220" style="display: block; max-width: 220px; height: auto;">
                         </td>
                     </tr>
                     

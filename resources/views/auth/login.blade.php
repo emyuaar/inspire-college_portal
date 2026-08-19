@@ -54,7 +54,7 @@
 
         {{-- Content --}}
         <div class="relative z-10">
-            <img src="https://inspirecollege.co.uk/images/Inspire%20College_logo.png" alt="Inspire College"
+            <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp" alt="Inspire College"
                 class="h-10 mb-8">
 
             <h1 class="text-4xl font-bold leading-tight mb-4">

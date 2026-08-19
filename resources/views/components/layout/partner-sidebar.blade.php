@@ -57,7 +57,7 @@
 
     {{-- Branding --}}
     <div class="h-16 flex items-center justify-center pl-0 pr-6 border-b border-white/10 bg-[#00203a]">
-        <img src="https://inspirecollege.co.uk/images/Inspire%20College_logo.png" alt="Inspire College" class="h-12">
+        <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp" alt="Inspire College" class="h-12">
         {{-- Close button for mobile --}}
         <button id="closeSidebar" class="lg:hidden ml-auto text-white/70 hover:text-white">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
