@@ -83,7 +83,7 @@
         {{-- Logo --}}
         <div class="text-center mb-8">
             <div class="mb-4">
-                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College" class="h-10 mx-auto">
+                <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College" class="h-10 mx-auto">
             </div>
             <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }}</h1>
             <p class="text-slate-500 mt-2">{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Create a secure password to access your course.' : 'Choose a new secure password for your account.' }}</p>

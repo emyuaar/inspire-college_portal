@@ -19,7 +19,7 @@
         </h1>
         
         {{-- Mobile Logo --}}
-        <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College" class="h-8 sm:hidden">
+        <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College" class="h-8 sm:hidden">
     </div>
 
     {{-- Right Actions --}}

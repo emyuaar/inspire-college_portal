@@ -41,7 +41,7 @@
                         <div class="relative aspect-[16/10] overflow-hidden bg-slate-100">
                             @if($course->image)
                                 @php 
-                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://inspirecollege.co.uk/storage/' . $course->image;
+                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://inspirecollegeoflearning.com/storage/' . $course->image;
                                 @endphp
                                 <img src="{{ $imgSrc }}" 
                                      alt="{{ $course->title }}" 
@@ -161,7 +161,7 @@
                                 <i class="fa-solid fa-plus-circle"></i>
                                 Enroll Now
                             </a>
-                            <a href="https://inspirecollege.co.uk/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
+                            <a href="https://inspirecollegeoflearning.com/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
                                class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors">
                                Details
                             </a>

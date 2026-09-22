@@ -407,7 +407,7 @@
             {{-- Left: Logo + Main Nav --}}
             <div class="flex items-center gap-6">
                 <a href="{{ route('portal.learner.dashboard') }}" class="flex items-center gap-2">
-                    <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" class="h-7" alt="Inspire College">
+                    <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" class="h-7" alt="Inspire College">
                     <span class="text-sm text-slate-600 font-medium">
                         Learner Portal
                     </span>

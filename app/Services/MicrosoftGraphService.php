@@ -67,16 +67,16 @@ class MicrosoftGraphService
         // 1. Determine UPN (DS{id}@domain)
         // Assumption: We want to use the standard DS email format if possible, 
         // to match CRM logic.
-        $domain = 'inspirecollege.co.uk'; // Ideally from config, but hardcoded in CRM example too? No, CRM used config.
+        $domain = 'inspirecollegeoflearning.com'; // Ideally from config, but hardcoded in CRM example too? No, CRM used config.
         // Let's assume we can get it from the user's current email or use a standard one.
         // CRM logic: $dsEmail = "DS{$dsNo}@{$domain}";
         // I'll stick to what the CRM does to ensure consistency.
         // I need the domain.
-        // If not in config, I'll fallback to 'inspirecollege.co.uk'. 
+        // If not in config, I'll fallback to 'inspirecollegeoflearning.com'. 
         // Or extract from existing email if it matches pattern?
         // Safest is to generate it:
         $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'inspirecollege.co.uk'); // Add domain to config if needed, logic below
+        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com'); // Add domain to config if needed, logic below
         $upn = "DS{$dsNo}@{$domain}";
 
         // If user already has ms_user_id, check if they exist?
@@ -194,7 +194,7 @@ class MicrosoftGraphService
         $token = $this->getAccessToken();
 
         $dsNo = $user->id;
-        $domain = config('services.ms.domain', 'inspirecollege.co.uk');
+        $domain = config('services.ms.domain', 'inspirecollegeoflearning.com');
         $upn = "DS{$dsNo}@{$domain}"; // Or use $user->email_address if already set to DS email
 
         $displayName = trim($user->first_name . ' ' . $user->sur_name);

@@ -21,7 +21,7 @@
 
                     <tr>
                         <td style="background:#01345B; padding:28px 32px; text-align:center;">
-                            <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College"
+                            <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College"
                                 style="max-width:180px; height:auto;">
                         </td>
                     </tr>

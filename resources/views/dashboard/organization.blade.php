@@ -10,7 +10,7 @@
     <header class="bg-white border-b border-slate-200">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png"
+                <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png"
                      class="h-7" alt="Inspire College">
                 <span class="text-sm text-slate-500 hidden sm:inline">
                     Organization Portal
