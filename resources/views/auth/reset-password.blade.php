@@ -160,7 +160,7 @@
         </div>
         
         <p class="text-center mt-8 text-slate-400 text-sm">
-            Need help? Contact <a href="mailto:support@inspirecollege.co.uk" class="text-slate-600 font-bold hover:underline">Support</a>
+            Need help? Contact <a href="mailto:support@inspirecollegeoflearning.com" class="text-slate-600 font-bold hover:underline">Support</a>
         </p>
     </div>
 
