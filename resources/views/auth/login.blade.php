@@ -67,7 +67,7 @@
         </div>
 
         <div class="relative z-10 text-sm text-slate-400">
-            &copy; {{ date('Y') }} Inspire College. All rights reserved.
+            &copy; {{ date('Y') }} Inspire College of Learning. All rights reserved.
         </div>
     </div>
 

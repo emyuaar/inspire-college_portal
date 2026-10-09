@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Learner student ID / Microsoft 365 address prefix: ICOL246@inspirecollegeoflearning.com (same setting as the CRM).
+    'student_email_prefix' => env('STUDENT_EMAIL_PREFIX', 'ICOL'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

@@ -88,7 +88,7 @@ class LearnerActivationService
 
                     // If the email was not set (generated), update it now
                     if (!$partnerLearner->email) {
-                        $dsEmail = "DS" . $portalUser->id . "@inspirecollegeoflearning.com";
+                        $dsEmail = config('app.student_email_prefix', 'ICOL') . $portalUser->id . "@inspirecollegeoflearning.com";
                         $portalUser->update(['email_address' => $dsEmail]);
                         $partnerLearner->update(['email' => $dsEmail]);
                     }
