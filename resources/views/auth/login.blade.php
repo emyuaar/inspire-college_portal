@@ -8,8 +8,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {
-            --ds-navy: #01345B;
-            --ds-pink: #A91A6A;
+            --ds-navy: #0E2C4A;
+            --ds-pink: #2774AE;
         }
 
         body {
@@ -21,7 +21,7 @@
         .ds-input:focus {
             outline: none;
             border-color: var(--ds-pink);
-            box-shadow: 0 0 0 4px rgba(169, 26, 106, 0.1);
+            box-shadow: 0 0 0 4px rgba(39, 116, 174, 0.1);
         }
 
         /* Checkbox custom style */
@@ -32,7 +32,7 @@
         }
 
         .ds-checkbox:focus {
-            box-shadow: 0 0 0 2px rgba(169, 26, 106, 0.2);
+            box-shadow: 0 0 0 2px rgba(39, 116, 174, 0.2);
         }
     </style>
 </head>
@@ -41,7 +41,7 @@
 
     {{-- LEFT COLUMN: BRANDING (Desktop Only) --}}
     <div
-        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#01345B] relative overflow-hidden flex-col justify-between p-12 text-white">
+        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#0E2C4A] relative overflow-hidden flex-col justify-between p-12 text-white">
 
         {{-- Background Pattern/Effect --}}
         <div class="absolute inset-0 opacity-10"
@@ -49,8 +49,8 @@
         </div>
 
         {{-- Decorative Circle --}}
-        <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#A91A6A] rounded-full blur-3xl opacity-20"></div>
-        <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-[#00203a] to-transparent"></div>
+        <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#2774AE] rounded-full blur-3xl opacity-20"></div>
+        <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-[#081C30] to-transparent"></div>
 
         {{-- Content --}}
         <div class="relative z-10">
@@ -59,7 +59,7 @@
 
             <h1 class="text-4xl font-bold leading-tight mb-4">
                 Welcome to <br>
-                <span class="text-[#A91A6A] text-pink-400">LMS Portal</span>
+                <span class="text-[#2774AE] text-pink-400">LMS Portal</span>
             </h1>
             <p class="text-slate-300 text-lg max-w-md leading-relaxed">
                 Access your courses, track your progress, and manage your assignments all in one place.
@@ -132,7 +132,7 @@
                             Password
                         </label>
                         {{-- Forgot Password Link --}}
-                        <a href="#" class="text-sm font-semibold text-[#01345B] hover:text-[#A91A6A] transition-colors">
+                        <a href="#" class="text-sm font-semibold text-[#0E2C4A] hover:text-[#2774AE] transition-colors">
                             Forgot password?
                         </a>
                     </div>
@@ -143,14 +143,14 @@
 
                 <div class="flex items-center pt-1">
                     <input id="remember" name="remember" type="checkbox"
-                        class="ds-checkbox h-5 w-5 rounded border-slate-300 text-[#A91A6A] focus:ring-[#A91A6A]">
+                        class="ds-checkbox h-5 w-5 rounded border-slate-300 text-[#2774AE] focus:ring-[#2774AE]">
                     <label for="remember" class="ml-3 block text-sm text-slate-600">
                         Remember me for 30 days
                     </label>
                 </div>
 
                 <button type="submit"
-                    class="w-full flex items-center justify-center rounded-full bg-[#A91A6A] py-3.5 px-4 text-sm font-bold text-white shadow-lg shadow-pink-900/10 hover:bg-[#8f165a] hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all duration-200">
+                    class="w-full flex items-center justify-center rounded-full bg-[#2774AE] py-3.5 px-4 text-sm font-bold text-white shadow-lg shadow-pink-900/10 hover:bg-[#1F5F8F] hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all duration-200">
                     Sign in to Portal
                 </button>
             </form>

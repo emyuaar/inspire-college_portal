@@ -25,7 +25,7 @@
             margin-bottom: 10px;
             font-size: 13px;
             font-weight: 800;
-            color: #01345B;
+            color: #0E2C4A;
         }
 
         .ds-password-rules ul {

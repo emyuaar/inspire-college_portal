@@ -25,7 +25,7 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-ds-navy text-white transition-transform duration-300 ease-in-out transform -translate-x-full lg:translate-x-0 lg:static lg:block shadow-xl lg:shadow-none">
     
     {{-- Branding --}}
-    <div class="h-16 flex items-center justify-center pl-0 pr-6 border-b border-white/10 bg-[#00203a]">
+    <div class="h-16 flex items-center justify-center pl-0 pr-6 border-b border-white/10 bg-[#081C30]">
         <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp" alt="Inspire College" class="h-12">
         {{-- Close button for mobile --}}
         <button id="closeSidebar" class="lg:hidden ml-auto text-white/70 hover:text-white">

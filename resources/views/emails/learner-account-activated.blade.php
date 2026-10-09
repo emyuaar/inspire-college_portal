@@ -20,8 +20,8 @@
                     style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08);">
 
                     <tr>
-                        <td style="background:#01345B; padding:28px 32px; text-align:center;">
-                            <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College"
+                        <td style="background:#29104A; padding:28px 32px; text-align:center;">
+                            <img src="https://inspirecollegeoflearning.com/images/brand/icol-lockup-light.png" alt="Inspire College of Learning"
                                 style="max-width:180px; height:auto;">
                         </td>
                     </tr>
@@ -33,7 +33,7 @@
                                 Account Activated
                             </div>
 
-                            <h1 style="margin:0; color:#01345B; font-size:26px; line-height:1.3;">
+                            <h1 style="margin:0; color:#0E2C4A; font-size:26px; line-height:1.3;">
                                 Your Learner Account Is Ready
                             </h1>
 
@@ -51,7 +51,7 @@
                                 style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:14px;">
                                 <tr>
                                     <td style="padding:22px;">
-                                        <h2 style="margin:0 0 14px 0; color:#01345B; font-size:18px;">
+                                        <h2 style="margin:0 0 14px 0; color:#0E2C4A; font-size:18px;">
                                             Course Details
                                         </h2>
 
@@ -110,7 +110,7 @@
                             style="background:#f9fafb; padding:20px 32px; text-align:center; border-top:1px solid #e5e7eb;">
                             <p style="margin:0; font-size:13px; color:#6b7280;">
                                 Thank you,<br>
-                                <strong style="color:#01345B;">Inspire College Team</strong>
+                                <strong style="color:#0E2C4A;">Inspire College Team</strong>
                             </p>
                         </td>
                     </tr>

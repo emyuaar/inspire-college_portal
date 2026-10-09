@@ -14,8 +14,8 @@
            ========================= */
 
         :root {
-            --ds-navy: #01345b;
-            --ds-pink: #a91a6a;
+            --ds-navy: #0E2C4A;
+            --ds-pink: #2774AE;
 
             --pwa-bg: #f1f5f9;
             --pwa-card: #ffffff;
@@ -115,7 +115,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px solid rgba(1, 52, 91, .12);
+            border: 2px solid rgba(14, 44, 74, .12);
             box-shadow: 0 10px 20px rgba(2, 6, 23, .10);
             transition: transform .15s ease;
         }
@@ -169,7 +169,7 @@
 
         /* active: pill highlight + small bar */
         .pwa-tab.is-active {
-            background: rgba(1, 52, 91, .07);
+            background: rgba(14, 44, 74, .07);
         }
 
         .pwa-tab.is-active svg,
@@ -221,8 +221,8 @@
         }
 
         .pwa-sheet-item:hover {
-            background: rgba(1, 52, 91, .06);
-            border-color: rgba(1, 52, 91, .12);
+            background: rgba(14, 44, 74, .06);
+            border-color: rgba(14, 44, 74, .12);
         }
 
         .pwa-sheet-danger {
