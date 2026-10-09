@@ -28,7 +28,7 @@
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50">
                         <span class="opacity-70 mr-2">Student ID:</span>
-                        <span class="font-bold text-white">DS{{ $user->id }}</span>
+                        <span class="font-bold text-white">ICOL{{ $user->id }}</span>
                     </div>
                     <div
                         class="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/20 text-xs font-medium border border-white/10 backdrop-blur-sm text-blue-50 overflow-x-auto">
@@ -98,7 +98,7 @@
                     </div>
                     <div class="flex justify-between pt-1">
                         <dt class="text-slate-500">Student ID</dt>
-                        <dd class="font-bold text-slate-800 text-right">DS{{ $user->id }}</dd>
+                        <dd class="font-bold text-slate-800 text-right">ICOL{{ $user->id }}</dd>
                     </div>
                 </dl>
             </x-ui.card>
@@ -219,7 +219,7 @@
                                             @endif
                                         </h3>
 
-                                        <p class="text-xs text-slate-500">Student ID: DS{{ $user->id }}</p>
+                                        <p class="text-xs text-slate-500">Student ID: ICOL{{ $user->id }}</p>
                                     </div>
 
                                     <div class="shrink-0 self-end sm:self-center">
@@ -646,8 +646,8 @@
                                 <radialGradient id="paint3_radial_353_14585" cx="0" cy="0" r="1"
                                     gradientUnits="userSpaceOnUse"
                                     gradientTransform="translate(16.9518 14.6154) rotate(90) scale(9.30769 47.4352)">
-                                    <stop offset="0.283333" stop-color="#4F006F" stop-opacity="0" />
-                                    <stop offset="1" stop-color="#4F006F" />
+                                    <stop offset="0.283333" stop-color="#163F5E" stop-opacity="0" />
+                                    <stop offset="1" stop-color="#163F5E" />
                                 </radialGradient>
                                 <linearGradient id="paint4_linear_353_14585" x1="5" y1="7.5" x2="18.9967" y2="7.71579"
                                     gradientUnits="userSpaceOnUse">
@@ -663,8 +663,8 @@
                                 <radialGradient id="paint6_radial_353_14585" cx="0" cy="0" r="1"
                                     gradientUnits="userSpaceOnUse"
                                     gradientTransform="translate(16.3626 22.0408) rotate(0.481618) scale(24.2597 10.781)">
-                                    <stop offset="0.124676" stop-color="#4F006F" stop-opacity="0" />
-                                    <stop offset="0.59498" stop-color="#4F006F" />
+                                    <stop offset="0.124676" stop-color="#163F5E" stop-opacity="0" />
+                                    <stop offset="0.59498" stop-color="#163F5E" />
                                 </radialGradient>
                                 <linearGradient id="paint7_linear_353_14585" x1="5" y1="11.6856" x2="18.9987"
                                     y2="11.819" gradientUnits="userSpaceOnUse">
@@ -675,14 +675,14 @@
                                 <radialGradient id="paint8_radial_353_14585" cx="0" cy="0" r="1"
                                     gradientUnits="userSpaceOnUse"
                                     gradientTransform="translate(16.9518 14.6154) rotate(90) scale(9.30769 47.4352)">
-                                    <stop offset="0.283333" stop-color="#4F006F" stop-opacity="0" />
-                                    <stop offset="1" stop-color="#4F006F" />
+                                    <stop offset="0.283333" stop-color="#163F5E" stop-opacity="0" />
+                                    <stop offset="1" stop-color="#163F5E" />
                                 </radialGradient>
                                 <radialGradient id="paint9_radial_353_14585" cx="0" cy="0" r="1"
                                     gradientUnits="userSpaceOnUse"
                                     gradientTransform="translate(16.9518 14.6154) rotate(90) scale(9.71329 27.1704)">
-                                    <stop offset="0.55" stop-color="#4F006F" stop-opacity="0" />
-                                    <stop offset="1" stop-color="#4F006F" />
+                                    <stop offset="0.55" stop-color="#163F5E" stop-opacity="0" />
+                                    <stop offset="1" stop-color="#163F5E" />
                                 </radialGradient>
                                 <linearGradient id="paint10_linear_353_14585" x1="19" y1="5.64045" x2="5" y2="5.64045"
                                     gradientUnits="userSpaceOnUse">
