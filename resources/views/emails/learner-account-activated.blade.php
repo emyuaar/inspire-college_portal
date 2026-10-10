@@ -21,7 +21,7 @@
 
                     <tr>
                         <td style="background:#0E2C4A; padding:28px 32px; text-align:center;">
-                            <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College"
+                            <img src="{{ asset('images/icol-logo.png') }}" alt="Inspire College"
                                 style="max-width:180px; height:auto;">
                         </td>
                     </tr>

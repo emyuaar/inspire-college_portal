@@ -19,7 +19,7 @@
         </h1>
         
         {{-- Mobile Logo --}}
-        <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College" class="h-8 sm:hidden">
+        <img src="{{ asset('images/icol-logo.png') }}" alt="Inspire College" class="h-8 sm:hidden">
     </div>
 
     {{-- Right Actions --}}

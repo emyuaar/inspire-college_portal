@@ -78,7 +78,7 @@
 
             {{-- Mobile Logo (Visible only on mobile) --}}
             <div class="md:hidden text-center mb-8">
-                <img src="https://inspirecollegeoflearning.com/images/Inspire College_logo.png" alt="Inspire College"
+                <img src="{{ asset('images/icol-logo.png') }}" alt="Inspire College"
                     class="h-10 mx-auto">
             </div>
 

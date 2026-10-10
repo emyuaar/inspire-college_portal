@@ -31,38 +31,38 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">First Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="first_name" required value="{{ old('first_name') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="first_name" required value="{{ old('first_name') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Middle Name</label>
-                    <input type="text" name="middle_name" value="{{ old('middle_name') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="middle_name" value="{{ old('middle_name') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Last Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="sur_name" required value="{{ old('sur_name') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="sur_name" required value="{{ old('sur_name') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Personal Email <span class="text-red-500">*</span></label>
-                    <input type="email" name="email_address" required value="{{ old('email_address') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm" placeholder="learner@personal.com">
+                    <input type="email" name="email_address" required value="{{ old('email_address') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm" placeholder="learner@personal.com">
                     <p class="mt-1 text-[11px] text-slate-500">For communications only. Login email will be auto-generated.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
-                    <input type="text" name="contact_number" required value="{{ old('contact_number') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="contact_number" required value="{{ old('contact_number') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Date of Birth <span class="text-red-500">*</span></label>
-                    <input type="date" name="dob" required value="{{ old('dob') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="date" name="dob" required value="{{ old('dob') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Gender <span class="text-red-500">*</span></label>
-                    <select name="gender" required class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <select name="gender" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                         <option value="">Select Gender</option>
                         <option value="male" {{ old('gender') == 'male' ? 'selected' : '' }}>Male</option>
                         <option value="female" {{ old('gender') == 'female' ? 'selected' : '' }}>Female</option>
@@ -76,27 +76,27 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div class="md:col-span-2">
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Address Line 1 <span class="text-red-500">*</span></label>
-                    <input type="text" name="address_line_1" required value="{{ old('address_line_1') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="address_line_1" required value="{{ old('address_line_1') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Address Line 2</label>
-                    <input type="text" name="address_line_2" value="{{ old('address_line_2') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="address_line_2" value="{{ old('address_line_2') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">City <span class="text-red-500">*</span></label>
-                    <input type="text" name="city" required value="{{ old('city') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="city" required value="{{ old('city') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">State / County</label>
-                    <input type="text" name="state" value="{{ old('state') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="state" value="{{ old('state') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Country <span class="text-red-500">*</span></label>
-                    <input type="text" name="country" required value="{{ old('country') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="country" required value="{{ old('country') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Postcode / Zip <span class="text-red-500">*</span></label>
-                    <input type="text" name="zip_code" required value="{{ old('zip_code') }}" class="w-full rounded-lg border-slate-300 focus:ring-ds-navy text-sm">
+                    <input type="text" name="zip_code" required value="{{ old('zip_code') }}" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 focus:ring-ds-navy text-sm">
                 </div>
             </div>
 
