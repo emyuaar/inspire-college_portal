@@ -82,8 +82,8 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-16 text-center">
-                                <div class="max-w-xs mx-auto">
+                            <td colspan="4" class="px-4 py-16 text-center sm:px-6">
+                                <div class="sticky left-0 mx-0 w-[min(20rem,calc(100vw-7rem))] max-w-xs sm:mx-auto">
                                     <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mx-auto mb-4">
                                         <i class="fa-solid fa-comment-slash text-2xl"></i>
                                     </div>

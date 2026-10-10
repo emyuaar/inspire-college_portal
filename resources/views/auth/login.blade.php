@@ -67,7 +67,7 @@
         </div>
 
         <div class="relative z-10 text-sm text-slate-400">
-            &copy; {{ date('Y') }} Inspire College. All rights reserved.
+            &copy; {{ date('Y') }} Inspire College of Learning. All rights reserved.
         </div>
     </div>
 
@@ -78,7 +78,7 @@
 
             {{-- Mobile Logo (Visible only on mobile) --}}
             <div class="md:hidden text-center mb-8">
-                <img src="https://inspirecollege.co.uk/images/Inspire College_logo.png" alt="Inspire College"
+                <img src="{{ asset('images/icol-logo.png') }}" alt="Inspire College"
                     class="h-10 mx-auto">
             </div>
 
@@ -157,8 +157,8 @@
 
             {{-- Footer Text --}}
             <p class="text-center text-xs text-slate-400 mt-8">
-                By signing in, you agree to our <a href="https://inspirecollege.co.uk/terms-and-conditions" class="underline hover:text-slate-600">Terms of Service</a>
-                and <a href="https://inspirecollege.co.uk/gdpr-and-retention-of-records-policy" class="underline hover:text-slate-600">Privacy Policy</a>.
+                By signing in, you agree to our <a href="https://inspirecollegeoflearning.com/terms-and-conditions" class="underline hover:text-slate-600">Terms of Service</a>
+                and <a href="https://inspirecollegeoflearning.com/gdpr-and-retention-of-records-policy" class="underline hover:text-slate-600">Privacy Policy</a>.
             </p>
         </div>
     </div>

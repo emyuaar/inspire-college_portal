@@ -91,7 +91,7 @@
                     </div>
                     <div class="flex justify-between border-b border-slate-50 pb-2">
                         <dt class="text-slate-500">Email Address</dt>
-                        <dd class="font-bold text-slate-800 text-right max-w-[180px]"
+                        <dd class="min-w-0 font-bold text-slate-800 text-right max-w-[180px] break-all"
                             title="{{ $user->email_address }}">
                             {{ $user->email_address }}
                         </dd>

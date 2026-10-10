@@ -15,12 +15,12 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
                  {{-- Search Header --}}
-                 <form action="{{ route('partner.courses.index') }}" method="GET" class="relative group">
+                 <form action="{{ route('partner.courses.index') }}" method="GET" class="relative group w-full sm:w-auto">
                     <input type="text" name="search" value="{{ $search }}" 
                         placeholder="Search courses..."
-                        class="pl-10 pr-4 py-2.5 w-64 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-ds-pink/20 focus:border-ds-pink transition-all shadow-sm">
+                        class="pl-10 pr-4 py-2.5 w-full sm:w-64 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-ds-pink/20 focus:border-ds-pink transition-all shadow-sm">
                     <i class="fa-solid fa-search absolute left-4 top-3 text-slate-400 group-focus-within:text-ds-pink transition-colors"></i>
                  </form>
 
