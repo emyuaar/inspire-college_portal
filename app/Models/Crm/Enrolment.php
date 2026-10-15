@@ -70,7 +70,7 @@ class Enrolment extends Model
         // -------------------------------------------------------------
         // PARTNER LOGIC: Check PartnerLearnerInstallments first
         // -------------------------------------------------------------
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        $partnerInstallments = $this->partnerInstallmentsForAccess();
         // Fallback: If no enrolment_id link, check via order_id if possible (but trusted link is enrolment_id)
 
         if ($partnerInstallments->isNotEmpty()) {
@@ -214,7 +214,7 @@ class Enrolment extends Model
         // ------------------------------------
         // 1. PARTNER LOGIC (Explicit Due Dates)
         // ------------------------------------
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        $partnerInstallments = $this->partnerInstallmentsForAccess();
 
         if ($partnerInstallments->isNotEmpty()) {
             // Overdue (Due < Today & Unpaid)
@@ -298,7 +298,7 @@ class Enrolment extends Model
         // ------------------------------------
         // 1. PARTNER LOGIC
         // ------------------------------------
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        $partnerInstallments = $this->partnerInstallmentsForAccess();
 
         if ($partnerInstallments->isNotEmpty()) {
             $overdue = $partnerInstallments->filter(function ($inst) {
@@ -358,7 +358,7 @@ class Enrolment extends Model
     public function getInstallmentDueInfoAttribute(): ?array
     {
         // Partner
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        $partnerInstallments = $this->partnerInstallmentsForAccess();
         if ($partnerInstallments->isNotEmpty()) {
             // Find first unpaid that is blocking or next due
             $unpaid = $partnerInstallments->where('status', '!=', 'paid')->sortBy('due_date')->first();
@@ -417,7 +417,7 @@ class Enrolment extends Model
         // ------------------------------------
         // 1. PARTNER LOGIC
         // ------------------------------------
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        $partnerInstallments = $this->partnerInstallmentsForAccess();
         if ($partnerInstallments->isNotEmpty()) {
             $status->has_plan = true;
 
@@ -525,5 +525,19 @@ class Enrolment extends Model
         }
 
         return $status;
+    }
+
+    /**
+     * [F-12] Partner instalments only apply to PARTNER enrolments (partner_id / partner_learner_id set). A direct
+     * website learner is judged on order_installments, so a stray partner_learner_installments row with the same
+     * enrolment_id (orphaned data on reused ids) can no longer block or mislabel a paid learner.
+     */
+    private function partnerInstallmentsForAccess(): \Illuminate\Support\Collection
+    {
+        if (empty($this->partner_id) && empty($this->partner_learner_id)) {
+            return collect();
+        }
+
+        return \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
     }
 }

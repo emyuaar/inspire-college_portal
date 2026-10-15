@@ -318,12 +318,17 @@ class LearnerCourseController extends Controller
 
         $primaryFile = $uploadedFiles[0];
 
+        // [F-9] Keep both the `status` enum (portal) and `status_id` FK (CRM reads this) in sync.
+        $submittedStatusId = \Illuminate\Support\Facades\DB::connection('mysql_portal')
+            ->table('assignment_submission_statuses')->where('name', 'submitted')->value('id');
+
         // DB save submission header
         $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
             'file_name' => $primaryFile['name'],
-            'status_id' => 1, // Submitted
+            'status' => 'submitted', // enum('submitted','graded','resubmitted'); was 'status_id' => 1 (non-existent column) [F-9]
+            'status_id' => $submittedStatusId, // mirror for CRM grading/listing [F-9]
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $primaryFile['item_id'],
