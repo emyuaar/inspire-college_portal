@@ -4,7 +4,7 @@
         $totalInstallments = $installments->count();
         $paidInstallments = $installments->where('status', 'paid')->count();
         $pendingInstallments = $installments->where('status', '!=', 'paid')->where('due_date', '>=', now())->count();
-        $overdueInstallments = $installments->where('status', '!=', 'paid')->where('due_date', '<', now())->count();
+        $overdueInstallments = $installments->where('status', '!=', 'paid')->where('due_date', '<', now()->startOfDay())->count();
 
         $totalAmount = $installments->sum('installment_amount');
         $paidAmount = $installments->sum('paid_amount');

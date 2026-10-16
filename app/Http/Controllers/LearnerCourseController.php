@@ -300,10 +300,28 @@ class LearnerCourseController extends Controller
             
             $size = $file->getSize();
 
-            if ($size <= 3.5 * 1024 * 1024) {
-                $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
-            } else {
-                $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+            try {
+                if ($size <= 3.5 * 1024 * 1024) {
+                    $uploaded = $sp->uploadSmallFile($path4, $fileName, $file->getRealPath());
+                } else {
+                    $uploaded = $sp->uploadLargeFile($path4, $fileName, $file->getRealPath());
+                }
+            } catch (\Throwable $e) {
+                // SharePoint/Microsoft unavailable or misconfigured: nothing is saved, the learner can try again.
+                \Illuminate\Support\Facades\Log::error('Assignment upload to SharePoint failed', [
+                    'learner_id' => $user->id,
+                    'assignment_id' => $assignment->id,
+                    'file_name' => $originalName,
+                    'files_already_uploaded' => count($uploadedFiles),
+                    'error' => $e->getMessage(),
+                ]);
+                LearnerLogger::log('learner.assignment.upload.failed', 'upload')
+                    ->courseId($assignment->course_id)
+                    ->assignmentId($assignment->id)
+                    ->humanMessage('Assignment file could not be uploaded to SharePoint: ' . $originalName)
+                    ->save();
+
+                return back()->with('error', 'We could not upload your file just now, so your assignment has not been submitted. Please try again in a few minutes. If it keeps happening, contact learner support.');
             }
 
             $uploadedFiles[] = [

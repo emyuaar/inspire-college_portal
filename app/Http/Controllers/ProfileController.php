@@ -77,15 +77,9 @@ class ProfileController extends Controller
         $this->storeDocuments($request, $user->id, 'education', 'education_documents');
         $this->storeDocuments($request, $user->id, 'experience', 'experience_documents');
 
-        // mark completed + reset verified (admin will re-verify)
-        LearnerOnboardingStatus::updateOrCreate(
-            ['learner_id' => $user->id],
-            [
-                'personal_info_completed' => 1,
-                'personal_verified'       => 0,
-                'personal_completed_at'   => now(),
-            ]
-        );
+        // Mark completed. A section admissions already verified stays verified, so an active learner who updates
+        // their phone, address or documents keeps course access (resetting it locked them out until re-approval).
+        $this->markSectionCompleted($user->id, 'personal');
 
         // if previously denied, move to pending
         DB::connection('mysql_crm')
@@ -121,13 +115,7 @@ class ProfileController extends Controller
             'confirm_no_rpl' => ['accepted'],
         ]);
 
-        LearnerOnboardingStatus::updateOrCreate(
-            ['learner_id' => $user->id],
-            [
-                'rpl_info_completed' => 1,
-                'rpl_verified'       => 0,
-            ]
-        );
+        $this->markSectionCompleted($user->id, 'rpl');
 
         DB::connection('mysql_crm')
             ->table('enrolments')
@@ -162,13 +150,7 @@ class ProfileController extends Controller
             'confirm_no_disability' => ['accepted'],
         ]);
 
-        LearnerOnboardingStatus::updateOrCreate(
-            ['learner_id' => $user->id],
-            [
-                'disability_info_completed' => 1,
-                'disability_verified'       => 0,
-            ]
-        );
+        $this->markSectionCompleted($user->id, 'disability');
 
         DB::connection('mysql_crm')
             ->table('enrolments')
@@ -294,5 +276,29 @@ class ProfileController extends Controller
         return redirect()
             ->route('portal.settings.profile')
             ->with('success', 'Your account details have been updated successfully.');
+    }
+
+    /**
+     * Mark an onboarding section (personal / rpl / disability) as completed. It starts unverified for admissions to
+     * review; a section that was already verified keeps its verification and the change is logged instead.
+     */
+    private function markSectionCompleted(int $learnerId, string $section): void
+    {
+        $onboarding = LearnerOnboardingStatus::firstOrNew(['learner_id' => $learnerId]);
+        $infoColumn = $section === 'personal' ? 'personal_info_completed' : $section . '_info_completed';
+        $verifiedColumn = $section . '_verified';
+        $wasVerified = (bool) $onboarding->{$verifiedColumn};
+
+        $onboarding->{$infoColumn} = 1;
+        if (!$wasVerified) {
+            $onboarding->{$verifiedColumn} = 0;
+        }
+        $onboarding->save();
+
+        if ($wasVerified) {
+            \App\Services\LearnerLogger::log('learner.profile.updated_after_verification', 'activity')
+                ->humanMessage("Learner updated their {$section} information after admissions verified it.")
+                ->save();
+        }
     }
 }

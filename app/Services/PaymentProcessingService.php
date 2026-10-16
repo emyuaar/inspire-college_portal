@@ -107,8 +107,10 @@ class PaymentProcessingService
             'reference' => $session->id,
             'stripe_session_id' => $session->id,
             'stripe_payment_intent_id' => $intentId,
-            'email' => $session->customer_details->email ?? null,
-            'full_name' => $session->customer_details->name ?? null,
+            // payments.email is NOT NULL: fall back to the session / learner email if Stripe sent no customer details.
+            'email' => $session->customer_details->email ?? $session->customer_email ?? $partnerLearner?->email ?? '',
+            'full_name' => $session->customer_details->name
+                ?? trim(($partnerLearner?->first_name ?? '') . ' ' . ($partnerLearner?->last_name ?? $partnerLearner?->sur_name ?? '')),
             'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ];
