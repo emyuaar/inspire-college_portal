@@ -41,13 +41,13 @@
                         <div class="relative aspect-[16/10] overflow-hidden bg-slate-100">
                             @if($course->image)
                                 @php 
-                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : 'https://inspirecollege.co.uk/storage/' . $course->image;
+                                    $imgSrc = str_starts_with($course->image, 'http') ? $course->image : rtrim(config('app.website_url'), '/') . '/storage/' . ltrim($course->image, '/');
                                 @endphp
                                 <img src="{{ $imgSrc }}" 
                                      alt="{{ $course->title }}" 
                                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                             @else
-                                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+                                <div class="w-full h-full flex items-center justify-center bg-slate-100">
                                     <i class="fa-solid fa-building-columns text-4xl text-slate-200"></i>
                                 </div>
                             @endif
@@ -161,7 +161,7 @@
                                 <i class="fa-solid fa-plus-circle"></i>
                                 Enroll Now
                             </a>
-                            <a href="https://inspirecollege.co.uk/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
+                            <a href="{{ rtrim(config('app.website_url'), '/') }}/courses/{{ $course->category->slug ?? 'health-and-social-care-management' }}/{{ $course->slug }}" target="_blank"
                                class="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-200 transition-colors">
                                Details
                             </a>

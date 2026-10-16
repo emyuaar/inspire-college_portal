@@ -33,15 +33,6 @@ Route::get('/reset-password', function() {
     return redirect()->route('portal.login')->with('info', 'Please use the secure link sent to your email to set your password.');
 })->middleware('guest')->name('password.request');
 
-// DEBUG ROUTE
-Route::get('/debug-webhook', function () {
-    $statuses = \App\Models\Crm\EnrolmentStatus::all();
-    $output = "";
-    foreach ($statuses as $s) {
-        $output .= "ID: {$s->id} - Status: {$s->status} <br>";
-    }
-    return $output;
-});
 // Public Webhook (Stripe)
 Route::post('/stripe/webhook', [\App\Http\Controllers\Payment\StripeWebhookController::class, 'handle'])
     ->name('stripe.webhook');
@@ -264,33 +255,3 @@ Route::middleware('auth')->group(function () {
             ->name('portal.learner.assignment.grading.download');
     });
 });
-
-Route::get('/debug-pdf-test', function () {
-    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College_Crm/storage/app')), '/\\')
-        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
-
-    if (!file_exists($path)) {
-        abort(404, 'File not found on CRM path.');
-    }
-
-    return response()->file($path, [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="test.pdf"',
-        'Cache-Control' => 'no-store',
-    ]);
-});
-
-Route::get('/debug-pdf-secure-test', function () {
-    $path = rtrim((string) config('services.crm.storage_root', base_path('../Inspire-College_Crm/storage/app')), '/\\')
-        . DIRECTORY_SEPARATOR . 'public/lms/resources/1777451086_Care Standards Act 2000.pdf';
-
-    if (!file_exists($path)) {
-        abort(404, 'File not found on CRM path.');
-    }
-
-    return response()->file($path, [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="test.pdf"',
-        'Cache-Control' => 'no-store',
-    ]);
-})->middleware(['web', 'auth']);

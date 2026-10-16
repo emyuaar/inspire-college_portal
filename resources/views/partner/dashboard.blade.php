@@ -7,8 +7,8 @@
 <div class="space-y-6">
 
     {{-- 1. WELCOME HERO --}}
-    <x-ui.card class="bg-gradient-to-r from-ds-navy to-[#0F4C81] text-white border-none overflow-hidden relative">
-        <div class="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+    <x-ui.card class="!bg-ds-navy text-white border-none overflow-hidden relative">
+        
         <div class="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-ds-pink/20 rounded-full blur-2xl pointer-events-none"></div>
 
         <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

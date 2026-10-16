@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Public website (course pages and course images in website storage).
+    'website_url' => env('WEBSITE_URL', 'https://inspirecollegeoflearning.com'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

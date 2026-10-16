@@ -113,7 +113,7 @@
                     {{-- Identity --}}
                     <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Identity Documents <span class="text-slate-500 font-normal text-xs ml-1">(Multiple allowed)</span></label>
-                        <input type="file" name="identity_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#081C30] transition-all"/>
+                        <input type="file" name="identity_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#1E0B37] transition-all"/>
                         
                         @if($identityDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
@@ -130,7 +130,7 @@
                     {{-- Education --}}
                     <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Educational Documents <span class="text-slate-500 font-normal text-xs ml-1">(Multiple allowed)</span></label>
-                        <input type="file" name="education_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#081C30] transition-all"/>
+                        <input type="file" name="education_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#1E0B37] transition-all"/>
                         
                          @if($educationDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
@@ -147,7 +147,7 @@
                     {{-- Experience --}}
                      <div class="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300">
                         <label class="block text-sm font-bold text-slate-800 mb-2">Experience Documents <span class="text-slate-500 font-normal text-xs ml-1">(Optional)</span></label>
-                        <input type="file" name="experience_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#081C30] transition-all"/>
+                        <input type="file" name="experience_documents[]" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-ds-navy file:text-white hover:file:bg-[#1E0B37] transition-all"/>
                         
                          @if($experienceDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">

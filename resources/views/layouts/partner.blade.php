@@ -5,13 +5,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/brand/favicon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/brand/apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#29104A">
 
     <title>@yield('title', 'Partner Portal') - Inspire College</title>
 
     {{-- Fonts --}}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     {{-- Bootstrap 5 for Modals (Legacy Requirement maintained) --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -24,7 +25,7 @@
 
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: "ICOL Text", "Atkinson Hyperlegible Next", sans-serif;
         }
 
         [x-cloak] {

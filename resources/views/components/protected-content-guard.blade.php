@@ -30,7 +30,7 @@
         visibility: visible !important;
         font-size: 20px;
         padding: 40px;
-        color: #0E2C4A;
+        color: #29104A;
     }
 }
 
@@ -49,7 +49,7 @@
     font-size: 20px;
     font-weight: 700;
     letter-spacing: 0.3px;
-    color: rgba(14, 44, 74, 0.045);
+    color: rgba(41, 16, 74, 0.045);
     transform: rotate(-28deg);
     white-space: nowrap;
     user-select: none;
@@ -66,13 +66,13 @@
     right: 18px;
     bottom: 18px;
     z-index: 99999;
-    background: rgba(14, 44, 74, 0.90);
+    background: rgba(41, 16, 74, 0.90);
     color: #ffffff;
     font-size: 12px;
     padding: 8px 12px;
     border-radius: 999px;
     pointer-events: none;
-    box-shadow: 0 8px 24px rgba(14, 44, 74, 0.18);
+    box-shadow: 0 8px 24px rgba(41, 16, 74, 0.18);
 }
 
 /* 7. Blur on Tab Inactive */
@@ -88,7 +88,7 @@ body.protected-blur .protected-content {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(14, 44, 74, 0.92);
+    background: rgba(41, 16, 74, 0.92);
     color: white;
     padding: 16px 32px;
     border-radius: 8px;
