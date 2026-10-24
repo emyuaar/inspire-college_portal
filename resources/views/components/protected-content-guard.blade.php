@@ -30,7 +30,7 @@
         visibility: visible !important;
         font-size: 20px;
         padding: 40px;
-        color: #0E2C4A;
+        color: #29104A;
     }
 }
 

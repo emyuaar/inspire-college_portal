@@ -7,7 +7,7 @@
     <div class="space-y-6">
 
         {{-- HEADER CARD (Matching Learner Dashboard) --}}
-        <x-ui.card class="bg-gradient-to-r from-ds-navy to-[#0F4C81] text-white border-none overflow-hidden relative">
+        <x-ui.card class="bg-gradient-to-r from-ds-navy to-ds-navy text-white border-none overflow-hidden relative">
             <div
                 class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none">
             </div>

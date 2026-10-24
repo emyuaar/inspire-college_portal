@@ -4,13 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/brand/favicon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/brand/apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#29104A">
     <title>{{ ($flow ?? 'account_setup') === 'account_setup' ? 'Set up your account' : 'Reset your password' }} - Inspire College</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: "ICOL Text", "Atkinson Hyperlegible Next", sans-serif; }
         .ds-gradient {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #29104A 100%);
         }
         
         .ds-password-rules {
@@ -25,7 +28,7 @@
             margin-bottom: 10px;
             font-size: 13px;
             font-weight: 800;
-            color: #0E2C4A;
+            color: #29104A;
         }
 
         .ds-password-rules ul {

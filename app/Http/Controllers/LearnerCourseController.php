@@ -18,14 +18,21 @@ use App\Services\LearnerLogger;
 use App\Models\LearnerCourseUnitSelection;
 use App\Services\Lms\UnitSelectionService;
 use App\Services\Lms\CreditCompletionService;
+use App\Services\SecureLessonDocumentService;
 
 class LearnerCourseController extends Controller
 {
     protected $accessService;
+    protected SecureLessonDocumentService $secureDocumentService;
 
-    public function __construct(SharePointService $sp, \App\Services\EnrolmentAccessService $accessService)
+    public function __construct(
+        SharePointService $sp,
+        \App\Services\EnrolmentAccessService $accessService,
+        SecureLessonDocumentService $secureDocumentService
+    )
     {
         $this->accessService = $accessService;
+        $this->secureDocumentService = $secureDocumentService;
     }
 
     /**
@@ -311,12 +318,17 @@ class LearnerCourseController extends Controller
 
         $primaryFile = $uploadedFiles[0];
 
+        // [F-9] Keep both the `status` enum (portal) and `status_id` FK (CRM reads this) in sync.
+        $submittedStatusId = \Illuminate\Support\Facades\DB::connection('mysql_portal')
+            ->table('assignment_submission_statuses')->where('name', 'submitted')->value('id');
+
         // DB save submission header
         $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'learner_id' => $user->id,
             'file_name' => $primaryFile['name'],
-            'status_id' => 1, // Submitted
+            'status' => 'submitted', // enum('submitted','graded','resubmitted'); was 'status_id' => 1 (non-existent column) [F-9]
+            'status_id' => $submittedStatusId, // mirror for CRM grading/listing [F-9]
             'attempt_no' => $attemptNo + 1,
 
             'sharepoint_item_id' => $primaryFile['item_id'],
@@ -562,25 +574,26 @@ class LearnerCourseController extends Controller
         }
 
         if (!blank($lesson->file_path)) {
-            if (\Storage::disk('public')->exists($lesson->file_path)) {
-                return response()->download(\Storage::disk('public')->path($lesson->file_path), $lesson->title . '.' . pathinfo($lesson->file_path, PATHINFO_EXTENSION));
+            // LMS files exist in both the portal disk and the CRM public disk
+            // depending on when the lesson was created. Resolve both layouts
+            // through the same protected path resolver used by secure lessons.
+            // (Restores c196732, which merge 5d63f52 dropped.)
+            $fullPath = $this->secureDocumentService->resolvePath($lesson->file_path);
+
+            if ($fullPath) {
+                $downloadName = $lesson->file_name
+                    ?: $lesson->title . '.' . pathinfo($fullPath, PATHINFO_EXTENSION);
+
+                return response()->download($fullPath, $downloadName, [
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
             }
 
-            // 2. Try CRM storage root
-            $crmRoot = config('services.crm.storage_root');
-            if ($crmRoot) {
-                $crmRootReal = realpath($crmRoot);
-                if ($crmRootReal) {
-                    // LMS resources are on 'public' disk in CRM, so storage/app/public/{file_path}
-                    $relative = 'public' . DIRECTORY_SEPARATOR . ltrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $lesson->file_path), '\\/');
-                    $fullPath = $crmRootReal . DIRECTORY_SEPARATOR . $relative;
-
-                    $fullReal = realpath($fullPath);
-                    if ($fullReal && is_file($fullReal) && strpos($fullReal, $crmRootReal) === 0) {
-                        return response()->download($fullReal, $lesson->title . '.' . pathinfo($fullReal, PATHINFO_EXTENSION));
-                    }
-                }
-            }
+            \Log::warning('Lesson file not found on disk', [
+                'lesson_id' => $lesson->id,
+                'file_path' => $lesson->file_path,
+                'configured_crm_root' => config('services.crm.storage_root'),
+            ]);
         }
 
         return back()->with('error', 'File not available.');

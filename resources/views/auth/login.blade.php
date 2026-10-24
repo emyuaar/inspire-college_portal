@@ -4,16 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/brand/favicon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/brand/apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#29104A">
     <title>Login - Inspire College Portal</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {
-            --ds-navy: #0E2C4A;
-            --ds-pink: #2774AE;
+            --ds-navy: #29104A;
+            --ds-pink: #8624E1;
         }
 
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: "ICOL Text", "Atkinson Hyperlegible Next", sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -41,7 +45,7 @@
 
     {{-- LEFT COLUMN: BRANDING (Desktop Only) --}}
     <div
-        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#0E2C4A] relative overflow-hidden flex-col justify-between p-12 text-white">
+        class="hidden md:flex md:w-1/2 lg:w-[45%] bg-[#29104A] relative overflow-hidden flex-col justify-between p-12 text-white">
 
         {{-- Background Pattern/Effect --}}
         <div class="absolute inset-0 opacity-10"
@@ -49,17 +53,17 @@
         </div>
 
         {{-- Decorative Circle --}}
-        <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#2774AE] rounded-full blur-3xl opacity-20"></div>
-        <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-[#081C30] to-transparent"></div>
+        <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#8624E1] rounded-full blur-3xl opacity-20"></div>
+        <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-[#29104A] to-transparent"></div>
 
         {{-- Content --}}
         <div class="relative z-10">
-            <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp" alt="Inspire College"
+            <img src="{{ asset('images/icol-logo-light.png') }}" alt="Inspire College"
                 class="h-10 mb-8">
 
             <h1 class="text-4xl font-bold leading-tight mb-4">
                 Welcome to <br>
-                <span class="text-[#2774AE] text-pink-400">LMS Portal</span>
+                <span class="text-[#FFB800]">LMS Portal</span>
             </h1>
             <p class="text-slate-300 text-lg max-w-md leading-relaxed">
                 Access your courses, track your progress, and manage your assignments all in one place.
@@ -132,7 +136,7 @@
                             Password
                         </label>
                         {{-- Forgot Password Link --}}
-                        <a href="#" class="text-sm font-semibold text-[#0E2C4A] hover:text-[#2774AE] transition-colors">
+                        <a href="#" class="text-sm font-semibold text-[#29104A] hover:text-[#8624E1] transition-colors">
                             Forgot password?
                         </a>
                     </div>
@@ -143,14 +147,14 @@
 
                 <div class="flex items-center pt-1">
                     <input id="remember" name="remember" type="checkbox"
-                        class="ds-checkbox h-5 w-5 rounded border-slate-300 text-[#2774AE] focus:ring-[#2774AE]">
+                        class="ds-checkbox h-5 w-5 rounded border-slate-300 text-[#8624E1] focus:ring-[#8624E1]">
                     <label for="remember" class="ml-3 block text-sm text-slate-600">
                         Remember me for 30 days
                     </label>
                 </div>
 
                 <button type="submit"
-                    class="w-full flex items-center justify-center rounded-full bg-[#2774AE] py-3.5 px-4 text-sm font-bold text-white shadow-lg shadow-pink-900/10 hover:bg-[#1F5F8F] hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all duration-200">
+                    class="w-full flex items-center justify-center rounded-full bg-[#8624E1] py-3.5 px-4 text-sm font-bold text-white shadow-lg shadow-pink-900/10 hover:bg-[#6B17B8] hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all duration-200">
                     Sign in to Portal
                 </button>
             </form>

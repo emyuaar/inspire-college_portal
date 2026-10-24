@@ -2,12 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ICOL brand fonts (same files as the website): Atkinson Hyperlegible Next for text, Schibsted Grotesk for headings
+   and for digits (Atkinson's slashed zero reads oddly in grades and prices). */
+@font-face { font-family: "Schibsted Grotesk"; font-weight: 400 900; font-display: swap; src: url("/fonts/schibsted-grotesk-latin.woff2") format("woff2"); }
+@font-face { font-family: "ICOL Text"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("/fonts/atkinson-next-latin.woff2") format("woff2"); }
+@font-face { font-family: "ICOL Text"; font-style: italic; font-weight: 200 800; font-display: swap; src: url("/fonts/atkinson-next-latin-italic.woff2") format("woff2"); }
+@font-face { font-family: "ICOL Text"; font-weight: 200 800; font-display: swap; src: url("/fonts/schibsted-grotesk-latin.woff2") format("woff2"); unicode-range: U+0030-0039; }
+
 @layer base {
+    body { font-family: "ICOL Text", "Atkinson Hyperlegible Next", "Segoe UI", sans-serif; }
+    h1, h2, h3, h4 { font-family: "Schibsted Grotesk", "Arial Narrow", sans-serif; letter-spacing: -0.015em; }
     :root {
-        --ds-navy: #0E2C4A;
-        --ds-pink: #2774AE;
-        --ds-navy-rgb: 1, 52, 91;
-        --ds-pink-rgb: 169, 26, 106;
+        --ds-navy: #29104A;
+        --ds-pink: #8624E1;
+        --ds-navy-rgb: 41, 16, 74;
+        --ds-pink-rgb: 134, 36, 225;
     }
 
     /* Custom Prose Overrides for Lessons */

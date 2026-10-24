@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/brand/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/brand/favicon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/brand/apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#29104A">
     <title>@yield('title', 'Learner Portal') - Inspire College</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -14,12 +18,12 @@
            ========================= */
 
         :root {
-            --ds-navy: #0E2C4A;
-            --ds-pink: #2774AE;
+            --ds-navy: #29104A;
+            --ds-pink: #8624E1;
 
             --pwa-bg: #f1f5f9;
             --pwa-card: #ffffff;
-            --pwa-text: #0f172a;
+            --pwa-text: #29104A;
             --pwa-muted: #64748b;
 
             --pwa-border: rgba(2, 6, 23, .08);
@@ -108,7 +112,7 @@
             height: 40px;
             width: 40px;
             border-radius: 999px;
-            background: #0f172a;
+            background: #29104A;
             color: #fff;
             font-weight: 800;
             font-size: 12px;
@@ -215,7 +219,7 @@
             border-radius: 12px;
             border: 1px solid var(--pwa-border-2);
             background: rgba(2, 6, 23, .02);
-            color: #0f172a;
+            color: #29104A;
             font-weight: 800;
             transition: .15s ease;
         }

@@ -417,7 +417,13 @@ class Enrolment extends Model
         // ------------------------------------
         // 1. PARTNER LOGIC
         // ------------------------------------
-        $partnerInstallments = \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get();
+        // [F-12] Only evaluate partner installments for actual PARTNER enrolments. A direct
+        // website learner (no partner_id/partner_learner_id) must be judged on order_installments,
+        // otherwise any stray partner-installment row wrongly blocks a paid website learner.
+        $isPartnerEnrolment = !empty($this->partner_id) || !empty($this->partner_learner_id);
+        $partnerInstallments = $isPartnerEnrolment
+            ? \App\Models\Partner\PartnerLearnerInstallment::where('enrolment_id', $this->id)->get()
+            : collect();
         if ($partnerInstallments->isNotEmpty()) {
             $status->has_plan = true;
 

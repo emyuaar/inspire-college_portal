@@ -19,8 +19,8 @@
                     <!-- Header -->
                     <tr>
                         <td align="center"
-                            style="background-color: #0E2C4A; padding: 30px 20px; border-bottom: 4px solid #d63384;">
-                            <img src="https://inspirecollegeoflearning.com/storage/site/wWEQv28wcsGRQdL8Al3WkBzVkYY5mWr0jmC68Ddo.webp"
+                            style="background-color: #29104A; padding: 30px 20px; border-bottom: 4px solid #d63384;">
+                            <img src="{{ asset('images/icol-logo-light.png') }}"
                                 alt="Inspire College Logo" width="220"
                                 style="display: block; max-width: 220px; height: auto;">
                         </td>
@@ -29,7 +29,7 @@
                     <!-- Title Area -->
                     <tr>
                         <td style="padding: 35px 35px 20px 35px; text-align: center;">
-                            <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #0E2C4A;">Assignment
+                            <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #29104A;">Assignment
                                 Submitted Successfully</h1>
                             <p style="margin: 10px 0 0 0; font-size: 16px; color: #666666;">Your submission has been
                                 securely received by our system.</p>
@@ -57,7 +57,7 @@
                                                 <td style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #64748b;"
                                                     width="35%"><strong>Course:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #0f172a; font-weight: 500;">
+                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #29104A; font-weight: 500;">
                                                     {{ $courseName ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
@@ -65,7 +65,7 @@
                                                     style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #64748b;">
                                                     <strong>Assignment:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #0f172a; font-weight: 500;">
+                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #29104A; font-weight: 500;">
                                                     {{ $assignmentName ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
@@ -73,7 +73,7 @@
                                                     style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #64748b;">
                                                     <strong>File Submitted:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #0E2C4A; font-weight: 600; word-break: break-all;">
+                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #29104A; font-weight: 600; word-break: break-all;">
                                                     {{ $fileName ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
@@ -81,14 +81,14 @@
                                                     style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #64748b;">
                                                     <strong>Submitted On:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #0f172a; font-weight: 500;">
+                                                    style="padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; color: #29104A; font-weight: 500;">
                                                     {{ $submittedAt ?? 'N/A' }}</td>
                                             </tr>
                                             <tr>
                                                 <td style="padding: 8px 0; font-size: 15px; color: #64748b;">
                                                     <strong>Attempt:</strong></td>
                                                 <td
-                                                    style="padding: 8px 0; font-size: 15px; color: #0f172a; font-weight: 500;">
+                                                    style="padding: 8px 0; font-size: 15px; color: #29104A; font-weight: 500;">
                                                     {{ $attemptNumber ?? '1' }}</td>
                                             </tr>
                                         </table>
@@ -111,7 +111,7 @@
                     <!-- Footer -->
                     <tr>
                         <td
-                            style="background-color: #0E2C4A; padding: 25px 30px; text-align: center; border-top: 1px solid #104b77;">
+                            style="background-color: #29104A; padding: 25px 30px; text-align: center; border-top: 1px solid #104b77;">
                             <p
                                 style="margin: 0 0 10px 0; font-size: 16px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px;">
                                 Inspire College</p>
