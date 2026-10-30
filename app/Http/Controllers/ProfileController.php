@@ -203,8 +203,9 @@ class ProfileController extends Controller
             $ext = strtolower($file->getClientOriginalExtension());
             $safeName = Str::uuid()->toString() . '.' . $ext;
 
-            // store in public disk (storage/app/public/...)
-            $path = $file->storeAs($dir, $safeName, 'public');
+            // Private disk (storage/app/private/...): ID documents never get a public URL. The learner opens their own
+            // through portal.profile.documents.show, staff through the CRM.
+            $path = $file->storeAs($dir, $safeName, 'local');
 
             // DB save (update model/table fields as per your schema)
             \App\Models\Crm\LearnerDocument::create([
@@ -216,6 +217,35 @@ class ProfileController extends Controller
                 'size'       => $file->getSize(),
             ]);
         }
+    }
+
+    /**
+     * One of the logged-in learner's own documents. Read from the private disk, or the old public folder for files
+     * uploaded before documents were made private (until they are moved).
+     */
+    public function showDocument(int $document)
+    {
+        $doc = \App\Models\Crm\LearnerDocument::where('learner_id', Auth::id())->whereNull('deleted_at')->findOrFail($document);
+        $path = ltrim(str_replace('\\', '/', (string) $doc->file_path), '/');
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8);
+        }
+        abort_if($path === '' || str_contains($path, '..'), 404);
+
+        foreach (['local', 'public'] as $disk) {
+            if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                $response = response()->file(\Illuminate\Support\Facades\Storage::disk($disk)->path($path), [
+                    'Content-Disposition' => 'inline; filename="' . str_replace('"', '', $doc->title ?: basename($path)) . '"',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+                $response->setPrivate(); // file responses default to "public": never keep an ID document in a shared cache
+                $response->headers->addCacheControlDirective('no-store');
+
+                return $response;
+            }
+        }
+
+        abort(404);
     }
 
     // ACCOUNT SETTINGS (simple profile + password)

@@ -176,6 +176,9 @@ Route::middleware('auth')->group(function () {
             ->name('portal.profile.personal');
         Route::post('/profile/personal', [App\Http\Controllers\ProfileController::class, 'updatePersonal'])
             ->name('portal.profile.personal.update');
+        // The learner's own verification documents (private storage, never a public URL)
+        Route::get('/profile/documents/{document}', [App\Http\Controllers\ProfileController::class, 'showDocument'])
+            ->whereNumber('document')->name('portal.profile.documents.show');
 
         // RPL Information
         Route::get('/profile/rpl', [App\Http\Controllers\ProfileController::class, 'editRpl'])

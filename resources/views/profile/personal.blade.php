@@ -123,7 +123,7 @@
                         @if($identityDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($identityDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-navy transition-colors">
+                                    <a href="{{ route('portal.profile.documents.show', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-navy transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>
@@ -140,7 +140,7 @@
                          @if($educationDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($educationDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-pink transition-colors">
+                                    <a href="{{ route('portal.profile.documents.show', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-ds-pink transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>
@@ -157,7 +157,7 @@
                          @if($experienceDocs->count())
                             <div class="mt-3 flex flex-wrap gap-2">
                                 @foreach($experienceDocs as $doc)
-                                    <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-slate-500 transition-colors">
+                                    <a href="{{ route('portal.profile.documents.show', $doc->id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-bold text-ds-navy hover:bg-slate-50 hover:border-slate-500 transition-colors">
                                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                         {{ $doc->title ?? basename($doc->file_path) }}
                                     </a>

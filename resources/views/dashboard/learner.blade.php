@@ -103,6 +103,18 @@
                 </dl>
             </x-ui.card>
 
+            {{-- Sent back by admissions: their reason, until the learner resubmits --}}
+            @if(!empty($onboarding?->denied_reason) && !$onboardingCompleted)
+                <x-ui.alert variant="warning" title="Admissions asked you to update your details">
+                    <p class="whitespace-pre-line">{{ $onboarding->denied_reason }}</p>
+                    <p class="mt-2 text-sm">Please update Personal Information, RPL and Disability below and save each one. We will check them again.</p>
+                </x-ui.alert>
+            @elseif($onboardingCompleted && !auth()->user()->isVerified())
+                <x-ui.alert variant="info" title="Thank you: your details are with admissions">
+                    We are checking your details and documents. We will email you as soon as your course is open.
+                </x-ui.alert>
+            @endif
+
             {{-- REQUIREMENTS --}}
             <x-ui.card title="Requirements" subtitle="Complete to start learning">
                 <div class="space-y-4">
