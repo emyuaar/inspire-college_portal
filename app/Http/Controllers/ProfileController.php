@@ -235,7 +235,7 @@ class ProfileController extends Controller
         foreach (['local', 'public'] as $disk) {
             if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
                 $response = response()->file(\Illuminate\Support\Facades\Storage::disk($disk)->path($path), [
-                    'Content-Disposition' => 'inline; filename="' . str_replace('"', '', $doc->title ?: basename($path)) . '"',
+                    'Content-Disposition' => 'inline; filename="' . $this->downloadName($doc->title, $path) . '"',
                     'X-Content-Type-Options' => 'nosniff',
                 ]);
                 $response->setPrivate(); // file responses default to "public": never keep an ID document in a shared cache
@@ -246,6 +246,15 @@ class ProfileController extends Controller
         }
 
         abort(404);
+    }
+
+    /** The document's title with the stored file's type added when it has none, so a saved file still opens. */
+    private function downloadName(?string $title, string $path): string
+    {
+        $name = trim(str_replace(['"', '/', '\\'], '', (string) $title)) ?: basename($path);
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return $ext !== '' && !str_ends_with(strtolower($name), '.' . $ext) ? $name . '.' . $ext : $name;
     }
 
     // ACCOUNT SETTINGS (simple profile + password)
