@@ -213,6 +213,11 @@ class LearnerCourseController extends Controller
         $request->validate([
             'submission_files' => 'required|array|min:1',
             'submission_files.*' => 'file|max:20480',
+        ], [
+            'submission_files.required' => 'Choose at least one file before pressing Submit Assignment.',
+            'submission_files.*.file' => 'A file could not be uploaded. It may be too large: keep each file under 20 MB.',
+            'submission_files.*.uploaded' => 'A file could not be uploaded. It may be too large: keep each file under 20 MB.',
+            'submission_files.*.max' => 'A file is larger than 20 MB. Please reduce it (for example save images at lower quality) and try again.',
         ]);
 
         $files = $request->file('submission_files');
@@ -249,11 +254,27 @@ class LearnerCourseController extends Controller
         $modFolder = $sp->safeName($moduleTitle);
         $assFolder = $sp->safeName($assignment->title);
 
-        // create folder structure
-        $path1 = $sp->ensureFolder('', $courseFolder);
-        $path2 = $sp->ensureFolder($path1, $dsFolder);
-        $path3 = $sp->ensureFolder($path2, $modFolder);
-        $path4 = $sp->ensureFolder($path3, $assFolder);
+        // create folder structure (SharePoint: if Microsoft can't be reached, the learner gets the same "try again"
+        // message as a failed upload below, not a Server Error page)
+        try {
+            $path1 = $sp->ensureFolder('', $courseFolder);
+            $path2 = $sp->ensureFolder($path1, $dsFolder);
+            $path3 = $sp->ensureFolder($path2, $modFolder);
+            $path4 = $sp->ensureFolder($path3, $assFolder);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Assignment upload: SharePoint folders could not be created', [
+                'learner_id' => $user->id,
+                'assignment_id' => $assignment->id,
+                'error' => $e->getMessage(),
+            ]);
+            LearnerLogger::log('learner.assignment.upload.failed', 'upload')
+                ->courseId($assignment->course_id)
+                ->assignmentId($assignment->id)
+                ->humanMessage('Assignment folder could not be created on SharePoint: ' . $e->getMessage())
+                ->save();
+
+            return back()->with('error', 'We could not upload your file just now, so your assignment has not been submitted. Please try again in a few minutes. If it keeps happening, contact learner support.');
+        }
 
         // Calculate Attempt No
         $attemptNo = (int) (AssignmentSubmission::where('assignment_id', $assignment->id)

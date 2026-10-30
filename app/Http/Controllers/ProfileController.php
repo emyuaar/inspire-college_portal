@@ -56,7 +56,7 @@ class ProfileController extends Controller
             'identity_documents.*'   => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'education_documents.*'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'experience_documents.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-        ]);
+        ], $this->documentMessages());
 
         $detail = UserDetail::firstOrNew(['learner_id' => $user->id]);
         $detail->fill($request->only([
@@ -161,6 +161,20 @@ class ProfileController extends Controller
         return redirect()
             ->route('portal.learner.dashboard')
             ->with('success', 'Disability information saved.');
+    }
+
+    /** Plain-English messages for the document upload rules (shown on the learner layout). */
+    private function documentMessages(): array
+    {
+        $messages = [];
+        foreach (['identity' => 'identity document', 'education' => 'educational document', 'experience' => 'experience document'] as $field => $label) {
+            $messages["{$field}_documents.*.file"] = "One {$label} could not be uploaded. It may be too large: keep each file under 5 MB.";
+            $messages["{$field}_documents.*.uploaded"] = "One {$label} could not be uploaded. It may be too large: keep each file under 5 MB.";
+            $messages["{$field}_documents.*.mimes"] = "One {$label} is not a PDF, JPG or PNG. iPhone photos: in Settings > Camera > Formats choose \"Most Compatible\", or take a screenshot of the photo and upload that.";
+            $messages["{$field}_documents.*.max"] = "One {$label} is larger than 5 MB. Please upload a smaller copy (for example a screenshot or a scan at lower quality).";
+        }
+
+        return $messages;
     }
 
     private function storeDocuments(Request $request, int $learnerId, string $category, string $inputName): void

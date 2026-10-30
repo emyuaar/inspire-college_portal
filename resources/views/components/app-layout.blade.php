@@ -42,7 +42,19 @@
                         {{ session('error') }}
                     </x-ui.alert>
                 @endif
-                
+
+                {{-- Form checks that failed (e.g. a file too big or the wrong type): without this the page just came
+                     back with nothing saved and no reason. --}}
+                @if($errors->any())
+                    <x-ui.alert variant="error" dismissible title="Nothing was saved">
+                        <ul class="list-disc pl-5 space-y-1">
+                            @foreach(collect($errors->all())->unique() as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
+                    </x-ui.alert>
+                @endif
+
                 {{ $slot }}
             </div>
         </main>
