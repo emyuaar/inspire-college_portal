@@ -415,6 +415,11 @@
                                                             $badgeVariant = 'success';
                                                             $badgeText = 'Submitted';
                                                             $allowUpload = false;
+                                                            // Wrong file uploaded: staff allowed one replacement (php artisan assignments:allow-reupload).
+                                                            if ($isActiveReset && $attemptCount < $maxAllowedAttempts) {
+                                                                $bannerType = 'reattempt_allowed';
+                                                                $allowUpload = true;
+                                                            }
                                                         } else {
                                                             // No submission
                                                             $badgeVariant = 'neutral';
