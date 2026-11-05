@@ -48,7 +48,7 @@ class AllowAssignmentReupload extends Command
             return self::FAILURE;
         }
         $graded = \Illuminate\Support\Facades\DB::connection('mysql_crm')->table('grade_sheet_cells')
-            ->where('last_submission_portal_id', $latest->id)->where(fn ($q) => $q->whereNotNull('grade_text')->where('grade_text', '!=', ''))->exists();
+            ->where('portal_assignment_id', $assignment->id)->where('last_submission_portal_id', $latest->id)->where(fn ($q) => $q->whereNotNull('grade_text')->where('grade_text', '!=', ''))->exists();
         if ($graded) {
             $this->error('The latest upload has already been graded: use the assessor\'s Refer / Allow resubmit in the CRM instead.');
 
