@@ -40,6 +40,7 @@
                             paid: {!! json_encode((float) ($inst->paid_amount ?? 0)) !!},
                             status: {!! json_encode(strtolower($inst->status ?? 'pending')) !!},
                             receipt_path: {!! json_encode($inst->receipt_path) !!},
+                            receipt_url: {!! json_encode($inst->receipt_path ? route('partner.installments.receipt', $inst->id) : null) !!},
                             rejection_reason: {!! json_encode($inst->rejection_reason) !!},
                             checkout_url: {!! json_encode(route("partner.installments.checkout", $inst->id)) !!}
                         },
@@ -294,7 +295,7 @@
                                     <div x-show="row.status === 'awaiting_approval'" class="flex flex-col items-end gap-1">
                                          <span class="text-[10px] font-bold text-blue-600 uppercase tracking-tight bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">Awaiting Approval</span>
                                          <template x-if="row.receipt_path">
-                                             <a :href="'/storage/' + row.receipt_path" target="_blank" class="text-[10px] text-blue-500 underline hover:text-blue-700 font-medium transition-colors">View Submitted Proof</a>
+                                             <a :href="row.receipt_url" target="_blank" class="text-[10px] text-blue-500 underline hover:text-blue-700 font-medium transition-colors">View Submitted Proof</a>
                                          </template>
                                     </div>
 

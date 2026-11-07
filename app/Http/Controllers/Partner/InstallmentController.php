@@ -225,6 +225,30 @@ class InstallmentController extends Controller
     /**
      * Record a manual payment for an installment.
      */
+    /** A payment proof the partner uploaded, for that partner only. New proofs are on the private disk, older ones on public. */
+    public function receipt($id)
+    {
+        $installment = PartnerLearnerInstallment::findOrFail($id);
+        abort_unless((int) $installment->partner_id === (int) Auth::id(), 403);
+        $path = ltrim(str_replace(['\\', '..'], ['/', ''], (string) $installment->receipt_path), '/');
+        abort_if($path === '', 404);
+
+        foreach (['local', 'public'] as $disk) {
+            if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                $response = response()->file(\Illuminate\Support\Facades\Storage::disk($disk)->path($path), [
+                    'Content-Disposition' => 'inline; filename="payment-proof-' . $installment->id . '.' . pathinfo($path, PATHINFO_EXTENSION) . '"',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+                $response->setPrivate();
+                $response->headers->addCacheControlDirective('no-store');
+
+                return $response;
+            }
+        }
+
+        abort(404, 'This payment proof file was not found. Please upload it again or contact admissions.');
+    }
+
     public function storePayment(Request $request, $id, PaymentProcessingService $paymentService)
     {
         $partner = Auth::user();
@@ -253,8 +277,8 @@ class InstallmentController extends Controller
             // Handle Receipt Upload
             $receiptPath = $installment->receipt_path; // Keep existing if not updated? Or append? Assuming replace.
             if ($request->hasFile('receipt')) {
-                // Store in private or public? Ideally private, but for simplicity public/partners
-                $path = $request->file('receipt')->store('partner_receipts', 'public');
+                // Private disk: opened through partner.installments.receipt (portal) or the CRM, never a public URL.
+                $path = $request->file('receipt')->store('partner_receipts', 'local');
                 $receiptPath = $path;
             }
 

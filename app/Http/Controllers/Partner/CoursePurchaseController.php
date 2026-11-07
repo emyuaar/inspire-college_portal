@@ -668,7 +668,8 @@ class CoursePurchaseController extends Controller
         $order = Order::where('enrolment_id', $enrolment->id)->latest()->firstOrFail();
 
         // Upload Proof
-        $path = $request->file('payment_proof')->store('proofs', 'public');
+        // Payment proofs are bank documents: private disk, opened through partner.installments.receipt (portal) or the CRM.
+        $path = $request->file('payment_proof')->store('proofs', 'local');
 
         DB::connection('mysql_crm')->beginTransaction();
 
@@ -725,12 +726,12 @@ class CoursePurchaseController extends Controller
             }
         } catch (DomainException $e) {
             DB::connection('mysql_crm')->rollBack();
-            Storage::disk('public')->delete($path);
+            Storage::disk('local')->delete($path);
 
             return redirect()->back()->with('error', $e->getMessage());
         } catch (\Throwable $e) {
             DB::connection('mysql_crm')->rollBack();
-            Storage::disk('public')->delete($path);
+            Storage::disk('local')->delete($path);
             Log::error('PARTNER_DEPOSIT_PROOF_SUBMISSION_FAILED', [
                 'enrolment_id' => $enrolment->id,
                 'error' => $e->getMessage(),

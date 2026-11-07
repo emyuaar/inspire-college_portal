@@ -228,7 +228,7 @@
                             </td>
                             <td class="px-8 py-5 text-center">
                                 @if($inst->receipt_path)
-                                    <a href="{{ asset('storage/' . $inst->receipt_path) }}" target="_blank" 
+                                    <a href="{{ route('partner.installments.receipt', $inst->id) }}" target="_blank" 
                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all shadow-sm" 
                                        title="View Proof">
                                         <i class="fa-solid fa-file-invoice text-sm"></i>

@@ -105,6 +105,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/installments/{enrolment}/details', [\App\Http\Controllers\Partner\InstallmentController::class, 'show'])
             ->name('installments.show');
 
+        Route::get('/installments/{installment}/receipt', [\App\Http\Controllers\Partner\InstallmentController::class, 'receipt'])
+            ->whereNumber('installment')->name('installments.receipt');
+
         Route::get('/installments/{installment}/checkout', [\App\Http\Controllers\Partner\InstallmentController::class, 'createCheckoutSession'])
             ->name('installments.checkout');
 
