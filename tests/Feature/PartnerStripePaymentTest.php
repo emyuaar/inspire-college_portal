@@ -42,10 +42,10 @@ class PartnerStripePaymentTest extends TestCase
         $service = $this->serviceWithActivationOnce();
 
         $first = $service->processOrderPayment(
-            $this->session(), $this->metadata()
+            $this->stripeSession(), $this->metadata()
         );
         $second = $service->processOrderPayment(
-            $this->session(), $this->metadata()
+            $this->stripeSession(), $this->metadata()
         );
 
         $this->assertTrue($first['newly_processed']);
@@ -80,7 +80,7 @@ class PartnerStripePaymentTest extends TestCase
             ->update(['learner_id' => 10, 'partner_learner_id' => null]);
 
         $result = $this->serviceWithActivationOnce()->processOrderPayment(
-            $this->session(), $this->metadata([
+            $this->stripeSession(), $this->metadata([
                 'learner_id' => 10, 'partner_learner_id' => null,
             ])
         );
@@ -96,7 +96,7 @@ class PartnerStripePaymentTest extends TestCase
         $this->expectException(\DomainException::class);
 
         (new PaymentProcessingService($activation))->processOrderPayment(
-            $this->session(), $this->metadata(['partner_id' => 999])
+            $this->stripeSession(), $this->metadata(['partner_id' => 999])
         );
     }
 
@@ -107,7 +107,7 @@ class PartnerStripePaymentTest extends TestCase
         $activation->shouldNotReceive('activate');
         try {
             (new PaymentProcessingService($activation))->processOrderPayment(
-                $this->session(['amount_total' => 54_999]), $this->metadata()
+                $this->stripeSession(['amount_total' => 54_999]), $this->metadata()
             );
             $this->fail('Expected amount mismatch.');
         } catch (\DomainException) {
@@ -122,7 +122,7 @@ class PartnerStripePaymentTest extends TestCase
         $activation->shouldNotReceive('activate');
         try {
             (new PaymentProcessingService($activation))->processOrderPayment(
-                $this->session(['currency' => 'usd']), $this->metadata()
+                $this->stripeSession(['currency' => 'usd']), $this->metadata()
             );
             $this->fail('Expected currency mismatch.');
         } catch (\DomainException) {
@@ -136,7 +136,7 @@ class PartnerStripePaymentTest extends TestCase
         $stripe = Mockery::mock(StripeSessionService::class);
         $stripe->shouldReceive('retrieve')->once()
             ->with('cs_test_partner')->andReturn(
-                $this->session(['metadata' => (object) $this->metadata()])
+                $this->stripeSession(['metadata' => (object) $this->metadata()])
             );
         $this->app->instance(StripeSessionService::class, $stripe);
         $this->app->instance(
@@ -156,6 +156,8 @@ class PartnerStripePaymentTest extends TestCase
             ['id' => 2257, 'org_id' => 2257, 'email_address' => 'partner@example.test'],
             ['id' => 10, 'org_id' => 2257, 'email_address' => 'learner@example.test'],
         ]);
+        // Payment is only offered for learners admissions approved (checked before "already paid").
+        DB::connection('mysql_portal')->table('users')->where('id', 10)->update(['crm_approved' => 1]);
         DB::connection('mysql_crm')->table('orders')->where('id', 79)
             ->update(['learner_id' => 10, 'partner_learner_id' => null, 'status_id' => 1]);
         DB::connection('mysql_crm')->table('enrolments')->where('id', 77)
@@ -197,7 +199,7 @@ class PartnerStripePaymentTest extends TestCase
         ]);
         $request->setLaravelSession($this->app['session.store']);
 
-        $response = (new CoursePurchaseController())->submitProof($request, 77);
+        $response = app(CoursePurchaseController::class)->submitProof($request, 77);
 
         $this->assertSame(302, $response->getStatusCode());
         $this->assertDatabaseHas('partner_learner_installments', [
@@ -239,7 +241,7 @@ class PartnerStripePaymentTest extends TestCase
         ]);
     }
 
-    private function session(array $overrides = []): object
+    private function stripeSession(array $overrides = []): object
     {
         return (object) array_merge([
             'id' => 'cs_test_partner', 'payment_status' => 'paid',
