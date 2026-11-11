@@ -9,7 +9,7 @@ class StripeSessionService
 {
     public function retrieve(string $sessionId): object
     {
-        Stripe::setApiKey((string) env('STRIPE_SECRET'));
+        Stripe::setApiKey((string) config('services.stripe.secret'));
         return Session::retrieve([
             'id' => $sessionId,
             'expand' => ['payment_intent'],
@@ -18,7 +18,7 @@ class StripeSessionService
 
     public function findByPaymentIntent(string $intentId): ?object
     {
-        Stripe::setApiKey((string) env('STRIPE_SECRET'));
+        Stripe::setApiKey((string) config('services.stripe.secret'));
         $sessions = Session::all([
             'payment_intent' => $intentId,
             'limit' => 1,

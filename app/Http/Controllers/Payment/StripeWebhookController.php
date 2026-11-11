@@ -22,7 +22,7 @@ class StripeWebhookController extends Controller
     {
         $payload = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
-        $endpointSecret = env('STRIPE_WEBHOOK_SECRET');
+        $endpointSecret = config('services.stripe.webhook_secret');
 
         try {
             $event = Webhook::constructEvent($payload, $sigHeader, $endpointSecret);

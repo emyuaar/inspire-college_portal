@@ -104,7 +104,7 @@ class CheckoutController extends Controller
         // The "Deposit" is stored in the Order itself.
 
         // 5. Create Stripe Session
-        Stripe::setApiKey(env('STRIPE_SECRET'));
+        Stripe::setApiKey(config('services.stripe.secret'));
 
         // STRIPE CUSTOMER LOGIC
         $stripeCustomerId = $isPending ? null : $learner->stripe_customer_id;

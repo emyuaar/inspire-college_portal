@@ -85,7 +85,7 @@ class PartnerLearnerController extends Controller
         // Check for synchronous payment confirmation (Fix for localhost/missed webhooks)
         if ($request->has('payment') && $request->payment === 'success' && $request->filled('session_id')) {
             try {
-                Stripe::setApiKey(env('STRIPE_SECRET'));
+                Stripe::setApiKey(config('services.stripe.secret'));
                 $session = StripeSession::retrieve($request->session_id);
 
                 if ($session->payment_status === 'paid') {

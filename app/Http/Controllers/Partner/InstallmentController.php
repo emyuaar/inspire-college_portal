@@ -136,7 +136,7 @@ class InstallmentController extends Controller
 
         $description = "DS-P{$enrolment->id} ".($installment->installment_no == 0 ? 'Deposit' : "{$installment->installment_no}th Installment")." Partner Payment for {$learnerName}";
 
-        Stripe::setApiKey(env('STRIPE_SECRET'));
+        Stripe::setApiKey(config('services.stripe.secret'));
 
         // Ensure Stripe Customer for PARTNER
         if (empty($partner->stripe_customer_id)) {

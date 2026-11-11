@@ -52,4 +52,10 @@ return [
     'crm' => [
         'storage_root' => env('CRM_STORAGE_ROOT', base_path('../Inspire-College_Crm/storage/app')),
     ],
+    // Read through config, not env(), so card payments keep working when the config is cached (11 Nov 2026).
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
 ];
