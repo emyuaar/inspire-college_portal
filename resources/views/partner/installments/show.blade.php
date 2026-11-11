@@ -257,8 +257,9 @@
                                     </div>
                                 @endif
                                 
-                                @if($inst->status === 'rejected' && $inst->rejection_reason)
-                                    <div class="mt-1 text-[9px] font-bold text-rose-500 italic">Reason: {{ $inst->rejection_reason }}</div>
+                                {{-- A rejected proof sets the instalment back to pending/partial and keeps the reason (11 Nov 2026). --}}
+                                @if($inst->rejection_reason && in_array($inst->status, ['rejected', 'pending', 'partial', 'overdue'], true))
+                                    <div class="mt-2 max-w-[220px] rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-semibold leading-snug text-rose-700">Last proof not accepted: {{ $inst->rejection_reason }}. Please upload a new proof.</div>
                                 @endif
                             </td>
                         </tr>

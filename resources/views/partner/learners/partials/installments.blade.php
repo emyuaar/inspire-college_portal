@@ -259,10 +259,10 @@
                                             x-text="row.label"></span>
                                         <span class="text-slate-700 font-medium leading-snug line-clamp-2"
                                             :title="row.course_title" x-text="row.course_title"></span>
-                                        <template x-if="row.status === 'rejected' && row.rejection_reason">
+                                        <template x-if="row.rejection_reason && ['rejected', 'pending', 'partial', 'overdue'].includes(row.status)">
                                             <div class="mt-1 flex items-start gap-1.5 p-1.5 bg-red-50 border border-red-100 rounded text-[10px] text-red-600 italic">
                                                 <svg class="w-3 h-3 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <span x-text="'Rejected: ' + row.rejection_reason"></span>
+                                                <span x-text="'Last proof not accepted: ' + row.rejection_reason + '. Please upload a new proof.'"></span>
                                             </div>
                                         </template>
                                     </div>
